@@ -133,3 +133,26 @@ export interface PlanDiffResult {
   before: MenuItem;
   after: MenuItem;
 }
+
+// 히스토리 식단 데이터
+export interface HistoricalMenuItem {
+  name: string;
+  process?: number;
+  code?: string;
+  price: number;
+  cost: number;
+}
+
+export interface HistoricalTargetPlan {
+  targetType: TargetType;
+  items: HistoricalMenuItem[];
+  totalPrice: number;
+  totalCost: number;
+  itemCount: number;
+}
+
+export interface HistoricalMealPlan {
+  date: string; // YYYY-MM-DD
+  cycleType: CycleType; // "화수목" | "금토월"
+  targets: HistoricalTargetPlan[];
+}

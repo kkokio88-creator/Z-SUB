@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Utensils, Users, Settings, LogOut, Leaf, Database, FileText } from 'lucide-react';
+import { LayoutDashboard, Utensils, Users, Settings, LogOut, Leaf, Database, FileText, History } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface LayoutProps {
@@ -68,6 +68,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
             active={activeTab === 'subscribers'}
             onClick={() => onTabChange('subscribers')}
           />
+          <SidebarItem
+            icon={History}
+            label="식단 히스토리"
+            active={activeTab === 'meal-history'}
+            onClick={() => onTabChange('meal-history')}
+          />
 
           <div className="mt-8 px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">시스템</div>
           <SidebarItem
@@ -123,6 +129,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               {activeTab === 'subscribers' && (
                 <>
                   <Users className="w-6 h-6 text-gray-400" /> 구독자 CRM
+                </>
+              )}
+              {activeTab === 'meal-history' && (
+                <>
+                  <History className="w-6 h-6 text-gray-400" /> 식단 히스토리
                 </>
               )}
               {activeTab === 'settings' && (

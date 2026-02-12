@@ -28,6 +28,9 @@ export default defineConfig({
           if (id.includes('/data/realMenuDB')) {
             return 'menu-data';
           }
+          if (id.includes('/data/historicalMealPlans')) {
+            return 'history-data';
+          }
           if (
             id.includes('node_modules/html2pdf') ||
             id.includes('node_modules/html2canvas') ||
