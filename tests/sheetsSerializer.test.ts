@@ -81,6 +81,28 @@ describe('menuItemToRow / rowToMenuItem', () => {
     const restored = rowToMenuItem(row);
     expect(restored.tastes).toEqual([TasteProfile.SPICY, TasteProfile.SWEET]);
   });
+
+  it('imageUrl이 있으면 보존', () => {
+    const itemWithImage = { ...sampleItem, imageUrl: 'https://example.com/img.jpg' };
+    const row = menuItemToRow(itemWithImage);
+    const restored = rowToMenuItem(row);
+    expect(restored.imageUrl).toBe('https://example.com/img.jpg');
+  });
+
+  it('tags가 빈 배열이면 빈 문자열로 직렬화', () => {
+    const itemNoTags = { ...sampleItem, tags: [] as string[] };
+    const row = menuItemToRow(itemNoTags);
+    expect(row[8]).toBe('');
+    const restored = rowToMenuItem(row);
+    expect(restored.tags).toEqual([]);
+  });
+
+  it('isUnused true 처리', () => {
+    const unusedItem = { ...sampleItem, isUnused: true };
+    const row = menuItemToRow(unusedItem);
+    const restored = rowToMenuItem(row);
+    expect(restored.isUnused).toBe(true);
+  });
 });
 
 describe('configToRow / rowToConfig', () => {
@@ -126,6 +148,30 @@ describe('configToRow / rowToConfig', () => {
     const row = configToRow(sampleConfig);
     const restored = rowToConfig(row);
     expect(restored.parentTarget).toBeFalsy();
+  });
+
+  it('bannedTags/requiredTags 빈 배열 처리', () => {
+    const emptyTagsConfig = { ...sampleConfig, bannedTags: [] as string[], requiredTags: [] as string[] };
+    const row = configToRow(emptyTagsConfig);
+    const restored = rowToConfig(row);
+    expect(restored.bannedTags).toEqual([]);
+    expect(restored.requiredTags).toEqual([]);
+  });
+
+  it('composition 값이 0인 카테고리 처리', () => {
+    const zeroComp = {
+      ...sampleConfig,
+      composition: {
+        [MenuCategory.SOUP]: 0,
+        [MenuCategory.MAIN]: 2,
+        [MenuCategory.SIDE]: 0,
+      },
+    };
+    const row = configToRow(zeroComp);
+    const restored = rowToConfig(row);
+    expect(restored.composition[MenuCategory.SOUP]).toBe(0);
+    expect(restored.composition[MenuCategory.MAIN]).toBe(2);
+    expect(restored.composition[MenuCategory.SIDE]).toBe(0);
   });
 });
 

@@ -1,3 +1,4 @@
+import html2pdf from 'html2pdf.js';
 import type { MonthlyMealPlan, MenuItem } from '../types';
 
 export function printMealPlan(plan: MonthlyMealPlan): void {
@@ -65,6 +66,30 @@ function generatePrintHTML(plan: MonthlyMealPlan): string {
   </div>
 </body>
 </html>`;
+}
+
+export function exportToPDF(plan: MonthlyMealPlan): void {
+  const container = document.createElement('div');
+  container.innerHTML = generatePrintHTML(plan);
+  // body 내용만 추출
+  const bodyMatch = container.innerHTML.match(/<body[^>]*>([\s\S]*)<\/body>/);
+  const bodyContent = bodyMatch ? bodyMatch[1] : container.innerHTML;
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = bodyContent;
+  wrapper.style.fontFamily = "'Noto Sans KR', sans-serif";
+  wrapper.style.padding = '20px';
+  wrapper.style.color = '#333';
+
+  const opt = {
+    margin: [10, 10, 10, 10] as [number, number, number, number],
+    filename: `${plan.monthLabel}_${plan.target}_식단표.pdf`,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { orientation: 'portrait' as const, unit: 'mm' as const, format: 'a4' as const } as const,
+  };
+
+  html2pdf().set(opt).from(wrapper).save();
 }
 
 export function exportToCSV(plan: MonthlyMealPlan): void {

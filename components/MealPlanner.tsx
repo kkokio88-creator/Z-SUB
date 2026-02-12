@@ -18,6 +18,7 @@ import {
   History,
   Printer,
   Download,
+  FileText,
 } from 'lucide-react';
 import { MAJOR_INGREDIENTS, TARGET_CONFIGS } from '../constants';
 import { useMenu } from '../context/MenuContext';
@@ -29,7 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { loadHistory, saveVersion, type PlanVersion } from '../services/historyService';
 import PlanHistory from './PlanHistory';
 import PlanDiffView from './PlanDiffView';
-import { printMealPlan, exportToCSV } from '../services/exportService';
+import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportService';
 
 // History & Diff types
 
@@ -511,6 +512,13 @@ const MealPlanner: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               <Printer className="w-3 h-3" /> 인쇄
+            </button>
+            {/* PDF Export */}
+            <button
+              onClick={() => plans.A && exportToPDF(plans.A)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <FileText className="w-3 h-3" /> PDF
             </button>
             {/* CSV Export */}
             <button
