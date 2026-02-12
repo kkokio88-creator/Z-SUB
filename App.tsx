@@ -7,6 +7,7 @@ import { SheetsProvider } from './context/SheetsContext';
 import ToastContainer from './components/Toast';
 import ConfirmDialog from './components/ConfirmDialog';
 import AuthGate from './components/AuthGate';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const MealPlanner = lazy(() => import('./components/MealPlanner'));
@@ -60,7 +61,9 @@ const App: React.FC = () => {
           <MenuProvider>
             <AuthGate>
               <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-                <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
+                </ErrorBoundary>
               </Layout>
             </AuthGate>
           </MenuProvider>
