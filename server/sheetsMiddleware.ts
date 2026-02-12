@@ -2,30 +2,26 @@
 // Google Sheets API를 서버 사이드에서 호출합니다.
 
 import type { Plugin } from 'vite';
-import { google } from 'googleapis';
-import { getSheetsAuthConfig } from './sheetsAuth';
-
-function getAuthorizedSheets() {
-  const config = getSheetsAuthConfig();
-  if (!config) return null;
-
-  const auth = new google.auth.JWT({
-    email: config.serviceAccountEmail,
-    key: config.privateKey,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-
-  return { sheets: google.sheets({ version: 'v4', auth }), spreadsheetId: config.spreadsheetId };
-}
+import { getAuthorizedSheets, testSheetsConnection } from './sheetsAuth';
 
 function parseBody(req: import('http').IncomingMessage): Promise<string> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     let body = '';
+    const maxSize = 5 * 1024 * 1024; // 5MB 제한
     req.on('data', (chunk: Buffer) => {
       body += chunk.toString();
+      if (body.length > maxSize) {
+        reject(new Error('요청 본문이 5MB를 초과했습니다.'));
+      }
     });
     req.on('end', () => resolve(body));
+    req.on('error', reject);
   });
+}
+
+function logRequest(method: string, path: string, status: number, durationMs: number) {
+  const timestamp = new Date().toISOString();
+  console.log(`[Sheets API] ${timestamp} ${method} ${path} → ${status} (${durationMs}ms)`);
 }
 
 export const sheetsMiddleware = (): Plugin => ({
@@ -33,37 +29,22 @@ export const sheetsMiddleware = (): Plugin => ({
   configureServer(server) {
     // GET /api/sheets/status - 연결 상태 확인
     server.middlewares.use('/api/sheets/status', async (_req, res) => {
+      const start = Date.now();
       res.setHeader('Content-Type', 'application/json');
 
-      const client = getAuthorizedSheets();
-      if (!client) {
-        res.end(
-          JSON.stringify({
-            connected: false,
-            message:
-              'Google Sheets 인증 정보가 설정되지 않았습니다. 환경변수(GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SPREADSHEET_ID)를 설정하세요.',
-          })
-        );
-        return;
-      }
+      const result = await testSheetsConnection();
+      const status = result.connected ? 200 : 503;
+      res.statusCode = status;
+      res.end(JSON.stringify(result));
 
-      try {
-        await client.sheets.spreadsheets.get({ spreadsheetId: client.spreadsheetId });
-        res.end(JSON.stringify({ connected: true, message: 'Google Sheets 연결 성공' }));
-      } catch (err) {
-        res.end(
-          JSON.stringify({
-            connected: false,
-            message: `연결 실패: ${err instanceof Error ? err.message : String(err)}`,
-          })
-        );
-      }
+      logRequest('GET', '/api/sheets/status', status, Date.now() - start);
     });
 
     // /api/sheets/:sheetName - 시트 데이터 CRUD
     server.middlewares.use('/api/sheets', async (req, res, next) => {
       if (req.url?.startsWith('/status')) return next();
 
+      const start = Date.now();
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const pathParts = url.pathname.split('/').filter(Boolean);
 
@@ -71,6 +52,7 @@ export const sheetsMiddleware = (): Plugin => ({
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ error: 'Sheet name required' }));
+        logRequest(req.method || 'UNKNOWN', '/api/sheets', 400, Date.now() - start);
         return;
       }
 
@@ -83,12 +65,12 @@ export const sheetsMiddleware = (): Plugin => ({
       if (!client) {
         res.statusCode = 503;
         res.end(JSON.stringify({ error: 'Google Sheets 미설정', sheetName, success: false }));
+        logRequest(req.method || 'UNKNOWN', `/api/sheets/${sheetName}`, 503, Date.now() - start);
         return;
       }
 
       try {
         if (req.method === 'GET') {
-          // 시트 데이터 조회
           const result = await client.sheets.spreadsheets.values.get({
             spreadsheetId: client.spreadsheetId,
             range: `${sheetName}!A:Z`,
@@ -99,9 +81,15 @@ export const sheetsMiddleware = (): Plugin => ({
               data: result.data.values || [],
             })
           );
+          logRequest('GET', `/api/sheets/${sheetName}`, 200, Date.now() - start);
         } else if (req.method === 'POST') {
-          // 시트 데이터 덮어쓰기
           const body = JSON.parse(await parseBody(req));
+          if (!body.data || !Array.isArray(body.data)) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'data 배열이 필요합니다.', sheetName, success: false }));
+            logRequest('POST', `/api/sheets/${sheetName}`, 400, Date.now() - start);
+            return;
+          }
           await client.sheets.spreadsheets.values.clear({
             spreadsheetId: client.spreadsheetId,
             range: `${sheetName}!A:Z`,
@@ -113,9 +101,15 @@ export const sheetsMiddleware = (): Plugin => ({
             requestBody: { values: body.data },
           });
           res.end(JSON.stringify({ sheetName, success: true, message: `${body.data?.length || 0}행 업데이트 완료` }));
+          logRequest('POST', `/api/sheets/${sheetName}`, 200, Date.now() - start);
         } else if (req.method === 'PUT' && isAppend) {
-          // 시트에 행 추가
           const body = JSON.parse(await parseBody(req));
+          if (!body.rows || !Array.isArray(body.rows)) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'rows 배열이 필요합니다.', sheetName, success: false }));
+            logRequest('PUT', `/api/sheets/${sheetName}/append`, 400, Date.now() - start);
+            return;
+          }
           await client.sheets.spreadsheets.values.append({
             spreadsheetId: client.spreadsheetId,
             range: `${sheetName}!A:Z`,
@@ -123,18 +117,21 @@ export const sheetsMiddleware = (): Plugin => ({
             requestBody: { values: body.rows },
           });
           res.end(JSON.stringify({ sheetName, success: true, message: `${body.rows?.length || 0}행 추가 완료` }));
+          logRequest('PUT', `/api/sheets/${sheetName}/append`, 200, Date.now() - start);
         } else {
           next();
         }
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         res.statusCode = 500;
         res.end(
           JSON.stringify({
             sheetName,
             success: false,
-            error: err instanceof Error ? err.message : String(err),
+            error: errorMessage,
           })
         );
+        logRequest(req.method || 'UNKNOWN', `/api/sheets/${sheetName}`, 500, Date.now() - start);
       }
     });
   },

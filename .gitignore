@@ -35,3 +35,5 @@ nul
 
 # Temp/helper files
 components/_*
+_gen_test.*
+test-*.png

@@ -10,6 +10,9 @@ import {
   Activity,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { checkSheetsConnection } from '../services/sheetsService';
+import { checkMISHealth } from '../services/misService';
+import { checkZPPSHealth } from '../services/zppsService';
 
 const SystemSettings: React.FC = () => {
   const { addToast } = useToast();
@@ -65,15 +68,54 @@ const SystemSettings: React.FC = () => {
     });
   };
 
-  const runConnectionTest = (target: string) => {
+  const runConnectionTest = async (target: string) => {
     setTestStatus(prev => ({ ...prev, [target]: 'loading' }));
 
-    // Simulate API Check
-    setTimeout(() => {
-      // Random success/fail for demo purposes (mostly success)
-      const isSuccess = Math.random() > 0.1;
-      setTestStatus(prev => ({ ...prev, [target]: isSuccess ? 'success' : 'error' }));
-    }, 1500);
+    try {
+      let result: { connected: boolean; message: string };
+
+      switch (target) {
+        case 'gemini': {
+          const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+          if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+            result = { connected: false, message: 'Gemini API 키가 설정되지 않았습니다.' };
+          } else {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+              signal: AbortSignal.timeout(5000),
+            });
+            result = res.ok
+              ? { connected: true, message: 'Gemini API 연결 성공' }
+              : { connected: false, message: `Gemini API 오류: ${res.status}` };
+          }
+          break;
+        }
+        case 'sheets':
+          result = await checkSheetsConnection();
+          break;
+        case 'mis':
+          result = await checkMISHealth(misApiUrl);
+          break;
+        case 'zpps':
+          result = await checkZPPSHealth(zppsApiUrl);
+          break;
+        default:
+          result = { connected: false, message: '알 수 없는 대상' };
+      }
+
+      setTestStatus(prev => ({ ...prev, [target]: result.connected ? 'success' : 'error' }));
+      addToast({
+        type: result.connected ? 'success' : 'error',
+        title: `${target.toUpperCase()} 연결 테스트`,
+        message: result.message,
+      });
+    } catch {
+      setTestStatus(prev => ({ ...prev, [target]: 'error' }));
+      addToast({
+        type: 'error',
+        title: `${target.toUpperCase()} 연결 실패`,
+        message: '네트워크 오류 또는 시간 초과',
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
