@@ -37,3 +37,6 @@ nul
 components/_*
 _gen_test.*
 test-*.png
+_parseSheetData.*
+_sheet_*.csv
+.playwright-mcp/

@@ -1,15 +1,20 @@
 // 식단 유형 정의
 export enum TargetType {
-  KIDS = '아이 식단',
-  KIDS_PLUS = '든든한 아이 식단',
-  SIDE_ONLY = '골고루 반찬 식단',
+  VALUE = '실속 식단',
   SENIOR_HEALTH = '건강한 시니어 식단',
   SENIOR = '시니어 식단',
   YOUTH = '청소연구소 식단',
   YOUTH_MAIN = '청소연구소 메인 식단',
-  VALUE = '실속 식단',
-  FAMILY = '가족 식단',
   FAMILY_PLUS = '든든한 가족 식단',
+  FAMILY = '가족 식단',
+  KIDS_PLUS = '든든한 아이 식단',
+  KIDS = '아이 식단',
+  SIDE_ONLY = '골고루 반찬 식단',
+  FIRST_MEET = '첫만남 식단',
+  TODDLER_PLUS = '든든한 유아 식단',
+  TODDLER = '유아 식단',
+  CHILD_PLUS = '든든한 어린이 식단',
+  CHILD = '어린이 식단',
 }
 
 export enum MenuCategory {

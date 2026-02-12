@@ -1,4 +1,3 @@
-import html2pdf from 'html2pdf.js';
 import type { MonthlyMealPlan, MenuItem } from '../types';
 
 export function printMealPlan(plan: MonthlyMealPlan): void {
@@ -68,10 +67,11 @@ function generatePrintHTML(plan: MonthlyMealPlan): string {
 </html>`;
 }
 
-export function exportToPDF(plan: MonthlyMealPlan): void {
+export async function exportToPDF(plan: MonthlyMealPlan): Promise<void> {
+  const html2pdf = (await import('html2pdf.js')).default;
+
   const container = document.createElement('div');
   container.innerHTML = generatePrintHTML(plan);
-  // body 내용만 추출
   const bodyMatch = container.innerHTML.match(/<body[^>]*>([\s\S]*)<\/body>/);
   const bodyContent = bodyMatch ? bodyMatch[1] : container.innerHTML;
 

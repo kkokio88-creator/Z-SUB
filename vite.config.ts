@@ -25,6 +25,16 @@ export default defineConfig({
           if (id.includes('node_modules/lucide-react')) {
             return 'vendor-icons';
           }
+          if (id.includes('/data/realMenuDB')) {
+            return 'menu-data';
+          }
+          if (
+            id.includes('node_modules/html2pdf') ||
+            id.includes('node_modules/html2canvas') ||
+            id.includes('node_modules/jspdf')
+          ) {
+            return 'vendor-pdf';
+          }
         },
       },
     },
