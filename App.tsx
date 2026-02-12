@@ -1,11 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import MealPlanner from './components/MealPlanner';
-import MasterDataManagement from './components/MasterDataManagement';
-import SubscriberManagement from './components/SubscriberManagement';
-import SystemSettings from './components/SystemSettings';
-import AuditLog from './components/AuditLog';
 import { MenuProvider } from './context/MenuContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
@@ -13,6 +7,22 @@ import { SheetsProvider } from './context/SheetsContext';
 import ToastContainer from './components/Toast';
 import ConfirmDialog from './components/ConfirmDialog';
 import AuthGate from './components/AuthGate';
+
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const MealPlanner = lazy(() => import('./components/MealPlanner'));
+const MasterDataManagement = lazy(() => import('./components/MasterDataManagement'));
+const SubscriberManagement = lazy(() => import('./components/SubscriberManagement'));
+const SystemSettings = lazy(() => import('./components/SystemSettings'));
+const AuditLog = lazy(() => import('./components/AuditLog'));
+
+const TabFallback = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-3 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+      <span className="text-sm text-gray-500">로딩 중...</span>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('planner');
@@ -50,7 +60,7 @@ const App: React.FC = () => {
           <MenuProvider>
             <AuthGate>
               <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-                {renderContent()}
+                <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
               </Layout>
             </AuthGate>
           </MenuProvider>
