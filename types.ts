@@ -1,4 +1,3 @@
-
 // 식단 유형 정의
 export enum TargetType {
   KIDS = '아이 식단',
@@ -37,7 +36,7 @@ export enum Season {
 }
 
 // 식단 주기 타입
-export type CycleType = "화수목" | "금토월";
+export type CycleType = '화수목' | '금토월';
 
 // 메뉴 아이템 인터페이스
 export interface MenuItem {
@@ -48,10 +47,10 @@ export interface MenuItem {
   recommendedPrice: number; // 권장 판매가
   tastes: TasteProfile[];
   season: Season;
-  tags: string[]; 
-  isSpicy: boolean; 
+  tags: string[];
+  isSpicy: boolean;
   mainIngredient: string; // e.g. 'pork', 'beef', 'chicken', 'tofu', 'seaweed'
-  
+
   // DB 관리용 추가 필드 (Optional for backward compatibility in logic, but populated in DB)
   code?: string; // 품목코드 (ZIP_P_XXXX)
   process?: number; // 공정 번호 (11, 22 etc)
@@ -67,7 +66,7 @@ export interface MealPlanConfig {
   targetPrice: number;
   targetCostRatio: number; // New: 목표 원가율 (e.g., 30 for 30%)
   composition: {
-    [key in MenuCategory]?: number; 
+    [key in MenuCategory]?: number;
   };
   bannedTags: string[];
   requiredTags: string[];
@@ -100,4 +99,32 @@ export interface ExpertReview {
   costExpertComment: string; // 단가 전문가 의견
   overallScore: number;
   flaggedItemIds: string[]; // 문제가 있는 메뉴 ID 목록
+}
+
+// 유효성 검증 결과
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+}
+
+// 식단 버전 (히스토리)
+export interface PlanVersion {
+  id: string;
+  planId: string;
+  plan: MonthlyMealPlan;
+  label: string;
+  savedAt: string;
+}
+
+// Diff 결과
+export interface PlanDiffResult {
+  weekIndex: number;
+  slotIndex: number;
+  before: MenuItem;
+  after: MenuItem;
 }

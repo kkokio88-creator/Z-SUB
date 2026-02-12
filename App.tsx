@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -6,9 +5,17 @@ import MealPlanner from './components/MealPlanner';
 import MasterDataManagement from './components/MasterDataManagement';
 import SubscriberManagement from './components/SubscriberManagement';
 import SystemSettings from './components/SystemSettings';
+import AuditLog from './components/AuditLog';
+import { MenuProvider } from './context/MenuContext';
+import { ToastProvider } from './context/ToastContext';
+import { AuthProvider } from './context/AuthContext';
+import { SheetsProvider } from './context/SheetsContext';
+import ToastContainer from './components/Toast';
+import ConfirmDialog from './components/ConfirmDialog';
+import AuthGate from './components/AuthGate';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('planner'); 
+  const [activeTab, setActiveTab] = useState('planner');
 
   const renderContent = () => {
     switch (activeTab) {
@@ -22,6 +29,8 @@ const App: React.FC = () => {
         return <SubscriberManagement />;
       case 'settings':
         return <SystemSettings />;
+      case 'audit-log':
+        return <AuditLog />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-gray-400">
@@ -35,9 +44,21 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-      {renderContent()}
-    </Layout>
+    <ToastProvider>
+      <AuthProvider>
+        <SheetsProvider>
+          <MenuProvider>
+            <AuthGate>
+              <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+                {renderContent()}
+              </Layout>
+            </AuthGate>
+          </MenuProvider>
+        </SheetsProvider>
+      </AuthProvider>
+      <ToastContainer />
+      <ConfirmDialog />
+    </ToastProvider>
   );
 };
 
