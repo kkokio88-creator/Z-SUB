@@ -1,5 +1,5 @@
 // TypeScript 객체 <-> Google Sheets 셀 배열 변환 서비스
-import { MenuItem, MenuCategory, Season, TasteProfile, MealPlanConfig } from '../types';
+import { MenuItem, MenuCategory, Season, TasteProfile, MealPlanConfig, MonthlyMealPlan, TargetType } from '../types';
 
 // 배열을 쉼표 구분 문자열로 변환
 const arrayToCell = (arr: string[]): string => arr.join(',');
@@ -82,6 +82,22 @@ export const configToRow = (config: MealPlanConfig): string[] => [
   config.parentTarget || '',
 ];
 
+// 셀 배열 -> MealPlanConfig
+export const rowToConfig = (row: string[]): MealPlanConfig => ({
+  target: row[0] as TargetType,
+  budgetCap: Number(row[1]) || 0,
+  targetPrice: Number(row[2]) || 0,
+  targetCostRatio: Number(row[3]) || 0,
+  composition: {
+    [MenuCategory.SOUP]: Number(row[4]) || 0,
+    [MenuCategory.MAIN]: Number(row[5]) || 0,
+    [MenuCategory.SIDE]: Number(row[6]) || 0,
+  },
+  bannedTags: cellToArray(row[7]),
+  requiredTags: cellToArray(row[8]),
+  parentTarget: (row[9] as TargetType) || undefined,
+});
+
 export const CONFIG_HEADERS = [
   'target',
   'budgetCap',
@@ -93,4 +109,42 @@ export const CONFIG_HEADERS = [
   'bannedTags',
   'requiredTags',
   'parentTarget',
+];
+
+// MonthlyMealPlan -> flat rows (식단데이터 시트용)
+export const mealPlanToRows = (plan: MonthlyMealPlan): string[][] => {
+  const rows: string[][] = [];
+  for (const week of plan.weeks) {
+    for (let pos = 0; pos < week.items.length; pos++) {
+      const item = week.items[pos];
+      rows.push([
+        plan.id,
+        plan.monthLabel,
+        plan.cycleType,
+        plan.target,
+        String(week.weekIndex),
+        item.id,
+        item.name,
+        item.category,
+        String(item.cost),
+        String(pos),
+        new Date().toISOString(),
+      ]);
+    }
+  }
+  return rows;
+};
+
+export const MEAL_PLAN_HEADERS = [
+  'planId',
+  'monthLabel',
+  'cycleType',
+  'target',
+  'weekIndex',
+  'menuItemId',
+  'menuItemName',
+  'category',
+  'cost',
+  'position',
+  'createdAt',
 ];
