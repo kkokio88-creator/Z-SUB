@@ -15,36 +15,64 @@ import {
   Check,
   X,
   Upload,
+  Edit3,
 } from 'lucide-react';
 import ImportDialog from './ImportDialog';
+import BulkEditDialog from './BulkEditDialog';
 import { MenuCategory, MenuItem, Season, TasteProfile } from '../types';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { MAJOR_INGREDIENTS } from '../constants';
 import { validateMenuItem, type ValidationError } from '../services/validationService';
 import { addAuditEntry } from '../services/auditService';
 
 const MenuDatabase: React.FC = () => {
-  const { menuItems, updateItem: contextUpdateItem, addItem, saveToStorage } = useMenu();
+  const {
+    menuItems,
+    updateItem: contextUpdateItem,
+    addItem,
+    bulkUpdate,
+    saveToStorage,
+    refreshFromSheet,
+    isLoading,
+  } = useMenu();
   const { addToast } = useToast();
   const { user } = useAuth();
   const [, setValidationErrors] = useState<ValidationError[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [filterIngredient, setFilterIngredient] = useState<string>('ALL');
+  const [filterTag, setFilterTag] = useState<string>('');
+  const [filterUsage, setFilterUsage] = useState<'ALL' | 'active' | 'unused'>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [lastSynced, setLastSynced] = useState<string>('2024-03-05 09:30');
+  const [lastSynced, setLastSynced] = useState<string>('—');
   const [showImportDialog, setShowImportDialog] = useState(false);
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+
+  // Collect all unique tags for filter
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    menuItems.forEach(item => item.tags.forEach(t => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [menuItems]);
 
   const filteredItems = useMemo(
     () =>
       menuItems.filter(item => {
         const matchesCategory = filterCategory === 'ALL' || item.category === filterCategory;
+        const matchesIngredient = filterIngredient === 'ALL' || item.mainIngredient === filterIngredient;
+        const matchesTag = !filterTag || item.tags.includes(filterTag);
+        const matchesUsage = filterUsage === 'ALL' || (filterUsage === 'active' ? !item.isUnused : item.isUnused);
         const matchesSearch =
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesCategory && matchesSearch;
+        return matchesCategory && matchesSearch && matchesIngredient && matchesTag && matchesUsage;
       }),
-    [menuItems, filterCategory, searchTerm]
+    [menuItems, filterCategory, filterIngredient, filterTag, filterUsage, searchTerm]
   );
 
   const selectedItem = menuItems.find(i => i.id === selectedId) || null;
@@ -59,10 +87,7 @@ const MenuDatabase: React.FC = () => {
   const handleTasteToggle = (id: string, taste: TasteProfile) => {
     const item = menuItems.find(i => i.id === id);
     if (!item) return;
-
     const newTastes = item.tastes.includes(taste) ? item.tastes.filter(t => t !== taste) : [...item.tastes, taste];
-
-    // Auto-update isSpicy based on TasteProfile
     handleUpdateItem(id, 'tastes', newTastes);
     if (taste === TasteProfile.SPICY) {
       handleUpdateItem(id, 'isSpicy', newTastes.includes(TasteProfile.SPICY));
@@ -72,8 +97,7 @@ const MenuDatabase: React.FC = () => {
   const handleAddTag = (id: string, tag: string) => {
     const item = menuItems.find(i => i.id === id);
     if (item && tag.trim()) {
-      const newTags = [...item.tags, tag.trim()];
-      handleUpdateItem(id, 'tags', newTags);
+      handleUpdateItem(id, 'tags', [...item.tags, tag.trim()]);
     }
   };
 
@@ -141,6 +165,70 @@ const MenuDatabase: React.FC = () => {
     }
   };
 
+  const toggleSelectItem = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredItems.map(i => i.id)));
+    }
+  };
+
+  const handleBulkApply = (changes: {
+    category?: MenuCategory;
+    addTags?: string[];
+    removeTags?: string[];
+    isUnused?: boolean;
+  }) => {
+    const ids = Array.from(selectedIds);
+
+    // For category and isUnused, use bulkUpdate
+    const directChanges: Partial<MenuItem> = {};
+    if (changes.category) directChanges.category = changes.category;
+    if (changes.isUnused !== undefined) directChanges.isUnused = changes.isUnused;
+
+    if (Object.keys(directChanges).length > 0) {
+      bulkUpdate(ids, directChanges);
+    }
+
+    // For tag changes, need per-item update
+    if (changes.addTags || changes.removeTags) {
+      for (const id of ids) {
+        const item = menuItems.find(i => i.id === id);
+        if (!item) continue;
+        let tags = [...item.tags];
+        if (changes.addTags) {
+          for (const t of changes.addTags) {
+            if (!tags.includes(t)) tags.push(t);
+          }
+        }
+        if (changes.removeTags) {
+          tags = tags.filter(t => !changes.removeTags!.includes(t));
+        }
+        contextUpdateItem(id, { ...item, ...directChanges, tags });
+      }
+    }
+
+    saveToStorage();
+    setShowBulkEdit(false);
+    setSelectedIds(new Set());
+    addToast({ type: 'success', title: '일괄 편집 완료', message: `${ids.length}개 메뉴가 변경되었습니다.` });
+  };
+
+  const handleRefresh = async () => {
+    await refreshFromSheet();
+    setLastSynced(new Date().toLocaleString('ko-KR'));
+    addToast({ type: 'success', title: '동기화 완료', message: '시트 데이터를 새로고침했습니다.' });
+  };
+
   const getSeasonIcon = (season: Season) => {
     switch (season) {
       case Season.SPRING:
@@ -167,6 +255,14 @@ const MenuDatabase: React.FC = () => {
               <Database className="w-4 h-4 text-gray-500" /> 메뉴 목록
             </h3>
             <div className="flex gap-1">
+              <button
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                title="시트 새로고침"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
               <button
                 onClick={() => setShowImportDialog(true)}
                 className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
@@ -195,6 +291,7 @@ const MenuDatabase: React.FC = () => {
             />
           </div>
 
+          {/* Category Filter */}
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             <button
               onClick={() => setFilterCategory('ALL')}
@@ -212,10 +309,78 @@ const MenuDatabase: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Additional Filters */}
+          <div className="flex gap-2">
+            <select
+              value={filterIngredient}
+              onChange={e => setFilterIngredient(e.target.value)}
+              className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500 flex-1"
+            >
+              <option value="ALL">주재료: 전체</option>
+              {MAJOR_INGREDIENTS.map(ing => (
+                <option key={ing.key} value={ing.key}>
+                  {ing.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterTag}
+              onChange={e => setFilterTag(e.target.value)}
+              className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500 flex-1"
+            >
+              <option value="">태그: 전체</option>
+              {allTags.map(tag => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterUsage}
+              onChange={e => setFilterUsage(e.target.value as 'ALL' | 'active' | 'unused')}
+              className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500"
+            >
+              <option value="ALL">상태: 전체</option>
+              <option value="active">사용</option>
+              <option value="unused">미사용</option>
+            </select>
+          </div>
         </div>
+
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="px-4 py-2 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
+            <span className="text-xs font-medium text-primary-700">{selectedIds.size}개 선택됨</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBulkEdit(true)}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+              >
+                <Edit3 className="w-3 h-3" /> 일괄 편집
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-2 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
+              >
+                선택 해제
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
+          {/* Select All header */}
+          <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-2 bg-gray-50/30">
+            <input
+              type="checkbox"
+              checked={filteredItems.length > 0 && selectedIds.size === filteredItems.length}
+              onChange={toggleSelectAll}
+              className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-[11px] text-gray-400">전체 선택</span>
+          </div>
           {filteredItems.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm">검색 결과가 없습니다.</div>
           ) : (
@@ -223,35 +388,47 @@ const MenuDatabase: React.FC = () => {
               {filteredItems.map(item => (
                 <div
                   key={item.id}
-                  onClick={() => setSelectedId(item.id)}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors flex justify-between items-center border-l-4 ${selectedId === item.id ? 'bg-blue-50 border-l-blue-500' : 'border-l-transparent'}`}
+                  className={`flex items-center border-l-4 ${selectedId === item.id ? 'bg-blue-50 border-l-blue-500' : 'border-l-transparent hover:bg-gray-50'}`}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className={`text-[10px] px-1.5 rounded font-bold ${
-                          item.category === MenuCategory.MAIN
-                            ? 'bg-orange-100 text-orange-700'
-                            : item.category === MenuCategory.SOUP
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-green-100 text-green-700'
-                        }`}
-                      >
-                        {item.category.substring(0, 2)}
-                      </span>
-                      <span
-                        className={`text-sm font-medium truncate ${item.isUnused ? 'text-gray-400 line-through' : 'text-gray-800'}`}
-                      >
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="font-mono">{item.code}</span>
-                      <span>·</span>
-                      <span>{item.cost.toLocaleString()}원</span>
-                    </div>
+                  <div className="pl-4 py-3 flex items-center" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelectItem(item.id)}
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
                   </div>
-                  {item.isSpicy && <Flame className="w-3 h-3 text-red-400 flex-shrink-0" />}
+                  <div
+                    onClick={() => setSelectedId(item.id)}
+                    className="flex-1 p-4 pl-2 cursor-pointer flex justify-between items-center transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span
+                          className={`text-[10px] px-1.5 rounded font-bold ${
+                            item.category === MenuCategory.MAIN
+                              ? 'bg-orange-100 text-orange-700'
+                              : item.category === MenuCategory.SOUP
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {item.category.substring(0, 2)}
+                        </span>
+                        <span
+                          className={`text-sm font-medium truncate ${item.isUnused ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+                        >
+                          {item.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="font-mono">{item.code}</span>
+                        <span>·</span>
+                        <span>{item.cost.toLocaleString()}원</span>
+                      </div>
+                    </div>
+                    {item.isSpicy && <Flame className="w-3 h-3 text-red-400 flex-shrink-0" />}
+                  </div>
                 </div>
               ))}
             </div>
@@ -261,8 +438,8 @@ const MenuDatabase: React.FC = () => {
         {/* List Footer */}
         <div className="p-3 bg-gray-50 text-xs text-gray-500 border-t border-gray-200 flex justify-between">
           <span>{filteredItems.length}개 항목</span>
-          <div className="flex items-center gap-1 cursor-pointer hover:text-green-600">
-            <RefreshCw className="w-3 h-3" /> 동기화: {lastSynced.split(' ')[1]}
+          <div className="flex items-center gap-1 cursor-pointer hover:text-green-600" onClick={handleRefresh}>
+            <RefreshCw className="w-3 h-3" /> {lastSynced}
           </div>
         </div>
       </div>
@@ -332,7 +509,7 @@ const MenuDatabase: React.FC = () => {
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                   <label className="text-xs font-bold text-gray-400 block mb-1">원가</label>
                   <div className="flex items-center">
-                    <span className="text-gray-400 text-sm mr-1">₩</span>
+                    <span className="text-gray-400 text-sm mr-1">{'\u20A9'}</span>
                     <input
                       type="number"
                       value={selectedItem.cost}
@@ -344,7 +521,7 @@ const MenuDatabase: React.FC = () => {
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                   <label className="text-xs font-bold text-gray-400 block mb-1">권장 판매가</label>
                   <div className="flex items-center">
-                    <span className="text-gray-400 text-sm mr-1">₩</span>
+                    <span className="text-gray-400 text-sm mr-1">{'\u20A9'}</span>
                     <input
                       type="number"
                       value={selectedItem.recommendedPrice}
@@ -380,7 +557,6 @@ const MenuDatabase: React.FC = () => {
                 </h4>
 
                 <div className="flex gap-8">
-                  {/* Season */}
                   <div>
                     <label className="text-xs font-bold text-gray-500 mb-2 block">계절성</label>
                     <div className="flex gap-2">
@@ -396,7 +572,6 @@ const MenuDatabase: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Main Ingredient */}
                   <div className="flex-1">
                     <label className="text-xs font-bold text-gray-500 mb-2 block">주재료</label>
                     <select
@@ -404,19 +579,16 @@ const MenuDatabase: React.FC = () => {
                       onChange={e => handleUpdateItem(selectedItem.id, 'mainIngredient', e.target.value)}
                       className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-primary-500 focus:border-primary-500"
                     >
-                      <option value="vegetable">채소류</option>
-                      <option value="pork">돼지고기</option>
-                      <option value="beef">소고기</option>
-                      <option value="chicken">닭고기</option>
-                      <option value="fish">생선</option>
-                      <option value="seafood">해산물</option>
-                      <option value="tofu">두부/콩</option>
-                      <option value="seaweed">해조류</option>
+                      {MAJOR_INGREDIENTS.map(ing => (
+                        <option key={ing.key} value={ing.key}>
+                          {ing.label}
+                        </option>
+                      ))}
+                      <option value="other">기타</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Taste Profile */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 mb-2 block">맛 속성</label>
                   <div className="flex flex-wrap gap-2">
@@ -469,10 +641,6 @@ const MenuDatabase: React.FC = () => {
                     }
                   }}
                 />
-                <p className="text-xs text-gray-400 mt-2">
-                  * '아이선호', '시니어', '제철', '인기' 등의 태그를 사용하여 식단 생성 로직에 가중치를 부여할 수
-                  있습니다.
-                </p>
               </div>
             </div>
           </>
@@ -486,7 +654,8 @@ const MenuDatabase: React.FC = () => {
           </div>
         )}
       </div>
-      {/* CSV Import Dialog */}
+
+      {/* Dialogs */}
       {showImportDialog && (
         <ImportDialog
           existingItems={menuItems}
@@ -503,6 +672,13 @@ const MenuDatabase: React.FC = () => {
             setShowImportDialog(false);
           }}
           onClose={() => setShowImportDialog(false)}
+        />
+      )}
+      {showBulkEdit && (
+        <BulkEditDialog
+          selectedCount={selectedIds.size}
+          onApply={handleBulkApply}
+          onClose={() => setShowBulkEdit(false)}
         />
       )}
     </div>

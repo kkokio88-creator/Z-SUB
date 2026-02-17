@@ -30,7 +30,9 @@ import { useAuth } from '../context/AuthContext';
 import { loadHistory, saveVersion, type PlanVersion } from '../services/historyService';
 import PlanHistory from './PlanHistory';
 import PlanDiffView from './PlanDiffView';
+import PlanReviewPanel from './PlanReviewPanel';
 import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportService';
+import { pushMealPlan } from '../services/syncManager';
 
 // History & Diff types
 
@@ -310,6 +312,13 @@ const MealPlanner: React.FC = () => {
   const currentBudgetCap = TARGET_CONFIGS[target].budgetCap;
   const targetPrice = TARGET_CONFIGS[target].targetPrice;
 
+  // Compute parent composition item count for "extra" menu detection
+  const currentConfig = TARGET_CONFIGS[target];
+  const parentConfig = currentConfig?.parentTarget ? TARGET_CONFIGS[currentConfig.parentTarget] : null;
+  const parentItemCount = parentConfig
+    ? Object.values(parentConfig.composition).reduce((sum, n) => sum + (n || 0), 0)
+    : null;
+
   // Render a Single Cycle Row
   const renderCycleRow = (cycleLabel: string, plan: MonthlyMealPlan, cycleKey: 'A' | 'B') => (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
@@ -321,6 +330,11 @@ const MealPlanner: React.FC = () => {
             {cycleLabel}
           </span>
           <span className="text-sm font-medium text-gray-500">{monthLabel} 식단표</span>
+          {parentConfig && (
+            <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              옵션 ({currentConfig.parentTarget} 기반)
+            </span>
+          )}
         </div>
         <button
           onClick={() => handleExpertReview(plan)}
@@ -348,25 +362,37 @@ const MealPlanner: React.FC = () => {
               </div>
 
               <div className="space-y-2 flex-1">
-                {week.items.map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => openSwapModal(cycleKey, week.weekIndex, item)}
-                    className="flex items-center gap-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all"
-                  >
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                        item.category === MenuCategory.SOUP
-                          ? 'bg-blue-500'
-                          : item.category === MenuCategory.MAIN
-                            ? 'bg-orange-500'
-                            : 'bg-green-500'
+                {week.items.map((item, itemIdx) => {
+                  const isExtra = parentItemCount !== null && itemIdx >= parentItemCount;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => openSwapModal(cycleKey, week.weekIndex, item)}
+                      className={`flex items-center gap-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer transition-all ${
+                        isExtra
+                          ? 'border border-amber-300 bg-amber-50/50'
+                          : 'border border-transparent hover:border-gray-200'
                       }`}
-                    ></span>
-                    <span className="font-medium text-gray-700 truncate flex-1">{item.name}</span>
-                    {item.isSpicy && <Flame className="w-3 h-3 text-red-400" />}
-                  </div>
-                ))}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                          item.category === MenuCategory.SOUP
+                            ? 'bg-blue-500'
+                            : item.category === MenuCategory.MAIN
+                              ? 'bg-orange-500'
+                              : 'bg-green-500'
+                        }`}
+                      ></span>
+                      <span className="font-medium text-gray-700 truncate flex-1">{item.name}</span>
+                      {isExtra && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 rounded border border-amber-200 flex-shrink-0">
+                          추가
+                        </span>
+                      )}
+                      {item.isSpicy && <Flame className="w-3 h-3 text-red-400" />}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -597,6 +623,24 @@ const MealPlanner: React.FC = () => {
                 * A조와 B조를 모두 구독하는 고객을 위해 2회 이상 중복된 재료는 하이라이트됩니다.
               </p>
             </div>
+
+            {/* Review Panel */}
+            {plans.A && (
+              <div className="mt-6">
+                <PlanReviewPanel
+                  planId={plans.A.id}
+                  onFinalized={async () => {
+                    if (plans.A) await pushMealPlan(plans.A);
+                    if (plans.B) await pushMealPlan(plans.B);
+                    addToast({
+                      type: 'success',
+                      title: '시트 동기화 완료',
+                      message: '확정된 식단이 시트에 등록되었습니다.',
+                    });
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

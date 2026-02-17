@@ -1,5 +1,17 @@
 // TypeScript 객체 <-> Google Sheets 셀 배열 변환 서비스
-import { MenuItem, MenuCategory, Season, TasteProfile, MealPlanConfig, MonthlyMealPlan, TargetType } from '../types';
+import {
+  MenuItem,
+  MenuCategory,
+  Season,
+  TasteProfile,
+  MealPlanConfig,
+  MonthlyMealPlan,
+  TargetType,
+  HistoricalMealPlan,
+  HistoricalTargetPlan,
+  HistoricalMenuItem,
+  CycleType,
+} from '../types';
 
 // 배열을 쉼표 구분 문자열로 변환
 const arrayToCell = (arr: string[]): string => arr.join(',');
@@ -148,3 +160,44 @@ export const MEAL_PLAN_HEADERS = [
   'position',
   'createdAt',
 ];
+
+// ── 식단데이터 시트 → HistoricalMealPlan[] 변환 ──
+// 시트 컬럼: date, cycleType, target, menuName, process, code, price, cost
+export const rowsToHistoricalPlans = (rows: string[][]): HistoricalMealPlan[] => {
+  const planMap = new Map<string, HistoricalMealPlan>();
+
+  for (const row of rows) {
+    const date = row[0];
+    const cycleType = (row[1] || '화수목') as CycleType;
+    const targetType = row[2] as TargetType;
+    const menuName = row[3] || '';
+    const process = Number(row[4]) || 0;
+    const code = row[5] || '';
+    const price = Number(row[6]) || 0;
+    const cost = Number(row[7]) || 0;
+
+    if (!date || !targetType || !menuName) continue;
+
+    const key = `${date}|${cycleType}`;
+    if (!planMap.has(key)) {
+      planMap.set(key, { date, cycleType, targets: [] });
+    }
+    const plan = planMap.get(key)!;
+
+    let targetPlan = plan.targets.find(t => t.targetType === targetType);
+    if (!targetPlan) {
+      targetPlan = { targetType, items: [], totalPrice: 0, totalCost: 0, itemCount: 0 };
+      plan.targets.push(targetPlan);
+    }
+
+    const item: HistoricalMenuItem = { name: menuName, process, code, price, cost };
+    targetPlan.items.push(item);
+    targetPlan.totalPrice += price;
+    targetPlan.totalCost += cost;
+    targetPlan.itemCount = targetPlan.items.length;
+  }
+
+  return Array.from(planMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+};
+
+export const HISTORICAL_PLAN_HEADERS = ['date', 'cycleType', 'target', 'menuName', 'process', 'code', 'price', 'cost'];

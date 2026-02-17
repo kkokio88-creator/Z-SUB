@@ -69,9 +69,9 @@ describe('MenuContext', () => {
     mainIngredient: 'beef',
   };
 
-  it('초기 메뉴 항목 로드', () => {
+  it('초기 메뉴 항목 로드 (빈 배열 또는 캐시)', () => {
     const { result } = renderHook(() => useMenu(), { wrapper });
-    expect(result.current.menuItems.length).toBeGreaterThan(0);
+    expect(Array.isArray(result.current.menuItems)).toBe(true);
   });
 
   it('메뉴 항목 추가', () => {
@@ -106,17 +106,6 @@ describe('MenuContext', () => {
       result.current.deleteItem('TEST001');
     });
     expect(result.current.menuItems).toHaveLength(lengthAfterAdd - 1);
-    expect(result.current.menuItems.find(i => i.id === 'TEST001')).toBeUndefined();
-  });
-
-  it('기본값으로 초기화', () => {
-    const { result } = renderHook(() => useMenu(), { wrapper });
-    act(() => {
-      result.current.addItem(testItem);
-    });
-    act(() => {
-      result.current.resetToDefault();
-    });
     expect(result.current.menuItems.find(i => i.id === 'TEST001')).toBeUndefined();
   });
 

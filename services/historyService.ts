@@ -6,7 +6,7 @@ export interface PlanVersion {
   label: string;
   savedAt: string;
   target: string;
-  status: 'draft' | 'reviewed' | 'published' | 'finalized';
+  status: 'draft' | 'review_requested' | 'approved' | 'finalized';
   planA: MonthlyMealPlan;
   planB: MonthlyMealPlan;
 }

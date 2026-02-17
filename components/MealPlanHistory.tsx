@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Search, X, UtensilsCrossed } from 'lucide-react';
-import { HISTORICAL_MEAL_PLANS } from '../data/historicalMealPlans';
-import { REAL_MENU_DB } from '../data/realMenuDB';
+import { ChevronLeft, ChevronRight, Search, X, UtensilsCrossed, RefreshCw } from 'lucide-react';
+import { useHistoricalPlans } from '../context/HistoricalPlansContext';
+import { useMenu } from '../context/MenuContext';
 import { TargetType } from '../types';
 import type { HistoricalMenuItem, HistoricalTargetPlan } from '../types';
 
@@ -211,18 +211,21 @@ const TableCell: React.FC<{
 
 const SwapModal: React.FC<{
   currentName: string;
+  menuItems: { id: string; name: string; mainIngredient: string; cost: number }[];
   onSelect: (name: string) => void;
   onClose: () => void;
-}> = ({ currentName, onSelect, onClose }) => {
+}> = ({ currentName, menuItems, onSelect, onClose }) => {
   const [search, setSearch] = useState('');
   const [ingredientFilter, setIngredientFilter] = useState('');
 
   const candidates = useMemo(() => {
-    return REAL_MENU_DB.filter(item => {
-      if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (ingredientFilter && item.mainIngredient !== ingredientFilter) return false;
-      return true;
-    }).slice(0, 50);
+    return menuItems
+      .filter(item => {
+        if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
+        if (ingredientFilter && item.mainIngredient !== ingredientFilter) return false;
+        return true;
+      })
+      .slice(0, 50);
   }, [search, ingredientFilter]);
 
   return (
@@ -314,6 +317,8 @@ const SwapModal: React.FC<{
 // ── 메인 컴포넌트 ──
 
 const MealPlanHistory: React.FC = () => {
+  const { plans: HISTORICAL_MEAL_PLANS, isLoading, refresh } = useHistoricalPlans();
+  const { menuItems } = useMenu();
   const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date || '2025-01-01';
   const [viewYear, setViewYear] = useState(() => parseInt(latestDate.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => parseInt(latestDate.slice(5, 7)) - 1);
@@ -436,6 +441,14 @@ const MealPlanHistory: React.FC = () => {
           >
             오늘
           </button>
+          <button
+            onClick={refresh}
+            disabled={isLoading}
+            className="ml-2 p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            title="시트에서 새로고침"
+          >
+            <RefreshCw className={`w-4 h-4 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
           {monthPlans.length > 0 && (
             <span className="ml-2 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-full">
               {monthPlans.length}건
@@ -540,7 +553,12 @@ const MealPlanHistory: React.FC = () => {
 
       {/* 교체 모달 */}
       {swapTarget && (
-        <SwapModal currentName={swapTarget.currentName} onSelect={handleSwap} onClose={() => setSwapTarget(null)} />
+        <SwapModal
+          currentName={swapTarget.currentName}
+          menuItems={menuItems}
+          onSelect={handleSwap}
+          onClose={() => setSwapTarget(null)}
+        />
       )}
     </div>
   );

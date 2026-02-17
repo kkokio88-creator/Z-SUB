@@ -1,8 +1,4 @@
 import { MealPlanConfig, MenuCategory, TargetType } from './types';
-import { REAL_MENU_DB } from './data/realMenuDB';
-
-// 실제 반찬 시트 데이터 기반 메뉴 DB (215개 아이템)
-export const MOCK_MENU_DB = REAL_MENU_DB;
 
 export const MAJOR_INGREDIENTS = [
   { key: 'beef', label: '소고기' },

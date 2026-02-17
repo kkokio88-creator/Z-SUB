@@ -156,3 +156,24 @@ export interface HistoricalMealPlan {
   cycleType: CycleType; // "화수목" | "금토월"
   targets: HistoricalTargetPlan[];
 }
+
+// 식단 검토/승인 워크플로우
+export type ReviewDepartment = 'quality' | 'development' | 'process';
+export type PlanStatus = 'draft' | 'review_requested' | 'approved' | 'finalized';
+
+export interface DepartmentReview {
+  department: ReviewDepartment;
+  reviewer: string;
+  status: 'pending' | 'approved' | 'rejected';
+  comment: string;
+  reviewedAt: string | null;
+}
+
+export interface PlanReviewRecord {
+  planId: string;
+  status: PlanStatus;
+  requestedAt: string;
+  requestedBy: string;
+  departments: DepartmentReview[];
+  finalizedAt: string | null;
+}

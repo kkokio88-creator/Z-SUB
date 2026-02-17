@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { MOCK_MENU_DB } from '../constants';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { MenuItem } from '../types';
+import { pullMenuDB } from '../services/syncManager';
 
 const STORAGE_KEY = 'zsub_menu_db';
 
@@ -11,22 +11,44 @@ const loadMenuFromStorage = (): MenuItem[] => {
   } catch {
     // ignore parse errors
   }
-  return MOCK_MENU_DB;
+  return [];
 };
 
 interface MenuContextType {
   menuItems: MenuItem[];
+  isLoading: boolean;
   updateItem: (id: string, updated: MenuItem) => void;
   addItem: (item: MenuItem) => void;
   deleteItem: (id: string) => void;
+  bulkUpdate: (ids: string[], changes: Partial<MenuItem>) => void;
   saveToStorage: () => void;
-  resetToDefault: () => void;
+  refreshFromSheet: () => Promise<void>;
 }
 
 const MenuContext = createContext<MenuContextType | null>(null);
 
 export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>(loadMenuFromStorage);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const refreshFromSheet = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await pullMenuDB();
+      if (result.success && result.items.length > 0) {
+        setMenuItems(result.items);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(result.items));
+      }
+    } catch {
+      // keep cached data on failure
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshFromSheet();
+  }, [refreshFromSheet]);
 
   const updateItem = useCallback((id: string, updated: MenuItem) => {
     setMenuItems(prev => prev.map(item => (item.id === id ? updated : item)));
@@ -40,17 +62,18 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setMenuItems(prev => prev.filter(item => item.id !== id));
   }, []);
 
+  const bulkUpdate = useCallback((ids: string[], changes: Partial<MenuItem>) => {
+    setMenuItems(prev => prev.map(item => (ids.includes(item.id) ? { ...item, ...changes } : item)));
+  }, []);
+
   const saveToStorage = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(menuItems));
   }, [menuItems]);
 
-  const resetToDefault = useCallback(() => {
-    setMenuItems(MOCK_MENU_DB);
-    localStorage.removeItem(STORAGE_KEY);
-  }, []);
-
   return (
-    <MenuContext.Provider value={{ menuItems, updateItem, addItem, deleteItem, saveToStorage, resetToDefault }}>
+    <MenuContext.Provider
+      value={{ menuItems, isLoading, updateItem, addItem, deleteItem, bulkUpdate, saveToStorage, refreshFromSheet }}
+    >
       {children}
     </MenuContext.Provider>
   );

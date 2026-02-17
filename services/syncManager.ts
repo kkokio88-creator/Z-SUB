@@ -11,8 +11,9 @@ import {
   CONFIG_HEADERS,
   mealPlanToRows,
   MEAL_PLAN_HEADERS,
+  rowsToHistoricalPlans,
 } from './sheetsSerializer';
-import { MenuItem, MealPlanConfig, MonthlyMealPlan } from '../types';
+import { MenuItem, MealPlanConfig, MonthlyMealPlan, HistoricalMealPlan } from '../types';
 import { addSyncRecord } from './syncTracker';
 
 export type SyncDirection = 'push' | 'pull';
@@ -124,83 +125,24 @@ export const pushMealPlan = async (plan: MonthlyMealPlan): Promise<SyncResult> =
   }
 };
 
-// ── 구독자현황 (Pull only - Sheets에서 입력) ──
+// ── 식단데이터 (Pull - 히스토리 로드) ──
 
-export interface SubscriberSnapshot {
-  target: string;
-  totalSubscribers: number;
-  newSubscribers: number;
-  churnRate: number;
-  satisfaction: number;
-  revenue: number;
-  tiers: string;
-  demographics: string;
-  snapshotDate: string;
-}
-
-export const pullSubscribers = async (): Promise<{
+export const pullHistoricalPlans = async (): Promise<{
   success: boolean;
-  snapshots: SubscriberSnapshot[];
+  plans: HistoricalMealPlan[];
   error?: string;
 }> => {
   try {
-    const data = await getSheetData('구독자현황');
+    const data = await getSheetData('식단데이터');
     if (!data.data || data.data.length <= 1) {
-      return { success: true, snapshots: [] };
+      return { success: true, plans: [] };
     }
-    const snapshots = data.data.slice(1).map(
-      (row): SubscriberSnapshot => ({
-        target: row[0] || '',
-        totalSubscribers: Number(row[1]) || 0,
-        newSubscribers: Number(row[2]) || 0,
-        churnRate: Number(row[3]) || 0,
-        satisfaction: Number(row[4]) || 0,
-        revenue: Number(row[5]) || 0,
-        tiers: row[6] || '',
-        demographics: row[7] || '',
-        snapshotDate: row[8] || '',
-      })
-    );
-    await logSync('pull', '구독자현황', snapshots.length, 'success');
-    return { success: true, snapshots };
+    const plans = rowsToHistoricalPlans(data.data.slice(1));
+    await logSync('pull', '식단데이터', plans.length, 'success');
+    return { success: true, plans };
   } catch (err) {
-    await logSync('pull', '구독자현황', 0, 'error', String(err));
-    return { success: false, snapshots: [], error: String(err) };
-  }
-};
-
-// ── 재무데이터 (Pull only - Sheets에서 입력) ──
-
-export interface FinancialRecord {
-  month: string;
-  revenue: number;
-  cost: number;
-  profit: number;
-}
-
-export const pullFinancials = async (): Promise<{
-  success: boolean;
-  records: FinancialRecord[];
-  error?: string;
-}> => {
-  try {
-    const data = await getSheetData('재무데이터');
-    if (!data.data || data.data.length <= 1) {
-      return { success: true, records: [] };
-    }
-    const records = data.data.slice(1).map(
-      (row): FinancialRecord => ({
-        month: row[0] || '',
-        revenue: Number(row[1]) || 0,
-        cost: Number(row[2]) || 0,
-        profit: Number(row[3]) || 0,
-      })
-    );
-    await logSync('pull', '재무데이터', records.length, 'success');
-    return { success: true, records };
-  } catch (err) {
-    await logSync('pull', '재무데이터', 0, 'error', String(err));
-    return { success: false, records: [], error: String(err) };
+    await logSync('pull', '식단데이터', 0, 'error', String(err));
+    return { success: false, plans: [], error: String(err) };
   }
 };
 

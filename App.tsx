@@ -4,6 +4,7 @@ import { MenuProvider } from './context/MenuContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { SheetsProvider } from './context/SheetsContext';
+import { HistoricalPlansProvider } from './context/HistoricalPlansContext';
 import ToastContainer from './components/Toast';
 import ConfirmDialog from './components/ConfirmDialog';
 import AuthGate from './components/AuthGate';
@@ -12,7 +13,6 @@ import ErrorBoundary from './components/ErrorBoundary';
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const MealPlanner = lazy(() => import('./components/MealPlanner'));
 const MasterDataManagement = lazy(() => import('./components/MasterDataManagement'));
-const SubscriberManagement = lazy(() => import('./components/SubscriberManagement'));
 const SystemSettings = lazy(() => import('./components/SystemSettings'));
 const AuditLog = lazy(() => import('./components/AuditLog'));
 const MealPlanHistory = lazy(() => import('./components/MealPlanHistory'));
@@ -37,8 +37,6 @@ const App: React.FC = () => {
         return <MealPlanner />;
       case 'master-data':
         return <MasterDataManagement />;
-      case 'subscribers':
-        return <SubscriberManagement />;
       case 'settings':
         return <SystemSettings />;
       case 'audit-log':
@@ -63,13 +61,15 @@ const App: React.FC = () => {
         <AuthProvider>
           <SheetsProvider>
             <MenuProvider>
-              <AuthGate>
-                <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-                  <ErrorBoundary>
-                    <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
-                  </ErrorBoundary>
-                </Layout>
-              </AuthGate>
+              <HistoricalPlansProvider>
+                <AuthGate>
+                  <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+                    <ErrorBoundary>
+                      <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
+                    </ErrorBoundary>
+                  </Layout>
+                </AuthGate>
+              </HistoricalPlansProvider>
             </MenuProvider>
           </SheetsProvider>
         </AuthProvider>
