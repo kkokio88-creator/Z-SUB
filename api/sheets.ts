@@ -51,7 +51,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         spreadsheetId: sheetId,
       });
       const title = result.data.properties?.title || '(제목 없음)';
-      return res.status(200).json({ connected: true, message: `연결 성공: "${title}"` });
+      const sheetTabs = (result.data.sheets || []).map(s => s.properties?.title).filter(Boolean);
+      return res.status(200).json({ connected: true, message: `연결 성공: "${title}"`, sheetTabs });
     } catch (err) {
       return res.status(200).json({
         connected: false,
