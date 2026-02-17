@@ -2,30 +2,41 @@
 // 프로덕션 환경에서 Google Sheets API 프록시 역할
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { auth as gauth, sheets as sheetsApi } from '@googleapis/sheets';
 
-function getAuthorizedSheets() {
+let sheetsModule: typeof import('@googleapis/sheets') | null = null;
+
+async function getSheetsModule() {
+  if (!sheetsModule) {
+    sheetsModule = await import('@googleapis/sheets');
+  }
+  return sheetsModule;
+}
+
+async function getAuthorizedSheets() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_PRIVATE_KEY;
   const sheetId = process.env.GOOGLE_SPREADSHEET_ID;
 
   if (!email || !key || !sheetId) return null;
 
-  const jwtAuth = new gauth.JWT({
+  const { auth, sheets } = await getSheetsModule();
+
+  const jwtAuth = new auth.JWT({
     email,
     key: key.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
-  return { sheets: sheetsApi({ version: 'v4', auth: jwtAuth }), spreadsheetId: sheetId };
+  return { sheets: sheets({ version: 'v4', auth: jwtAuth }), spreadsheetId: sheetId };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS - restrict to same-origin Vercel deployment
+  // CORS
   const allowedOrigins = [
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
     process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '',
     'http://localhost:3000',
+    'http://localhost:5173',
   ].filter(Boolean);
   const origin = req.headers.origin || '';
   if (allowedOrigins.includes(origin)) {
@@ -38,43 +49,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  const url = new URL(req.url || '', `https://${req.headers.host}`);
-  const pathParts = url.pathname.replace('/api/sheets/', '').split('/').filter(Boolean);
-
-  // GET /api/sheets/status
-  if (pathParts[0] === 'status') {
-    const client = getAuthorizedSheets();
-    if (!client) {
-      return res.status(200).json({
-        connected: false,
-        message: 'Google Sheets 환경변수가 설정되지 않았습니다.',
-      });
-    }
-    try {
-      const result = await client.sheets.spreadsheets.get({ spreadsheetId: client.spreadsheetId });
-      const title = result.data.properties?.title || '(제목 없음)';
-      return res.status(200).json({ connected: true, message: `연결 성공: "${title}"` });
-    } catch (err) {
-      return res.status(200).json({
-        connected: false,
-        message: `연결 실패: ${err instanceof Error ? err.message : String(err)}`,
-      });
-    }
-  }
-
-  if (pathParts.length < 1) {
-    return res.status(400).json({ error: 'Sheet name required' });
-  }
-
-  const sheetName = decodeURIComponent(pathParts[0]);
-  const isAppend = pathParts[1] === 'append';
-  const client = getAuthorizedSheets();
-
-  if (!client) {
-    return res.status(503).json({ error: 'Google Sheets 미설정', sheetName, success: false });
-  }
-
   try {
+    const url = new URL(req.url || '', `https://${req.headers.host}`);
+    const pathParts = url.pathname.replace('/api/sheets/', '').split('/').filter(Boolean);
+
+    // GET /api/sheets/status
+    if (pathParts[0] === 'status') {
+      const client = await getAuthorizedSheets();
+      if (!client) {
+        return res.status(200).json({
+          connected: false,
+          message: 'Google Sheets 환경변수가 설정되지 않았습니다.',
+          envCheck: {
+            email: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            key: !!process.env.GOOGLE_PRIVATE_KEY,
+            sheetId: !!process.env.GOOGLE_SPREADSHEET_ID,
+          },
+        });
+      }
+      try {
+        const result = await client.sheets.spreadsheets.get({
+          spreadsheetId: client.spreadsheetId,
+        });
+        const title = result.data.properties?.title || '(제목 없음)';
+        return res.status(200).json({ connected: true, message: `연결 성공: "${title}"` });
+      } catch (err) {
+        return res.status(200).json({
+          connected: false,
+          message: `연결 실패: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
+
+    if (pathParts.length < 1) {
+      return res.status(400).json({ error: 'Sheet name required' });
+    }
+
+    const sheetName = decodeURIComponent(pathParts[0]);
+    const isAppend = pathParts[1] === 'append';
+    const client = await getAuthorizedSheets();
+
+    if (!client) {
+      return res.status(503).json({ error: 'Google Sheets 미설정', sheetName, success: false });
+    }
+
     if (req.method === 'GET') {
       const result = await client.sheets.spreadsheets.values.get({
         spreadsheetId: client.spreadsheetId,
@@ -118,9 +136,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     return res.status(500).json({
-      sheetName,
       success: false,
       error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
     });
   }
 }
