@@ -1,5 +1,17 @@
 import React, { useState, useCallback } from 'react';
-import { CheckCircle, XCircle, Clock, Send, Shield, Beaker, Factory, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Send,
+  Shield,
+  Beaker,
+  Factory,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare,
+  Plus,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import {
@@ -8,8 +20,11 @@ import {
   submitDepartmentReview,
   finalizeReview,
   DEPARTMENT_LABELS,
+  addReviewComment,
+  getReviewComments,
+  resolveComment,
 } from '../services/reviewService';
-import type { PlanReviewRecord, ReviewDepartment } from '../types';
+import type { PlanReviewRecord, ReviewDepartment, ReviewComment } from '../types';
 
 const DEPT_ICONS: Record<ReviewDepartment, React.ElementType> = {
   quality: Shield,
@@ -21,6 +36,18 @@ const STATUS_STYLES = {
   pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: '대기' },
   approved: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle, label: '승인' },
   rejected: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle, label: '반려' },
+};
+
+const SCOPE_LABELS = {
+  plan: '식단 전체',
+  week: '주차',
+  item: '메뉴',
+};
+
+const SCOPE_BADGE_COLORS = {
+  plan: 'bg-blue-100 text-blue-700',
+  week: 'bg-purple-100 text-purple-700',
+  item: 'bg-green-100 text-green-700',
 };
 
 interface PlanReviewPanelProps {
@@ -35,6 +62,17 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
   const [expanded, setExpanded] = useState(true);
   const [reviewComment, setReviewComment] = useState('');
   const [activeDept, setActiveDept] = useState<ReviewDepartment | null>(null);
+
+  // Inline Comments State
+  const [comments, setComments] = useState<ReviewComment[]>(() => getReviewComments(planId));
+  const [showCommentForm, setShowCommentForm] = useState(false);
+  const [newCommentDept, setNewCommentDept] = useState<ReviewDepartment>('quality');
+  const [newCommentScope, setNewCommentScope] = useState<'plan' | 'week' | 'item'>('plan');
+  const [newCommentScopeKey, setNewCommentScopeKey] = useState('');
+  const [newCommentText, setNewCommentText] = useState('');
+  const [newCommentStatus, setNewCommentStatus] = useState<'comment' | 'issue'>('comment');
+
+  const unresolvedCount = comments.filter(c => c.status !== 'resolved').length;
 
   const handleRequestReview = useCallback(() => {
     const result = requestReview(planId, user?.displayName || '사용자');
@@ -68,6 +106,41 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
     }
   }, [planId, addToast, onFinalized]);
 
+  const handleAddComment = useCallback(() => {
+    if (!newCommentText.trim()) return;
+
+    const scopeKey = newCommentScope === 'plan' ? planId : newCommentScopeKey;
+    if (!scopeKey) {
+      addToast({ type: 'error', title: '입력 오류', message: 'scope 키를 입력하세요.' });
+      return;
+    }
+
+    const created = addReviewComment(planId, {
+      department: newCommentDept,
+      reviewer: user?.displayName || '사용자',
+      scope: newCommentScope,
+      scopeKey,
+      comment: newCommentText,
+      status: newCommentStatus,
+    });
+
+    setComments(prev => [...prev, created]);
+    setNewCommentText('');
+    setNewCommentScopeKey('');
+    setShowCommentForm(false);
+    addToast({ type: 'success', title: '코멘트 추가', message: '코멘트가 등록되었습니다.' });
+  }, [planId, newCommentDept, newCommentScope, newCommentScopeKey, newCommentText, newCommentStatus, user, addToast]);
+
+  const handleResolveComment = useCallback(
+    (commentId: string) => {
+      const updated = resolveComment(planId, commentId);
+      if (updated) {
+        setComments(prev => prev.map(c => (c.id === commentId ? updated : c)));
+      }
+    },
+    [planId]
+  );
+
   // No review yet → show request button
   if (!review) {
     return (
@@ -81,7 +154,7 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
             onClick={handleRequestReview}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm"
           >
-            <Send className="w-4 h-4" /> 검토 요청
+            <Send className="w-4 h-4" /> 전체 식단 검토 요청
           </button>
         </div>
       </div>
@@ -116,6 +189,12 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
                   ? '승인 완료'
                   : '최종 등록'}
           </span>
+          {unresolvedCount > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
+              <MessageSquare className="w-3 h-3" />
+              미해결 {unresolvedCount}
+            </span>
+          )}
         </div>
         {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
       </div>
@@ -191,6 +270,152 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
               </div>
             );
           })}
+
+          {/* Inline Comments Section */}
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <div className="flex items-center justify-between mb-3">
+              <h5 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4 text-gray-500" />
+                인라인 코멘트
+                {comments.length > 0 && <span className="text-xs font-normal text-gray-400">({comments.length})</span>}
+              </h5>
+              {review.status !== 'finalized' && (
+                <button
+                  onClick={() => setShowCommentForm(!showCommentForm)}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100"
+                >
+                  <Plus className="w-3 h-3" /> 코멘트 추가
+                </button>
+              )}
+            </div>
+
+            {/* Comment Form */}
+            {showCommentForm && (
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 mb-3 space-y-2">
+                <div className="flex gap-2 flex-wrap">
+                  <select
+                    value={newCommentDept}
+                    onChange={e => setNewCommentDept(e.target.value as ReviewDepartment)}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
+                  >
+                    <option value="quality">품질팀</option>
+                    <option value="development">개발팀</option>
+                    <option value="process">공정팀</option>
+                  </select>
+                  <select
+                    value={newCommentScope}
+                    onChange={e => {
+                      setNewCommentScope(e.target.value as 'plan' | 'week' | 'item');
+                      setNewCommentScopeKey('');
+                    }}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
+                  >
+                    <option value="plan">식단 전체</option>
+                    <option value="week">주차</option>
+                    <option value="item">메뉴</option>
+                  </select>
+                  {newCommentScope !== 'plan' && (
+                    <input
+                      type="text"
+                      value={newCommentScopeKey}
+                      onChange={e => setNewCommentScopeKey(e.target.value)}
+                      placeholder={newCommentScope === 'week' ? 'A-1, B-2...' : 'A-1-돈까스'}
+                      className="text-xs border border-gray-200 rounded px-2 py-1 bg-white flex-1 min-w-[120px]"
+                    />
+                  )}
+                  <select
+                    value={newCommentStatus}
+                    onChange={e => setNewCommentStatus(e.target.value as 'comment' | 'issue')}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
+                  >
+                    <option value="comment">의견</option>
+                    <option value="issue">이슈</option>
+                  </select>
+                </div>
+                <textarea
+                  value={newCommentText}
+                  onChange={e => setNewCommentText(e.target.value)}
+                  placeholder="코멘트를 입력하세요..."
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none"
+                  rows={2}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setShowCommentForm(false)}
+                    className="px-3 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleAddComment}
+                    className="px-3 py-1 text-xs font-bold text-white bg-blue-600 rounded hover:bg-blue-700"
+                  >
+                    등록
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Comments List */}
+            {comments.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-3">등록된 코멘트가 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {comments.map(comment => (
+                  <div
+                    key={comment.id}
+                    className={`rounded-lg border p-2.5 ${
+                      comment.status === 'resolved'
+                        ? 'border-gray-200 bg-gray-50 opacity-60'
+                        : comment.status === 'issue'
+                          ? 'border-red-200 bg-red-50/50'
+                          : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-medium text-gray-500">
+                          {DEPARTMENT_LABELS[comment.department]}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${SCOPE_BADGE_COLORS[comment.scope]}`}
+                        >
+                          {SCOPE_LABELS[comment.scope]}
+                          {comment.scope !== 'plan' && `: ${comment.scopeKey}`}
+                        </span>
+                        {comment.status === 'issue' && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
+                            이슈
+                          </span>
+                        )}
+                        {comment.status === 'resolved' && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">
+                            해결됨
+                          </span>
+                        )}
+                      </div>
+                      {review.status !== 'finalized' && (
+                        <button
+                          onClick={() => handleResolveComment(comment.id)}
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded border transition-colors ${
+                            comment.status === 'resolved'
+                              ? 'text-gray-500 bg-white border-gray-200 hover:bg-gray-50'
+                              : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100'
+                          }`}
+                        >
+                          {comment.status === 'resolved' ? '재오픈' : '해결'}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-700">{comment.comment}</p>
+                    <div className="mt-1 text-[10px] text-gray-400">
+                      {comment.reviewer} · {new Date(comment.createdAt).toLocaleString('ko-KR')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Finalize Button */}
           {allApproved && review.status === 'approved' && (

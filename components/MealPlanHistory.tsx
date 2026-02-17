@@ -43,6 +43,66 @@ const TARGET_COLORS: Record<string, string> = {
   [TargetType.CHILD]: 'bg-sky-100 text-sky-700 border-sky-200',
 };
 
+// ── 부모-자식 병합 매핑 ──
+
+interface MergeGroup {
+  groupLabel: string;
+  baseTarget: TargetType;
+  plusTarget: TargetType;
+  plusBadge: string;
+  color: string;
+}
+
+const TARGET_MERGE_MAP: MergeGroup[] = [
+  {
+    groupLabel: '시니어',
+    baseTarget: TargetType.SENIOR,
+    plusTarget: TargetType.SENIOR_HEALTH,
+    plusBadge: '건강',
+    color: 'bg-teal-100 text-teal-700 border-teal-200',
+  },
+  {
+    groupLabel: '가족',
+    baseTarget: TargetType.FAMILY,
+    plusTarget: TargetType.FAMILY_PLUS,
+    plusBadge: '든든',
+    color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  },
+  {
+    groupLabel: '아이',
+    baseTarget: TargetType.KIDS,
+    plusTarget: TargetType.KIDS_PLUS,
+    plusBadge: '든든',
+    color: 'bg-rose-100 text-rose-700 border-rose-200',
+  },
+  {
+    groupLabel: '유아',
+    baseTarget: TargetType.TODDLER,
+    plusTarget: TargetType.TODDLER_PLUS,
+    plusBadge: '든든',
+    color: 'bg-red-100 text-red-700 border-red-200',
+  },
+  {
+    groupLabel: '어린이',
+    baseTarget: TargetType.CHILD,
+    plusTarget: TargetType.CHILD_PLUS,
+    plusBadge: '든든',
+    color: 'bg-sky-100 text-sky-700 border-sky-200',
+  },
+  {
+    groupLabel: '청소연구소',
+    baseTarget: TargetType.YOUTH,
+    plusTarget: TargetType.YOUTH_MAIN,
+    plusBadge: '메인',
+    color: 'bg-violet-100 text-violet-700 border-violet-200',
+  },
+];
+
+// 단독 식단 (병합 없음)
+const STANDALONE_TARGETS = [TargetType.VALUE, TargetType.SIDE_ONLY, TargetType.FIRST_MEET];
+
+type ColumnDef = { type: 'standalone'; target: TargetType } | { type: 'merged'; group: MergeGroup };
+
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
 // ── 주재료 감지 ──
@@ -146,7 +206,92 @@ const IngredientLegend: React.FC = () => (
   </div>
 );
 
-// ── 테이블 셀 ──
+// ── 병합 셀 컴포넌트 ──
+
+const MergedTableCell: React.FC<{
+  baseItems: HistoricalMenuItem[];
+  plusItems: HistoricalMenuItem[];
+  plusBadge: string;
+  date: string;
+  baseTarget: string;
+  plusTarget: string;
+  editedKeys: Set<string>;
+  onSwap: (targetType: string, itemIndex: number, currentName: string) => void;
+}> = ({ baseItems, plusItems, plusBadge, date, baseTarget, plusTarget, editedKeys, onSwap }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  // 공통 메뉴와 plus 전용 메뉴 구분
+  const baseNameSet = new Set(baseItems.map(i => cleanMenuName(i.name)));
+  const allItems: { item: HistoricalMenuItem; isPlusOnly: boolean; targetType: string; idx: number }[] = [];
+
+  baseItems.forEach((item, idx) => {
+    allItems.push({ item, isPlusOnly: false, targetType: baseTarget, idx });
+  });
+
+  plusItems.forEach((item, idx) => {
+    const cleanName = cleanMenuName(item.name);
+    if (!baseNameSet.has(cleanName)) {
+      allItems.push({ item, isPlusOnly: true, targetType: plusTarget, idx });
+    }
+  });
+
+  const displayItems = expanded ? allItems : allItems.slice(0, 6);
+  const hasMore = allItems.length > 6;
+
+  return (
+    <div className="space-y-0.5">
+      {displayItems.map((entry, displayIdx) => {
+        const ingredient = detectIngredient(entry.item.name);
+        const colors = INGREDIENT_COLORS[ingredient];
+        const isEdited = editedKeys.has(`${date}|${entry.targetType}|${entry.idx}`);
+        const displayName = cleanMenuName(entry.item.name);
+
+        return (
+          <div
+            key={`${entry.targetType}-${entry.idx}-${displayIdx}`}
+            onClick={() => onSwap(entry.targetType, entry.idx, entry.item.name)}
+            className={`px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
+            title={entry.item.name}
+          >
+            <span className={`${colors.text} truncate block`}>
+              {displayName}
+              {entry.isPlusOnly && (
+                <span className="ml-1 bg-amber-100 text-amber-700 text-[9px] px-1 rounded font-medium">
+                  {plusBadge}
+                </span>
+              )}
+              {isEdited && <span className="ml-1 text-[9px] text-amber-600 font-medium">수정</span>}
+            </span>
+          </div>
+        );
+      })}
+      {hasMore && !expanded && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
+        >
+          +{allItems.length - 6}개 더보기
+        </button>
+      )}
+      {hasMore && expanded && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            setExpanded(false);
+          }}
+          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
+        >
+          접기
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ── 테이블 셀 (단독) ──
 
 const TableCell: React.FC<{
   items: HistoricalMenuItem[];
@@ -341,15 +486,45 @@ const MealPlanHistory: React.FC = () => {
     return HISTORICAL_MEAL_PLANS.filter(p => p.date.startsWith(prefix));
   }, [viewYear, viewMonth]);
 
-  // 해당 월에 데이터가 있는 타겟만 열로 표시
-  const activeTargets = useMemo(() => {
+  // 해당 월에 데이터가 있는 타겟 기반으로 컬럼 정의 (병합 그룹 기준)
+  const columns = useMemo((): ColumnDef[] => {
     const targetSet = new Set<string>();
     for (const plan of monthPlans) {
       for (const target of plan.targets) {
         targetSet.add(target.targetType);
       }
     }
-    return Object.keys(TARGET_LABELS).filter(t => targetSet.has(t));
+
+    const result: ColumnDef[] = [];
+
+    // 병합 그룹 확인
+    const usedTargets = new Set<string>();
+    for (const group of TARGET_MERGE_MAP) {
+      const hasBase = targetSet.has(group.baseTarget);
+      const hasPlus = targetSet.has(group.plusTarget);
+      if (hasBase || hasPlus) {
+        result.push({ type: 'merged', group });
+        usedTargets.add(group.baseTarget);
+        usedTargets.add(group.plusTarget);
+      }
+    }
+
+    // 단독 타겟
+    for (const target of STANDALONE_TARGETS) {
+      if (targetSet.has(target) && !usedTargets.has(target)) {
+        result.push({ type: 'standalone', target });
+        usedTargets.add(target);
+      }
+    }
+
+    // 나머지 (예상 외의 타겟)
+    for (const t of targetSet) {
+      if (!usedTargets.has(t)) {
+        result.push({ type: 'standalone', target: t as TargetType });
+      }
+    }
+
+    return result;
   }, [monthPlans]);
 
   // 네비게이션
@@ -413,6 +588,21 @@ const MealPlanHistory: React.FC = () => {
     const day = d.getDate();
     const dow = DAY_NAMES[d.getDay()];
     return `${month}.${String(day).padStart(2, '0')}(${dow})`;
+  };
+
+  // 컬럼 헤더 라벨 가져오기
+  const getColumnLabel = (col: ColumnDef): string => {
+    if (col.type === 'standalone') {
+      return TARGET_LABELS[col.target] || col.target;
+    }
+    return col.group.groupLabel;
+  };
+
+  const getColumnColor = (col: ColumnDef): string => {
+    if (col.type === 'standalone') {
+      return TARGET_COLORS[col.target] || 'bg-gray-100 text-gray-600';
+    }
+    return col.group.color;
   };
 
   return (
@@ -482,15 +672,15 @@ const MealPlanHistory: React.FC = () => {
                 <th className="sticky left-[80px] z-30 bg-gray-50 px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
                   주기
                 </th>
-                {activeTargets.map(t => (
+                {columns.map((col, idx) => (
                   <th
-                    key={t}
+                    key={idx}
                     className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200 min-w-[180px]"
                   >
                     <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${TARGET_COLORS[t] || 'bg-gray-100 text-gray-600'}`}
+                      className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${getColumnColor(col)}`}
                     >
-                      {TARGET_LABELS[t] || t}
+                      {getColumnLabel(col)}
                     </span>
                   </th>
                 ))}
@@ -515,28 +705,65 @@ const MealPlanHistory: React.FC = () => {
                         {plan.cycleType}
                       </span>
                     </td>
-                    {/* 타겟 열들 */}
-                    {activeTargets.map(targetType => {
-                      const target = targetMap.get(targetType);
-                      if (!target) {
+                    {/* 컬럼 렌더링 */}
+                    {columns.map((col, colIdx) => {
+                      if (col.type === 'standalone') {
+                        const target = targetMap.get(col.target);
+                        if (!target) {
+                          return (
+                            <td
+                              key={colIdx}
+                              className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
+                            >
+                              —
+                            </td>
+                          );
+                        }
+                        const items = getItems(plan.date, col.target, target.items);
+                        return (
+                          <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                            <TableCell
+                              items={items}
+                              date={plan.date}
+                              targetType={col.target}
+                              editedKeys={editedKeys}
+                              onSwap={(itemIndex, currentName) =>
+                                setSwapTarget({ date: plan.date, targetType: col.target, itemIndex, currentName })
+                              }
+                            />
+                          </td>
+                        );
+                      }
+
+                      // Merged column
+                      const baseData = targetMap.get(col.group.baseTarget);
+                      const plusData = targetMap.get(col.group.plusTarget);
+
+                      if (!baseData && !plusData) {
                         return (
                           <td
-                            key={targetType}
+                            key={colIdx}
                             className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
                           >
                             —
                           </td>
                         );
                       }
-                      const items = getItems(plan.date, targetType, target.items);
+
+                      const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
+                      const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
+
                       return (
-                        <td key={targetType} className="px-2 py-1.5 border-r border-gray-100 align-top">
-                          <TableCell
-                            items={items}
+                        <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                          <MergedTableCell
+                            baseItems={baseItems}
+                            plusItems={plusItems}
+                            plusBadge={col.group.plusBadge}
                             date={plan.date}
-                            targetType={targetType}
+                            baseTarget={col.group.baseTarget}
+                            plusTarget={col.group.plusTarget}
                             editedKeys={editedKeys}
-                            onSwap={(itemIndex, currentName) =>
+                            onSwap={(targetType, itemIndex, currentName) =>
                               setSwapTarget({ date: plan.date, targetType, itemIndex, currentName })
                             }
                           />

@@ -2,36 +2,41 @@ import React, { useState, useMemo } from 'react';
 import {
   Database,
   Search,
-  Filter,
   Save,
   RefreshCw,
   Plus,
-  Hash,
   Flame,
-  Leaf,
-  Snowflake,
-  Sun,
-  CloudRain,
-  Check,
-  X,
   Upload,
   Edit3,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Wand2,
+  Eraser,
+  ArrowUpDown,
 } from 'lucide-react';
 import ImportDialog from './ImportDialog';
 import BulkEditDialog from './BulkEditDialog';
-import { MenuCategory, MenuItem, Season, TasteProfile } from '../types';
+import MenuDetailModal from './MenuDetailModal';
+import { MenuCategory, MenuItem, Season } from '../types';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { MAJOR_INGREDIENTS } from '../constants';
 import { validateMenuItem, type ValidationError } from '../services/validationService';
 import { addAuditEntry } from '../services/auditService';
+import { autoClassifyBatch } from '../services/autoClassifyService';
+
+const PAGE_SIZE = 50;
+
+type SortField = 'name' | 'category' | 'recommendedPrice' | 'cost' | 'process' | 'weight';
+type SortDir = 'asc' | 'desc';
 
 const MenuDatabase: React.FC = () => {
   const {
     menuItems,
     updateItem: contextUpdateItem,
     addItem,
+    deleteItems,
     bulkUpdate,
     saveToStorage,
     refreshFromSheet,
@@ -41,41 +46,122 @@ const MenuDatabase: React.FC = () => {
   const { user } = useAuth();
   const [, setValidationErrors] = useState<ValidationError[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
-  const [filterIngredient, setFilterIngredient] = useState<string>('ALL');
-  const [filterTag, setFilterTag] = useState<string>('');
   const [filterUsage, setFilterUsage] = useState<'ALL' | 'active' | 'unused'>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [lastSynced, setLastSynced] = useState<string>('—');
+  const [lastSynced, setLastSynced] = useState<string>('\u2014');
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [page, setPage] = useState(0);
+
+  // Sort
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // Modal
+  const [modalItem, setModalItem] = useState<MenuItem | null>(null);
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkEdit, setShowBulkEdit] = useState(false);
 
-  // Collect all unique tags for filter
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    menuItems.forEach(item => item.tags.forEach(t => tagSet.add(t)));
-    return Array.from(tagSet).sort();
+  // Stats
+  const stats = useMemo(() => {
+    const total = menuItems.length;
+    const active = menuItems.filter(i => !i.isUnused).length;
+    const unused = menuItems.filter(i => i.isUnused).length;
+    const byCat: Record<string, number> = {};
+    for (const item of menuItems) {
+      byCat[item.category] = (byCat[item.category] || 0) + 1;
+    }
+    return { total, active, unused, byCat };
   }, [menuItems]);
 
   const filteredItems = useMemo(
     () =>
       menuItems.filter(item => {
         const matchesCategory = filterCategory === 'ALL' || item.category === filterCategory;
-        const matchesIngredient = filterIngredient === 'ALL' || item.mainIngredient === filterIngredient;
-        const matchesTag = !filterTag || item.tags.includes(filterTag);
         const matchesUsage = filterUsage === 'ALL' || (filterUsage === 'active' ? !item.isUnused : item.isUnused);
         const matchesSearch =
+          !searchTerm ||
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesCategory && matchesSearch && matchesIngredient && matchesTag && matchesUsage;
+        return matchesCategory && matchesSearch && matchesUsage;
       }),
-    [menuItems, filterCategory, filterIngredient, filterTag, filterUsage, searchTerm]
+    [menuItems, filterCategory, filterUsage, searchTerm]
   );
 
-  const selectedItem = menuItems.find(i => i.id === selectedId) || null;
+  // Sorted items
+  const sortedItems = useMemo(() => {
+    if (!sortField) return filteredItems;
+    const sorted = [...filteredItems].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+      switch (sortField) {
+        case 'name':
+          valA = a.name;
+          valB = b.name;
+          break;
+        case 'category':
+          valA = a.category;
+          valB = b.category;
+          break;
+        case 'recommendedPrice':
+          valA = a.recommendedPrice;
+          valB = b.recommendedPrice;
+          break;
+        case 'cost':
+          valA = a.cost;
+          valB = b.cost;
+          break;
+        case 'process':
+          valA = a.process || 0;
+          valB = b.process || 0;
+          break;
+        case 'weight':
+          valA = a.weight || 0;
+          valB = b.weight || 0;
+          break;
+      }
+      if (typeof valA === 'string') {
+        return sortDir === 'asc' ? valA.localeCompare(valB as string) : (valB as string).localeCompare(valA);
+      }
+      return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
+    });
+    return sorted;
+  }, [filteredItems, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageItems = sortedItems.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  // Reset page when filters change
+  useMemo(() => {
+    setPage(0);
+  }, [filterCategory, filterUsage, searchTerm]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const SortHeader: React.FC<{ field: SortField; label: string; className?: string }> = ({
+    field,
+    label,
+    className,
+  }) => (
+    <th
+      className={`px-3 py-2 text-xs font-semibold text-gray-500 cursor-pointer select-none hover:bg-gray-100 transition-colors ${className || ''}`}
+      onClick={() => handleSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {sortField === field && <ArrowUpDown className="w-3 h-3 text-primary-500" />}
+      </span>
+    </th>
+  );
 
   const handleUpdateItem = (id: string, field: keyof MenuItem, value: MenuItem[keyof MenuItem]) => {
     const item = menuItems.find(i => i.id === id);
@@ -84,38 +170,10 @@ const MenuDatabase: React.FC = () => {
     }
   };
 
-  const handleTasteToggle = (id: string, taste: TasteProfile) => {
-    const item = menuItems.find(i => i.id === id);
-    if (!item) return;
-    const newTastes = item.tastes.includes(taste) ? item.tastes.filter(t => t !== taste) : [...item.tastes, taste];
-    handleUpdateItem(id, 'tastes', newTastes);
-    if (taste === TasteProfile.SPICY) {
-      handleUpdateItem(id, 'isSpicy', newTastes.includes(TasteProfile.SPICY));
-    }
-  };
-
-  const handleAddTag = (id: string, tag: string) => {
-    const item = menuItems.find(i => i.id === id);
-    if (item && tag.trim()) {
-      handleUpdateItem(id, 'tags', [...item.tags, tag.trim()]);
-    }
-  };
-
-  const handleRemoveTag = (id: string, tag: string) => {
-    const item = menuItems.find(i => i.id === id);
-    if (item) {
-      handleUpdateItem(
-        id,
-        'tags',
-        item.tags.filter(t => t !== tag)
-      );
-    }
-  };
-
   const handleCreateNew = () => {
     const newItem: MenuItem = {
       id: `NEW_${Date.now()}`,
-      name: '신규 메뉴',
+      name: '\uC2E0\uADDC \uBA54\uB274',
       category: MenuCategory.MAIN,
       cost: 0,
       recommendedPrice: 0,
@@ -129,7 +187,7 @@ const MenuDatabase: React.FC = () => {
       process: 11,
     };
     addItem(newItem);
-    setSelectedId(newItem.id);
+    setModalItem(newItem);
     addAuditEntry({
       action: 'menu.create',
       userId: user?.id || '',
@@ -141,28 +199,43 @@ const MenuDatabase: React.FC = () => {
   };
 
   const handleSave = () => {
-    if (selectedItem) {
-      const result = validateMenuItem(selectedItem);
-      setValidationErrors(result.errors);
-      if (!result.isValid) {
-        addToast({ type: 'error', title: '저장 실패', message: '입력값을 확인해주세요.' });
-        return;
-      }
-    }
     saveToStorage();
     setLastSynced(new Date().toLocaleString('ko-KR'));
     setValidationErrors([]);
-    addToast({ type: 'success', title: '저장 완료', message: '메뉴 데이터가 저장되었습니다.' });
-    if (selectedItem) {
-      addAuditEntry({
-        action: 'menu.update',
-        userId: user?.id || '',
-        userName: user?.displayName || '',
-        entityType: 'menu_item',
-        entityId: selectedItem.id,
-        entityName: selectedItem.name,
+    addToast({
+      type: 'success',
+      title: '\uC800\uC7A5 \uC644\uB8CC',
+      message: '\uBA54\uB274 \uB370\uC774\uD130\uAC00 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.',
+    });
+  };
+
+  const handleModalSave = (updated: MenuItem) => {
+    const result = validateMenuItem(updated);
+    if (!result.isValid) {
+      setValidationErrors(result.errors);
+      addToast({
+        type: 'error',
+        title: '\uC800\uC7A5 \uC2E4\uD328',
+        message: '\uC785\uB825\uAC12\uC744 \uD655\uC778\uD574\uC8FC\uC138\uC694.',
       });
+      return;
     }
+    contextUpdateItem(updated.id, updated);
+    saveToStorage();
+    setModalItem(null);
+    addToast({
+      type: 'success',
+      title: '\uC800\uC7A5 \uC644\uB8CC',
+      message: `${updated.name} \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`,
+    });
+    addAuditEntry({
+      action: 'menu.update',
+      userId: user?.id || '',
+      userName: user?.displayName || '',
+      entityType: 'menu_item',
+      entityId: updated.id,
+      entityName: updated.name,
+    });
   };
 
   const toggleSelectItem = (id: string) => {
@@ -175,10 +248,10 @@ const MenuDatabase: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredItems.length) {
+    if (selectedIds.size === pageItems.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredItems.map(i => i.id)));
+      setSelectedIds(new Set(pageItems.map(i => i.id)));
     }
   };
 
@@ -189,8 +262,6 @@ const MenuDatabase: React.FC = () => {
     isUnused?: boolean;
   }) => {
     const ids = Array.from(selectedIds);
-
-    // For category and isUnused, use bulkUpdate
     const directChanges: Partial<MenuItem> = {};
     if (changes.category) directChanges.category = changes.category;
     if (changes.isUnused !== undefined) directChanges.isUnused = changes.isUnused;
@@ -199,7 +270,6 @@ const MenuDatabase: React.FC = () => {
       bulkUpdate(ids, directChanges);
     }
 
-    // For tag changes, need per-item update
     if (changes.addTags || changes.removeTags) {
       for (const id of ids) {
         const item = menuItems.find(i => i.id === id);
@@ -220,79 +290,217 @@ const MenuDatabase: React.FC = () => {
     saveToStorage();
     setShowBulkEdit(false);
     setSelectedIds(new Set());
-    addToast({ type: 'success', title: '일괄 편집 완료', message: `${ids.length}개 메뉴가 변경되었습니다.` });
+    addToast({
+      type: 'success',
+      title: '\uC77C\uAD04 \uD3B8\uC9D1 \uC644\uB8CC',
+      message: `${ids.length}\uAC1C \uBA54\uB274\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`,
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    deleteItems(ids);
+    saveToStorage();
+    setSelectedIds(new Set());
+    addToast({
+      type: 'success',
+      title: '\uC0AD\uC81C \uC644\uB8CC',
+      message: `${ids.length}\uAC1C \uBA54\uB274\uAC00 \uC0AD\uC81C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`,
+    });
   };
 
   const handleRefresh = async () => {
     await refreshFromSheet();
     setLastSynced(new Date().toLocaleString('ko-KR'));
-    addToast({ type: 'success', title: '동기화 완료', message: '시트 데이터를 새로고침했습니다.' });
+    addToast({
+      type: 'success',
+      title: '\uB3D9\uAE30\uD654 \uC644\uB8CC',
+      message: '\uC2DC\uD2B8 \uB370\uC774\uD130\uB97C \uC0C8\uB85C\uACE0\uCE68\uD588\uC2B5\uB2C8\uB2E4.',
+    });
   };
 
-  const getSeasonIcon = (season: Season) => {
-    switch (season) {
-      case Season.SPRING:
-        return <Leaf className="w-3 h-3 text-green-500" />;
-      case Season.SUMMER:
-        return <Sun className="w-3 h-3 text-orange-500" />;
-      case Season.AUTUMN:
-        return <CloudRain className="w-3 h-3 text-brown-500" />;
-      case Season.WINTER:
-        return <Snowflake className="w-3 h-3 text-blue-500" />;
+  // 자동 분류
+  const handleAutoClassify = () => {
+    const targets = menuItems.filter(item => item.mainIngredient === 'vegetable' && !item.isUnused);
+    const results = autoClassifyBatch(targets);
+
+    if (results.length === 0) {
+      addToast({ type: 'info', title: '자동 분류', message: '분류 변경이 필요한 항목이 없습니다.' });
+      return;
+    }
+
+    if (!window.confirm(`${results.length}개 항목에 자동 분류를 적용하시겠습니까?`)) return;
+
+    for (const change of results) {
+      const item = menuItems.find(i => i.id === change.id);
+      if (!item) continue;
+      const updated: Partial<MenuItem> = {};
+      if (change.mainIngredient) updated.mainIngredient = change.mainIngredient;
+      if (change.category) updated.category = change.category;
+      contextUpdateItem(item.id, { ...item, ...updated });
+    }
+    saveToStorage();
+    addToast({ type: 'success', title: '자동 분류 완료', message: `${results.length}개 항목이 업데이트되었습니다.` });
+  };
+
+  // 데이터 정리
+  const handleCleanup = () => {
+    const emptyNameItems = menuItems.filter(i => !i.name || !i.name.trim());
+    const nameMap = new Map<string, string[]>();
+    const codeMap = new Map<string, string[]>();
+    for (const item of menuItems) {
+      if (item.name && item.name.trim()) {
+        const key = item.name.trim();
+        if (!nameMap.has(key)) nameMap.set(key, []);
+        nameMap.get(key)!.push(item.id);
+      }
+      if (item.code && item.code.trim()) {
+        const key = item.code.trim();
+        if (!codeMap.has(key)) codeMap.set(key, []);
+        codeMap.get(key)!.push(item.id);
+      }
+    }
+
+    const duplicateNameIds = new Set<string>();
+    for (const ids of nameMap.values()) {
+      if (ids.length > 1) {
+        ids.slice(1).forEach(id => duplicateNameIds.add(id));
+      }
+    }
+    const duplicateCodeIds = new Set<string>();
+    for (const ids of codeMap.values()) {
+      if (ids.length > 1) {
+        ids.slice(1).forEach(id => duplicateCodeIds.add(id));
+      }
+    }
+
+    const duplicateCount = new Set([...duplicateNameIds, ...duplicateCodeIds]).size;
+    const totalToRemove = emptyNameItems.length + duplicateCount;
+
+    if (totalToRemove === 0) {
+      addToast({ type: 'info', title: '데이터 정리', message: '정리할 항목이 없습니다.' });
+      return;
+    }
+
+    const msg = [
+      `분석 결과:`,
+      emptyNameItems.length > 0 ? `- 빈 이름 항목: ${emptyNameItems.length}개` : null,
+      duplicateCount > 0 ? `- 중복 항목: ${duplicateCount}개` : null,
+      `\n총 ${totalToRemove}개 항목을 정리하시겠습니까?`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    if (!window.confirm(msg)) return;
+
+    const idsToRemove = new Set([...emptyNameItems.map(i => i.id), ...duplicateNameIds, ...duplicateCodeIds]);
+    deleteItems(Array.from(idsToRemove));
+    saveToStorage();
+    addToast({ type: 'success', title: '정리 완료', message: `${idsToRemove.size}개 항목이 제거되었습니다.` });
+  };
+
+  const categoryBadgeClass = (cat: MenuCategory) => {
+    switch (cat) {
+      case MenuCategory.MAIN:
+        return 'bg-orange-100 text-orange-700';
+      case MenuCategory.SOUP:
+        return 'bg-blue-100 text-blue-700';
+      case MenuCategory.DESSERT:
+        return 'bg-purple-100 text-purple-700';
       default:
-        return <span className="text-[10px]">전체</span>;
+        return 'bg-green-100 text-green-700';
     }
   };
 
   return (
-    <div className="flex h-full gap-4 overflow-hidden">
-      {/* Left Panel: List View */}
-      <div className="w-1/3 flex flex-col bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        {/* Search & Header */}
-        <div className="p-4 border-b border-gray-100 space-y-3 bg-gray-50/50">
-          <div className="flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-              <Database className="w-4 h-4 text-gray-500" /> 메뉴 목록
-            </h3>
-            <div className="flex gap-1">
-              <button
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
-                title="시트 새로고침"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={() => setShowImportDialog(true)}
-                className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
-                title="CSV 가져오기"
-              >
-                <Upload className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleCreateNew}
-                className="p-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
-                title="신규 추가"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
+    <div className="flex flex-col h-full bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Top Action Bar */}
+      <div className="p-4 border-b border-gray-100 space-y-3 bg-gray-50/50">
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <Database className="w-4 h-4 text-gray-500" /> 반찬 리스트
+            <span className="text-xs font-normal text-gray-400 ml-1">({filteredItems.length.toLocaleString()}개)</span>
+          </h3>
+          <div className="flex gap-1.5">
+            <button
+              onClick={handleAutoClassify}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium rounded hover:bg-amber-100 transition-colors"
+              title="주재료 기본값인 항목에 자동 분류 적용"
+            >
+              <Wand2 className="w-3.5 h-3.5" /> 자동분류
+            </button>
+            <button
+              onClick={handleCleanup}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 text-gray-600 text-xs font-medium rounded hover:bg-gray-100 transition-colors"
+              title="빈 이름/중복 항목 정리"
+            >
+              <Eraser className="w-3.5 h-3.5" /> 정리
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="\uC2DC\uD2B8 \uC0C8\uB85C\uACE0\uCE68"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowImportDialog(true)}
+              className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
+              title="CSV \uAC00\uC838\uC624\uAE30"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleCreateNew}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> 신규추가
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+            >
+              <Save className="w-3.5 h-3.5" /> 저장
+            </button>
           </div>
+        </div>
 
-          <div className="relative">
+        {/* Stats Summary */}
+        <div className="flex gap-3 text-[11px] text-gray-500">
+          <span>
+            전체 <strong className="text-gray-700">{stats.total}</strong>개
+          </span>
+          <span className="text-gray-300">|</span>
+          <span>
+            사용 <strong className="text-green-600">{stats.active}</strong>개
+          </span>
+          <span className="text-gray-300">|</span>
+          <span>
+            미사용 <strong className="text-gray-400">{stats.unused}</strong>개
+          </span>
+          <span className="text-gray-300">|</span>
+          {Object.entries(stats.byCat).map(([cat, count]) => (
+            <span key={cat}>
+              {cat} <strong>{count}</strong>
+            </span>
+          ))}
+        </div>
+
+        {/* Filters Row */}
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="메뉴명, 코드 검색..."
+              placeholder="\uBA54\uB274\uBA85, \uCF54\uB4DC \uAC80\uC0C9..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
-
-          {/* Category Filter */}
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setFilterCategory('ALL')}
               className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full border ${filterCategory === 'ALL' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
@@ -309,353 +517,181 @@ const MenuDatabase: React.FC = () => {
               </button>
             ))}
           </div>
+          <select
+            value={filterUsage}
+            onChange={e => setFilterUsage(e.target.value as 'ALL' | 'active' | 'unused')}
+            className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500"
+          >
+            <option value="ALL">상태: 전체</option>
+            <option value="active">사용</option>
+            <option value="unused">미사용</option>
+          </select>
+        </div>
+      </div>
 
-          {/* Additional Filters */}
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="px-4 py-2 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
+          <span className="text-xs font-medium text-primary-700">{selectedIds.size}개 선택됨</span>
           <div className="flex gap-2">
-            <select
-              value={filterIngredient}
-              onChange={e => setFilterIngredient(e.target.value)}
-              className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500 flex-1"
+            <button
+              onClick={() => setShowBulkEdit(true)}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
             >
-              <option value="ALL">주재료: 전체</option>
-              {MAJOR_INGREDIENTS.map(ing => (
-                <option key={ing.key} value={ing.key}>
-                  {ing.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterTag}
-              onChange={e => setFilterTag(e.target.value)}
-              className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500 flex-1"
+              <Edit3 className="w-3 h-3" /> 일괄 편집
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700"
             >
-              <option value="">태그: 전체</option>
-              {allTags.map(tag => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterUsage}
-              onChange={e => setFilterUsage(e.target.value as 'ALL' | 'active' | 'unused')}
-              className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500"
+              <Trash2 className="w-3 h-3" /> 삭제
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-2 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
             >
-              <option value="ALL">상태: 전체</option>
-              <option value="active">사용</option>
-              <option value="unused">미사용</option>
-            </select>
+              선택 해제
+            </button>
           </div>
         </div>
+      )}
 
-        {/* Bulk Action Bar */}
-        {selectedIds.size > 0 && (
-          <div className="px-4 py-2 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
-            <span className="text-xs font-medium text-primary-700">{selectedIds.size}개 선택됨</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowBulkEdit(true)}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-              >
-                <Edit3 className="w-3 h-3" /> 일괄 편집
-              </button>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="px-2 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
-              >
-                선택 해제
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* List */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Select All header */}
-          <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-2 bg-gray-50/30">
-            <input
-              type="checkbox"
-              checked={filteredItems.length > 0 && selectedIds.size === filteredItems.length}
-              onChange={toggleSelectAll}
-              className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="text-[11px] text-gray-400">전체 선택</span>
-          </div>
-          {filteredItems.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 text-sm">검색 결과가 없습니다.</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {filteredItems.map(item => (
-                <div
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 sticky top-0 z-10">
+            <tr className="border-b border-gray-200">
+              <th className="w-10 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={pageItems.length > 0 && selectedIds.size === pageItems.length}
+                  onChange={toggleSelectAll}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+              </th>
+              <SortHeader field="category" label="구분" className="text-left w-28" />
+              <SortHeader field="name" label="메뉴명" className="text-left" />
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-28">품목코드</th>
+              <SortHeader field="process" label="공정" className="text-center w-16" />
+              <SortHeader field="weight" label="용량" className="text-right w-16" />
+              <SortHeader field="recommendedPrice" label="가격" className="text-right w-20" />
+              <SortHeader field="cost" label="원가" className="text-right w-20" />
+              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-20">사용여부</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-12">맵</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {pageItems.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="text-center py-12 text-gray-400 text-sm">
+                  검색 결과가 없습니다.
+                </td>
+              </tr>
+            ) : (
+              pageItems.map(item => (
+                <tr
                   key={item.id}
-                  className={`flex items-center border-l-4 ${selectedId === item.id ? 'bg-blue-50 border-l-blue-500' : 'border-l-transparent hover:bg-gray-50'}`}
+                  className="hover:bg-blue-50/50 cursor-pointer transition-colors"
+                  onClick={() => setModalItem(item)}
                 >
-                  <div className="pl-4 py-3 flex items-center" onClick={e => e.stopPropagation()}>
+                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(item.id)}
                       onChange={() => toggleSelectItem(item.id)}
                       className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
-                  </div>
-                  <div
-                    onClick={() => setSelectedId(item.id)}
-                    className="flex-1 p-4 pl-2 cursor-pointer flex justify-between items-center transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span
-                          className={`text-[10px] px-1.5 rounded font-bold ${
-                            item.category === MenuCategory.MAIN
-                              ? 'bg-orange-100 text-orange-700'
-                              : item.category === MenuCategory.SOUP
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-green-100 text-green-700'
-                          }`}
-                        >
-                          {item.category.substring(0, 2)}
-                        </span>
-                        <span
-                          className={`text-sm font-medium truncate ${item.isUnused ? 'text-gray-400 line-through' : 'text-gray-800'}`}
-                        >
-                          {item.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="font-mono">{item.code}</span>
-                        <span>·</span>
-                        <span>{item.cost.toLocaleString()}원</span>
-                      </div>
-                    </div>
-                    {item.isSpicy && <Flame className="w-3 h-3 text-red-400 flex-shrink-0" />}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* List Footer */}
-        <div className="p-3 bg-gray-50 text-xs text-gray-500 border-t border-gray-200 flex justify-between">
-          <span>{filteredItems.length}개 항목</span>
-          <div className="flex items-center gap-1 cursor-pointer hover:text-green-600" onClick={handleRefresh}>
-            <RefreshCw className="w-3 h-3" /> {lastSynced}
-          </div>
-        </div>
-      </div>
-
-      {/* Right Panel: Detail View */}
-      <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
-        {selectedItem ? (
-          <>
-            {/* Detail Header */}
-            <div className="p-6 border-b border-gray-100 flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <select
-                    value={selectedItem.category}
-                    onChange={e => handleUpdateItem(selectedItem.id, 'category', e.target.value)}
-                    className="text-xs font-bold bg-gray-100 border-transparent rounded px-2 py-1 focus:ring-primary-500 focus:bg-white"
-                  >
-                    {Object.values(MenuCategory).map(c => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedItem.isUnused && (
-                    <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">미사용</span>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={selectedItem.name}
-                  onChange={e => handleUpdateItem(selectedItem.id, 'name', e.target.value)}
-                  className="text-2xl font-bold text-gray-900 border-none p-0 focus:ring-0 w-full placeholder-gray-300"
-                  placeholder="메뉴명 입력"
-                />
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <span className="text-gray-400">품목코드:</span>
-                    <input
-                      value={selectedItem.code || ''}
-                      onChange={e => handleUpdateItem(selectedItem.id, 'code', e.target.value)}
-                      className="font-mono bg-transparent border-none p-0 w-24 focus:ring-0 text-gray-600"
-                      placeholder="CODE"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleUpdateItem(selectedItem.id, 'isUnused', !selectedItem.isUnused)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded border ${selectedItem.isUnused ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border-gray-300'}`}
-                >
-                  {selectedItem.isUnused ? '사용으로 전환' : '미사용 처리'}
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 shadow-sm"
-                >
-                  <Save className="w-4 h-4" /> 저장
-                </button>
-              </div>
-            </div>
-
-            {/* Detail Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              {/* 1. Basic Info Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                  <label className="text-xs font-bold text-gray-400 block mb-1">원가</label>
-                  <div className="flex items-center">
-                    <span className="text-gray-400 text-sm mr-1">{'\u20A9'}</span>
-                    <input
-                      type="number"
-                      value={selectedItem.cost}
-                      onChange={e => handleUpdateItem(selectedItem.id, 'cost', parseInt(e.target.value))}
-                      className="bg-transparent border-none p-0 font-bold text-lg text-gray-800 w-full focus:ring-0"
-                    />
-                  </div>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                  <label className="text-xs font-bold text-gray-400 block mb-1">권장 판매가</label>
-                  <div className="flex items-center">
-                    <span className="text-gray-400 text-sm mr-1">{'\u20A9'}</span>
-                    <input
-                      type="number"
-                      value={selectedItem.recommendedPrice}
-                      onChange={e => handleUpdateItem(selectedItem.id, 'recommendedPrice', parseInt(e.target.value))}
-                      className="bg-transparent border-none p-0 font-bold text-lg text-gray-800 w-full focus:ring-0"
-                    />
-                  </div>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                  <label className="text-xs font-bold text-gray-400 block mb-1">중량 (g)</label>
-                  <input
-                    type="number"
-                    value={selectedItem.weight || 0}
-                    onChange={e => handleUpdateItem(selectedItem.id, 'weight', parseInt(e.target.value))}
-                    className="bg-transparent border-none p-0 font-bold text-lg text-gray-800 w-full focus:ring-0"
-                  />
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                  <label className="text-xs font-bold text-gray-400 block mb-1">공정 번호</label>
-                  <input
-                    type="number"
-                    value={selectedItem.process || 0}
-                    onChange={e => handleUpdateItem(selectedItem.id, 'process', parseInt(e.target.value))}
-                    className="bg-transparent border-none p-0 font-bold text-lg text-gray-800 w-full focus:ring-0"
-                  />
-                </div>
-              </div>
-
-              {/* 2. Characteristics */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <Filter className="w-4 h-4 text-gray-400" /> 메뉴 속성 상세
-                </h4>
-
-                <div className="flex gap-8">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">계절성</label>
-                    <div className="flex gap-2">
-                      {Object.values(Season).map(s => (
-                        <button
-                          key={s}
-                          onClick={() => handleUpdateItem(selectedItem.id, 'season', s)}
-                          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border ${selectedItem.season === s ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                          {getSeasonIcon(s)} {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">주재료</label>
+                  </td>
+                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     <select
-                      value={selectedItem.mainIngredient}
-                      onChange={e => handleUpdateItem(selectedItem.id, 'mainIngredient', e.target.value)}
-                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-primary-500 focus:border-primary-500"
+                      value={item.category}
+                      onChange={e => handleUpdateItem(item.id, 'category', e.target.value as MenuCategory)}
+                      className={`text-[11px] font-bold rounded px-1.5 py-0.5 border-transparent focus:ring-primary-500 ${categoryBadgeClass(item.category)}`}
                     >
-                      {MAJOR_INGREDIENTS.map(ing => (
-                        <option key={ing.key} value={ing.key}>
-                          {ing.label}
+                      {Object.values(MenuCategory).map(c => (
+                        <option key={c} value={c}>
+                          {c}
                         </option>
                       ))}
-                      <option value="other">기타</option>
                     </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">맛 속성</label>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.values(TasteProfile).map(t => {
-                      const isActive = selectedItem.tastes.includes(t);
-                      return (
-                        <button
-                          key={t}
-                          onClick={() => handleTasteToggle(selectedItem.id, t)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-gray-800 text-white shadow-md transform scale-105' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                        >
-                          {t}
-                          {isActive && <Check className="w-3 h-3 inline ml-1" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Tags */}
-              <div>
-                <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 pb-2 border-b border-gray-100 mb-4">
-                  <Hash className="w-4 h-4 text-gray-400" /> 관리 태그
-                </h4>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {selectedItem.tags.map((tag, idx) => (
+                  </td>
+                  <td className="px-3 py-2">
                     <span
-                      key={idx}
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                      className={`text-sm font-medium ${item.isUnused ? 'text-gray-400 line-through' : 'text-gray-800'}`}
                     >
-                      #{tag}
-                      <button
-                        onClick={() => handleRemoveTag(selectedItem.id, tag)}
-                        className="ml-1.5 hover:text-blue-900"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      {item.name}
                     </span>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  placeholder="태그 추가 (Enter)..."
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-primary-500 focus:border-primary-500"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      handleAddTag(selectedItem.id, e.currentTarget.value);
-                      e.currentTarget.value = '';
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-            <Database className="w-12 h-12 mb-4 opacity-20" />
-            <p>좌측 목록에서 메뉴를 선택하거나</p>
-            <button onClick={handleCreateNew} className="mt-2 text-primary-600 font-bold hover:underline">
-              새 메뉴를 추가하세요
-            </button>
-          </div>
-        )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-xs text-gray-500">{item.code || '\u2014'}</span>
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <span className="text-xs text-gray-600">{item.process || '\u2014'}</span>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="text-xs text-gray-600">{item.weight ? `${item.weight}g` : '\u2014'}</span>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="text-xs text-gray-700">{item.recommendedPrice.toLocaleString()}</span>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="text-xs font-medium text-gray-700">{item.cost.toLocaleString()}</span>
+                  </td>
+                  <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleUpdateItem(item.id, 'isUnused', !item.isUnused)}
+                      className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
+                        item.isUnused ? 'bg-gray-200 text-gray-500' : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {item.isUnused ? '미사용' : '사용'}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {item.isSpicy && <Flame className="w-3.5 h-3.5 text-red-400 mx-auto" />}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer: Pagination */}
+      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+        <div className="text-xs text-gray-500 flex items-center gap-3">
+          <span>
+            {sortedItems.length.toLocaleString()}개 중 {(safePage * PAGE_SIZE + 1).toLocaleString()}-
+            {Math.min((safePage + 1) * PAGE_SIZE, sortedItems.length).toLocaleString()}
+          </span>
+          <span className="text-gray-300">|</span>
+          <span className="flex items-center gap-1 cursor-pointer hover:text-green-600" onClick={handleRefresh}>
+            <RefreshCw className="w-3 h-3" /> {lastSynced}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={safePage === 0}
+            className="p-1 rounded border border-gray-300 bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-gray-600 min-w-[60px] text-center">
+            {safePage + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={safePage >= totalPages - 1}
+            className="p-1 rounded border border-gray-300 bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Dialogs */}
+      {modalItem && <MenuDetailModal item={modalItem} onSave={handleModalSave} onClose={() => setModalItem(null)} />}
       {showImportDialog && (
         <ImportDialog
           existingItems={menuItems}
@@ -666,8 +702,8 @@ const MenuDatabase: React.FC = () => {
             saveToStorage();
             addToast({
               type: 'success',
-              title: 'CSV 가져오기 완료',
-              message: `${items.length}개 메뉴가 추가되었습니다.`,
+              title: 'CSV \uAC00\uC838\uC624\uAE30 \uC644\uB8CC',
+              message: `${items.length}\uAC1C \uBA54\uB274\uAC00 \uCD94\uAC00\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`,
             });
             setShowImportDialog(false);
           }}

@@ -1,6 +1,7 @@
-import type { PlanReviewRecord, PlanStatus, ReviewDepartment, DepartmentReview } from '../types';
+import type { PlanReviewRecord, PlanStatus, ReviewDepartment, DepartmentReview, ReviewComment } from '../types';
 
 const STORAGE_KEY = 'zsub_plan_reviews';
+const COMMENTS_STORAGE_KEY = 'zsub_review_comments';
 
 const DEPARTMENT_LABELS: Record<ReviewDepartment, string> = {
   quality: '품질팀',
@@ -98,4 +99,53 @@ export const finalizeReview = (planId: string): PlanReviewRecord | null => {
   review.finalizedAt = new Date().toISOString();
   saveReviews(reviews);
   return review;
+};
+
+// ── 인라인 코멘트 CRUD ──
+
+const loadComments = (): Record<string, ReviewComment[]> => {
+  try {
+    const stored = localStorage.getItem(COMMENTS_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {
+    /* ignore */
+  }
+  return {};
+};
+
+const saveComments = (comments: Record<string, ReviewComment[]>): void => {
+  localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+};
+
+export const addReviewComment = (planId: string, comment: Omit<ReviewComment, 'id' | 'createdAt'>): ReviewComment => {
+  const allComments = loadComments();
+  const planComments = allComments[planId] || [];
+
+  const newComment: ReviewComment = {
+    ...comment,
+    id: `rc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    createdAt: new Date().toISOString(),
+  };
+
+  planComments.push(newComment);
+  allComments[planId] = planComments;
+  saveComments(allComments);
+  return newComment;
+};
+
+export const getReviewComments = (planId: string): ReviewComment[] => {
+  const allComments = loadComments();
+  return allComments[planId] || [];
+};
+
+export const resolveComment = (planId: string, commentId: string): ReviewComment | null => {
+  const allComments = loadComments();
+  const planComments = allComments[planId] || [];
+  const comment = planComments.find(c => c.id === commentId);
+  if (!comment) return null;
+
+  comment.status = comment.status === 'resolved' ? 'comment' : 'resolved';
+  allComments[planId] = planComments;
+  saveComments(allComments);
+  return comment;
 };

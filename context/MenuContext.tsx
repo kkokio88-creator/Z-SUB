@@ -7,7 +7,10 @@ const STORAGE_KEY = 'zsub_menu_db';
 const loadMenuFromStorage = (): MenuItem[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const items: MenuItem[] = JSON.parse(stored);
+      return items.filter(item => item.name && item.name.trim());
+    }
   } catch {
     // ignore parse errors
   }
@@ -20,6 +23,7 @@ interface MenuContextType {
   updateItem: (id: string, updated: MenuItem) => void;
   addItem: (item: MenuItem) => void;
   deleteItem: (id: string) => void;
+  deleteItems: (ids: string[]) => void;
   bulkUpdate: (ids: string[], changes: Partial<MenuItem>) => void;
   saveToStorage: () => void;
   refreshFromSheet: () => Promise<void>;
@@ -36,8 +40,9 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const result = await pullMenuDB();
       if (result.success && result.items.length > 0) {
-        setMenuItems(result.items);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(result.items));
+        const filtered = result.items.filter(item => item.name && item.name.trim());
+        setMenuItems(filtered);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
       }
     } catch {
       // keep cached data on failure
@@ -62,6 +67,11 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setMenuItems(prev => prev.filter(item => item.id !== id));
   }, []);
 
+  const deleteItems = useCallback((ids: string[]) => {
+    const idSet = new Set(ids);
+    setMenuItems(prev => prev.filter(item => !idSet.has(item.id)));
+  }, []);
+
   const bulkUpdate = useCallback((ids: string[], changes: Partial<MenuItem>) => {
     setMenuItems(prev => prev.map(item => (ids.includes(item.id) ? { ...item, ...changes } : item)));
   }, []);
@@ -72,7 +82,17 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <MenuContext.Provider
-      value={{ menuItems, isLoading, updateItem, addItem, deleteItem, bulkUpdate, saveToStorage, refreshFromSheet }}
+      value={{
+        menuItems,
+        isLoading,
+        updateItem,
+        addItem,
+        deleteItem,
+        deleteItems,
+        bulkUpdate,
+        saveToStorage,
+        refreshFromSheet,
+      }}
     >
       {children}
     </MenuContext.Provider>

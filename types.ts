@@ -177,3 +177,15 @@ export interface PlanReviewRecord {
   departments: DepartmentReview[];
   finalizedAt: string | null;
 }
+
+// 인라인 코멘트 시스템
+export interface ReviewComment {
+  id: string;
+  department: ReviewDepartment;
+  reviewer: string;
+  scope: 'plan' | 'week' | 'item';
+  scopeKey: string; // plan: planId, week: "A-1", item: "A-1-돈까스"
+  comment: string;
+  status: 'comment' | 'issue' | 'resolved';
+  createdAt: string;
+}

@@ -294,20 +294,32 @@ const MealPlanner: React.FC = () => {
     }
   };
 
-  // Helper: Combined Ingredient Matrix with Color Coding
-  const ingredientCounts = useMemo(() => {
+  // Helper: Per-week Ingredient Counts
+  const ingredientCountsByWeek = useMemo(() => {
     if (!plans.A || !plans.B) return null;
-    const counts: Record<string, number> = {};
-    MAJOR_INGREDIENTS.forEach(ing => (counts[ing.key] = 0));
+    const result: Record<string, Record<string, number>> = {};
+    const total: Record<string, number> = {};
+    MAJOR_INGREDIENTS.forEach(ing => (total[ing.key] = 0));
 
-    [plans.A, plans.B].forEach(plan => {
+    const processPlan = (plan: MonthlyMealPlan, label: string) => {
       plan.weeks.forEach(week => {
+        const key = `${label}-${week.weekIndex}`;
+        const counts: Record<string, number> = {};
+        MAJOR_INGREDIENTS.forEach(ing => (counts[ing.key] = 0));
         week.items.forEach(item => {
-          if (counts[item.mainIngredient] !== undefined) counts[item.mainIngredient]++;
+          if (counts[item.mainIngredient] !== undefined) {
+            counts[item.mainIngredient]++;
+            total[item.mainIngredient]++;
+          }
         });
+        result[key] = counts;
       });
-    });
-    return counts;
+    };
+
+    processPlan(plans.A, 'A');
+    processPlan(plans.B, 'B');
+    result['total'] = total;
+    return result;
   }, [plans.A, plans.B]);
   const currentBudgetCap = TARGET_CONFIGS[target].budgetCap;
   const targetPrice = TARGET_CONFIGS[target].targetPrice;
@@ -400,6 +412,20 @@ const MealPlanner: React.FC = () => {
       </div>
     </div>
   );
+
+  const IngredientCell: React.FC<{ count: number; isTotal?: boolean }> = ({ count, isTotal }) => {
+    if (count === 0) return <span className="text-gray-300">-</span>;
+    let colorClass = 'bg-green-100 text-green-700';
+    if (count >= 4) colorClass = 'bg-red-100 text-red-700 font-bold';
+    else if (count >= 2) colorClass = 'bg-orange-100 text-orange-700 font-bold';
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-6 h-6 rounded text-[11px] ${isTotal ? 'font-bold' : ''} ${colorClass}`}
+      >
+        {count}
+      </span>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full gap-6 relative">
@@ -578,49 +604,90 @@ const MealPlanner: React.FC = () => {
             {/* Cycle B Row */}
             {plans.B && renderCycleRow('금토월 (B조)', plans.B, 'B')}
 
-            {/* Ingredient Matrix */}
+            {/* Ingredient Matrix - Per Week Table */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                   <LayoutGrid className="w-4 h-4 text-gray-500" />
-                  통합 식재료 활용 분포 (8주 합계)
+                  주차별 식재료 활용 분포
                 </h4>
                 <div className="flex gap-2 text-[10px] font-medium text-gray-500">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-100 border border-green-300"></span>적정(1회)
+                    <span className="w-2 h-2 rounded-full bg-green-100 border border-green-300"></span>1회
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-orange-100 border border-orange-300"></span>주의(2~3회)
+                    <span className="w-2 h-2 rounded-full bg-orange-100 border border-orange-300"></span>2~3회
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-100 border border-red-300"></span>과다(4회+)
+                    <span className="w-2 h-2 rounded-full bg-red-100 border border-red-300"></span>4회+
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-                {MAJOR_INGREDIENTS.map(ing => {
-                  const count = ingredientCounts ? ingredientCounts[ing.key] || 0 : 0;
-
-                  // Color Coding Logic
-                  let colorClass = 'bg-gray-50 border-gray-200 text-gray-400'; // 0
-                  if (count >= 4) colorClass = 'bg-red-50 border-red-200 text-red-700 font-bold ring-2 ring-red-100';
-                  else if (count >= 2) colorClass = 'bg-orange-50 border-orange-200 text-orange-700 font-bold';
-                  else if (count === 1) colorClass = 'bg-green-50 border-green-200 text-green-700';
-
-                  return (
-                    <div
-                      key={ing.key}
-                      className={`flex-1 min-w-[80px] flex flex-col items-center p-3 rounded-lg border transition-all ${colorClass}`}
-                    >
-                      <div className="text-lg mb-1">{count}회</div>
-                      <span className="text-xs">{ing.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              {ingredientCountsByWeek && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="px-2 py-2 text-left font-semibold text-gray-600 sticky left-0 bg-white min-w-[60px]">
+                          재료
+                        </th>
+                        {[1, 2, 3, 4].map(w => (
+                          <th key={`A-${w}`} className="px-2 py-2 text-center font-semibold text-blue-600 min-w-[48px]">
+                            A{w}주
+                          </th>
+                        ))}
+                        <th className="px-1 py-2 w-px bg-gray-200"></th>
+                        {[1, 2, 3, 4].map(w => (
+                          <th
+                            key={`B-${w}`}
+                            className="px-2 py-2 text-center font-semibold text-purple-600 min-w-[48px]"
+                          >
+                            B{w}주
+                          </th>
+                        ))}
+                        <th className="px-1 py-2 w-px bg-gray-200"></th>
+                        <th className="px-2 py-2 text-center font-bold text-gray-800 min-w-[48px]">합계</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MAJOR_INGREDIENTS.map(ing => {
+                        const totalCount = ingredientCountsByWeek['total']?.[ing.key] || 0;
+                        return (
+                          <tr key={ing.key} className="border-b border-gray-100 hover:bg-gray-50/50">
+                            <td className="px-2 py-1.5 font-medium text-gray-700 sticky left-0 bg-white">
+                              {ing.label}
+                            </td>
+                            {[1, 2, 3, 4].map(w => {
+                              const count = ingredientCountsByWeek[`A-${w}`]?.[ing.key] || 0;
+                              return (
+                                <td key={`A-${w}`} className="px-2 py-1.5 text-center">
+                                  <IngredientCell count={count} />
+                                </td>
+                              );
+                            })}
+                            <td className="px-0 py-1.5 bg-gray-100"></td>
+                            {[1, 2, 3, 4].map(w => {
+                              const count = ingredientCountsByWeek[`B-${w}`]?.[ing.key] || 0;
+                              return (
+                                <td key={`B-${w}`} className="px-2 py-1.5 text-center">
+                                  <IngredientCell count={count} />
+                                </td>
+                              );
+                            })}
+                            <td className="px-0 py-1.5 bg-gray-100"></td>
+                            <td className="px-2 py-1.5 text-center">
+                              <IngredientCell count={totalCount} isTotal />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <p className="text-xs text-gray-400 mt-2 text-center">
-                * A조와 B조를 모두 구독하는 고객을 위해 2회 이상 중복된 재료는 하이라이트됩니다.
+                * A조와 B조를 모두 구독하는 고객을 위해 주차별 재료 분포를 확인하세요.
               </p>
             </div>
 
