@@ -2,7 +2,7 @@
 // 프로덕션 환경에서 Google Sheets API 프록시 역할
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { google } from 'googleapis';
+import { auth as gauth, sheets as sheetsApi } from '@googleapis/sheets';
 
 function getAuthorizedSheets() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -11,13 +11,13 @@ function getAuthorizedSheets() {
 
   if (!email || !key || !sheetId) return null;
 
-  const auth = new google.auth.JWT({
+  const jwtAuth = new gauth.JWT({
     email,
     key: key.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
-  return { sheets: google.sheets({ version: 'v4', auth }), spreadsheetId: sheetId };
+  return { sheets: sheetsApi({ version: 'v4', auth: jwtAuth }), spreadsheetId: sheetId };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
