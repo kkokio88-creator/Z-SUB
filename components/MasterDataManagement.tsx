@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import MenuDatabase from './MenuDatabase';
 import PlanManagement from './PlanManagement';
@@ -13,8 +12,8 @@ const MasterDataManagement: React.FC = () => {
         <button
           onClick={() => setSubTab('menu-db')}
           className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
-            subTab === 'menu-db' 
-              ? 'bg-gray-900 text-white shadow-sm' 
+            subTab === 'menu-db'
+              ? 'bg-gray-900 text-white shadow-sm'
               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
           }`}
         >
@@ -23,8 +22,8 @@ const MasterDataManagement: React.FC = () => {
         <button
           onClick={() => setSubTab('policy')}
           className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
-            subTab === 'policy' 
-              ? 'bg-gray-900 text-white shadow-sm' 
+            subTab === 'policy'
+              ? 'bg-gray-900 text-white shadow-sm'
               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
           }`}
         >
@@ -33,13 +32,7 @@ const MasterDataManagement: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0">
-        {subTab === 'menu-db' ? (
-          <MenuDatabase />
-        ) : (
-          <PlanManagement />
-        )}
-      </div>
+      <div className="flex-1 min-h-0">{subTab === 'menu-db' ? <MenuDatabase /> : <PlanManagement />}</div>
     </div>
   );
 };

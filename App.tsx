@@ -58,23 +58,25 @@ const App: React.FC = () => {
   };
 
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <SheetsProvider>
-          <MenuProvider>
-            <AuthGate>
-              <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-                <ErrorBoundary>
-                  <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
-                </ErrorBoundary>
-              </Layout>
-            </AuthGate>
-          </MenuProvider>
-        </SheetsProvider>
-      </AuthProvider>
-      <ToastContainer />
-      <ConfirmDialog />
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <SheetsProvider>
+            <MenuProvider>
+              <AuthGate>
+                <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+                  <ErrorBoundary>
+                    <Suspense fallback={<TabFallback />}>{renderContent()}</Suspense>
+                  </ErrorBoundary>
+                </Layout>
+              </AuthGate>
+            </MenuProvider>
+          </SheetsProvider>
+        </AuthProvider>
+        <ToastContainer />
+        <ConfirmDialog />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 };
 

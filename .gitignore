@@ -43,3 +43,9 @@ _checkDates.*
 _sheet_*.csv
 calendar-*.png
 .playwright-mcp/
+.vercel
+.bkit/
+docs/.bkit-memory.json
+docs/.pdca-status.json
+docs/.pdca-snapshots/
+meal-history-table-view.png

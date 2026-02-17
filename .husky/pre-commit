@@ -1,1 +1,1 @@
-npx lint-staged
+node.exe node_modules/lint-staged/bin/lint-staged.js

@@ -1,8 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, UtensilsCrossed, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, UtensilsCrossed } from 'lucide-react';
 import { HISTORICAL_MEAL_PLANS } from '../data/historicalMealPlans';
+import { REAL_MENU_DB } from '../data/realMenuDB';
 import { TargetType } from '../types';
-import type { HistoricalMealPlan, HistoricalTargetPlan } from '../types';
+import type { HistoricalMenuItem, HistoricalTargetPlan } from '../types';
+
+// ── 상수 ──
 
 const TARGET_LABELS: Record<string, string> = {
   [TargetType.VALUE]: '실속',
@@ -42,85 +45,309 @@ const TARGET_COLORS: Record<string, string> = {
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
-// 날짜 → YYYY-MM-DD 문자열
-function toDateKey(y: number, m: number, d: number): string {
-  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+// ── 주재료 감지 ──
+
+const INGREDIENT_KEYWORDS: Record<string, string[]> = {
+  beef: ['소고기', '한우', '불고기', '갈비', '사골'],
+  pork: ['한돈', '돼지', '제육', '삼겹', '탕수'],
+  chicken: ['닭', '치킨'],
+  fish: ['동태', '오징어', '새우', '어묵', '참치', '멸치', '황태', '맛살'],
+  tofu: ['두부', '순두부'],
+  egg: ['계란', '달걀', '메추리알'],
+  potato: ['감자', '고구마'],
+  seaweed: ['미역', '파래', '김무침'],
+  mushroom: ['버섯', '표고', '느타리'],
+  vegetable: ['나물', '시래기', '애호박', '양배추', '콩나물'],
+};
+
+const INGREDIENT_COLORS: Record<string, { bg: string; borderL: string; text: string; dot: string; label: string }> = {
+  beef: { bg: 'bg-red-50', borderL: 'border-l-red-400', text: 'text-red-700', dot: 'bg-red-400', label: '소고기' },
+  pork: { bg: 'bg-pink-50', borderL: 'border-l-pink-400', text: 'text-pink-700', dot: 'bg-pink-400', label: '한돈' },
+  chicken: {
+    bg: 'bg-amber-50',
+    borderL: 'border-l-amber-400',
+    text: 'text-amber-700',
+    dot: 'bg-amber-400',
+    label: '닭',
+  },
+  fish: { bg: 'bg-blue-50', borderL: 'border-l-blue-400', text: 'text-blue-700', dot: 'bg-blue-400', label: '생선' },
+  tofu: {
+    bg: 'bg-yellow-50',
+    borderL: 'border-l-yellow-400',
+    text: 'text-yellow-700',
+    dot: 'bg-yellow-400',
+    label: '두부',
+  },
+  egg: {
+    bg: 'bg-orange-50',
+    borderL: 'border-l-orange-400',
+    text: 'text-orange-700',
+    dot: 'bg-orange-400',
+    label: '달걀',
+  },
+  potato: {
+    bg: 'bg-stone-100',
+    borderL: 'border-l-stone-400',
+    text: 'text-stone-700',
+    dot: 'bg-stone-400',
+    label: '감자',
+  },
+  seaweed: {
+    bg: 'bg-emerald-50',
+    borderL: 'border-l-emerald-400',
+    text: 'text-emerald-700',
+    dot: 'bg-emerald-400',
+    label: '해조류',
+  },
+  mushroom: {
+    bg: 'bg-purple-50',
+    borderL: 'border-l-purple-400',
+    text: 'text-purple-700',
+    dot: 'bg-purple-400',
+    label: '버섯',
+  },
+  vegetable: {
+    bg: 'bg-green-50',
+    borderL: 'border-l-green-400',
+    text: 'text-green-700',
+    dot: 'bg-green-400',
+    label: '채소',
+  },
+  other: { bg: 'bg-gray-50', borderL: 'border-l-gray-300', text: 'text-gray-500', dot: 'bg-gray-300', label: '기타' },
+};
+
+function detectIngredient(name: string): string {
+  for (const [ingredient, keywords] of Object.entries(INGREDIENT_KEYWORDS)) {
+    if (keywords.some(kw => name.includes(kw))) return ingredient;
+  }
+  return 'other';
 }
 
-// 해당 월의 달력 그리드 생성 (6주 × 7일)
-function buildCalendarGrid(year: number, month: number) {
-  const firstDay = new Date(year, month, 1).getDay(); // 0=일 ~ 6=토
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const prevDays = new Date(year, month, 0).getDate();
-
-  const cells: { year: number; month: number; day: number; isCurrentMonth: boolean }[] = [];
-
-  // 이전 달
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const pm = month === 0 ? 11 : month - 1;
-    const py = month === 0 ? year - 1 : year;
-    cells.push({ year: py, month: pm, day: prevDays - i, isCurrentMonth: false });
-  }
-  // 이번 달
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ year, month, day: d, isCurrentMonth: true });
-  }
-  // 다음 달 (6주 채우기)
-  const remaining = 42 - cells.length;
-  const nm = month === 11 ? 0 : month + 1;
-  const ny = month === 11 ? year + 1 : year;
-  for (let d = 1; d <= remaining; d++) {
-    cells.push({ year: ny, month: nm, day: d, isCurrentMonth: false });
-  }
-
-  return cells;
+function cleanMenuName(name: string): string {
+  return name
+    .replace(/_냉장|_반조리|_냉동/g, '')
+    .replace(/\s+\d+$/, '')
+    .trim();
 }
+
+// ── 주재료 범례 ──
+
+const IngredientLegend: React.FC = () => (
+  <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
+    <span className="text-[11px] font-medium text-gray-500">주재료:</span>
+    {Object.entries(INGREDIENT_COLORS)
+      .filter(([k]) => k !== 'other')
+      .map(([key, val]) => (
+        <div key={key} className="flex items-center gap-1">
+          <span className={`w-2.5 h-2.5 rounded-full ${val.dot}`} />
+          <span className="text-[11px] text-gray-600">{val.label}</span>
+        </div>
+      ))}
+  </div>
+);
+
+// ── 테이블 셀 ──
+
+const TableCell: React.FC<{
+  items: HistoricalMenuItem[];
+  date: string;
+  targetType: string;
+  editedKeys: Set<string>;
+  onSwap: (itemIndex: number, currentName: string) => void;
+}> = ({ items, date, targetType, editedKeys, onSwap }) => {
+  const [expanded, setExpanded] = useState(false);
+  const displayItems = expanded ? items : items.slice(0, 6);
+  const hasMore = items.length > 6;
+
+  return (
+    <div className="space-y-0.5">
+      {displayItems.map((item, idx) => {
+        const ingredient = detectIngredient(item.name);
+        const colors = INGREDIENT_COLORS[ingredient];
+        const isEdited = editedKeys.has(`${date}|${targetType}|${idx}`);
+        const displayName = cleanMenuName(item.name);
+
+        return (
+          <div
+            key={idx}
+            onClick={() => onSwap(idx, item.name)}
+            className={`px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
+            title={item.name}
+          >
+            <span className={`${colors.text} truncate block`}>
+              {displayName}
+              {isEdited && <span className="ml-1 text-[9px] text-amber-600 font-medium">수정</span>}
+            </span>
+          </div>
+        );
+      })}
+      {hasMore && !expanded && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
+        >
+          +{items.length - 6}개 더보기
+        </button>
+      )}
+      {hasMore && expanded && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            setExpanded(false);
+          }}
+          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
+        >
+          접기
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ── 메뉴 교체 모달 ──
+
+const SwapModal: React.FC<{
+  currentName: string;
+  onSelect: (name: string) => void;
+  onClose: () => void;
+}> = ({ currentName, onSelect, onClose }) => {
+  const [search, setSearch] = useState('');
+  const [ingredientFilter, setIngredientFilter] = useState('');
+
+  const candidates = useMemo(() => {
+    return REAL_MENU_DB.filter(item => {
+      if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (ingredientFilter && item.mainIngredient !== ingredientFilter) return false;
+      return true;
+    }).slice(0, 50);
+  }, [search, ingredientFilter]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="px-5 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-gray-800">메뉴 교체</h3>
+            <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+          <p className="text-sm text-gray-500 mb-3">
+            현재: <span className="font-medium text-gray-700">{cleanMenuName(currentName)}</span>
+          </p>
+
+          {/* 검색 */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="메뉴명 검색..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              autoFocus
+            />
+          </div>
+
+          {/* 주재료 필터 */}
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(INGREDIENT_COLORS)
+              .filter(([k]) => k !== 'other')
+              .map(([key, val]) => (
+                <button
+                  key={key}
+                  onClick={() => setIngredientFilter(f => (f === key ? '' : key))}
+                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
+                    ingredientFilter === key
+                      ? `${val.bg} ${val.text} border-current font-bold`
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {val.label}
+                </button>
+              ))}
+          </div>
+        </div>
+
+        {/* 후보 목록 */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {candidates.length === 0 ? (
+            <p className="text-center text-sm text-gray-400 py-8">검색 결과 없음</p>
+          ) : (
+            <div className="space-y-1">
+              {candidates.map(item => {
+                const colors = INGREDIENT_COLORS[item.mainIngredient] || INGREDIENT_COLORS.other;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onSelect(item.name)}
+                    className={`w-full text-left px-3 py-2 rounded-lg border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all flex items-center justify-between`}
+                  >
+                    <span className="text-sm text-gray-700 truncate">{item.name}</span>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 shrink-0 ml-2">
+                      <span className={`px-1.5 py-0.5 rounded ${colors.bg} ${colors.text} text-[10px] font-medium`}>
+                        {colors.label}
+                      </span>
+                      <span>
+                        {'\u20A9'}
+                        {item.cost.toLocaleString()}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── 메인 컴포넌트 ──
 
 const MealPlanHistory: React.FC = () => {
-  // 데이터 범위에서 초기 월 설정 (가장 최근 데이터가 있는 월)
   const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date || '2025-01-01';
   const [viewYear, setViewYear] = useState(() => parseInt(latestDate.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => parseInt(latestDate.slice(5, 7)) - 1);
-  const [selectedPlan, setSelectedPlan] = useState<HistoricalMealPlan | null>(null);
-  const [filterTarget, setFilterTarget] = useState('');
 
-  // 날짜 키 → 식단 매핑 (O(1) 조회)
-  // 화수목: 시작일(주로 화) + 다음날 + 그다음날
-  // 금토월: 시작일(주로 금) + 다음날 + 그다음날
-  const planMap = useMemo(() => {
-    const map = new Map<string, HistoricalMealPlan>();
-    for (const p of HISTORICAL_MEAL_PLANS) {
-      const d = new Date(p.date);
-      for (let offset = 0; offset < 3; offset++) {
-        const nd = new Date(d);
-        nd.setDate(nd.getDate() + offset);
-        const key = toDateKey(nd.getFullYear(), nd.getMonth(), nd.getDate());
-        if (!map.has(key)) {
-          map.set(key, p);
-        }
-      }
-    }
-    return map;
-  }, []);
+  // 편집 상태: key = "date|targetType|itemIndex", value = 교체된 메뉴명
+  const [editedPlans, setEditedPlans] = useState<Map<string, string>>(new Map());
+  const editedKeys = useMemo(() => new Set(editedPlans.keys()), [editedPlans]);
 
-  // 데이터가 존재하는 월 목록 (빠른 네비게이션용)
-  const dataMonths = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of HISTORICAL_MEAL_PLANS) {
-      set.add(p.date.slice(0, 7));
-    }
-    return set;
-  }, []);
+  // 교체 모달 상태
+  const [swapTarget, setSwapTarget] = useState<{
+    date: string;
+    targetType: string;
+    itemIndex: number;
+    currentName: string;
+  } | null>(null);
 
-  // 달력 그리드
-  const calendarCells = useMemo(() => buildCalendarGrid(viewYear, viewMonth), [viewYear, viewMonth]);
-
-  // 현재 월의 식단 수
-  const currentMonthCount = useMemo(() => {
+  // 현재 월의 식단 필터링
+  const monthPlans = useMemo(() => {
     const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
-    return HISTORICAL_MEAL_PLANS.filter(p => p.date.startsWith(prefix)).length;
+    return HISTORICAL_MEAL_PLANS.filter(p => p.date.startsWith(prefix));
   }, [viewYear, viewMonth]);
 
+  // 해당 월에 데이터가 있는 타겟만 열로 표시
+  const activeTargets = useMemo(() => {
+    const targetSet = new Set<string>();
+    for (const plan of monthPlans) {
+      for (const target of plan.targets) {
+        targetSet.add(target.targetType);
+      }
+    }
+    return Object.keys(TARGET_LABELS).filter(t => targetSet.has(t));
+  }, [monthPlans]);
+
+  // 네비게이션
   const goToPrevMonth = useCallback(() => {
     setViewMonth(m => {
       if (m === 0) {
@@ -147,28 +374,46 @@ const MealPlanHistory: React.FC = () => {
     setViewMonth(now.getMonth());
   }, []);
 
-  // 상세 뷰
-  if (selectedPlan) {
-    return (
-      <DetailView
-        plan={selectedPlan}
-        filterTarget={filterTarget}
-        onBack={() => setSelectedPlan(null)}
-        onNavigate={dir => {
-          const idx = HISTORICAL_MEAL_PLANS.findIndex(p => p.date === selectedPlan.date);
-          const next = HISTORICAL_MEAL_PLANS[idx + dir];
-          if (next) setSelectedPlan(next);
-        }}
-        hasPrev={HISTORICAL_MEAL_PLANS.findIndex(p => p.date === selectedPlan.date) > 0}
-        hasNext={HISTORICAL_MEAL_PLANS.findIndex(p => p.date === selectedPlan.date) < HISTORICAL_MEAL_PLANS.length - 1}
-      />
-    );
-  }
+  // 아이템 가져오기 (편집 반영)
+  const getItems = useCallback(
+    (date: string, targetType: string, items: HistoricalMenuItem[]): HistoricalMenuItem[] => {
+      return items.map((item, idx) => {
+        const key = `${date}|${targetType}|${idx}`;
+        const editedName = editedPlans.get(key);
+        return editedName ? { ...item, name: editedName } : item;
+      });
+    },
+    [editedPlans]
+  );
+
+  // 메뉴 교체 핸들러
+  const handleSwap = useCallback(
+    (newName: string) => {
+      if (!swapTarget) return;
+      const key = `${swapTarget.date}|${swapTarget.targetType}|${swapTarget.itemIndex}`;
+      setEditedPlans(prev => {
+        const next = new Map(prev);
+        next.set(key, newName);
+        return next;
+      });
+      setSwapTarget(null);
+    },
+    [swapTarget]
+  );
+
+  // 날짜 포맷: "11.05(화)"
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const dow = DAY_NAMES[d.getDay()];
+    return `${month}.${String(day).padStart(2, '0')}(${dow})`;
+  };
 
   return (
     <div className="h-full flex flex-col">
-      {/* 헤더: 월 네비게이션 + 필터 */}
-      <div className="flex items-center justify-between mb-5">
+      {/* 헤더: 월 네비게이션 */}
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <button
             onClick={goToPrevMonth}
@@ -191,268 +436,112 @@ const MealPlanHistory: React.FC = () => {
           >
             오늘
           </button>
-          {currentMonthCount > 0 && (
+          {monthPlans.length > 0 && (
             <span className="ml-2 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-full">
-              {currentMonthCount}건
+              {monthPlans.length}건
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={filterTarget}
-            onChange={e => setFilterTarget(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg appearance-none bg-white focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">전체 타겟 보기</option>
-            {Object.entries(TARGET_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-          {filterTarget && (
-            <button onClick={() => setFilterTarget('')} className="p-2 text-gray-400 hover:text-gray-600">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 요일 헤더 */}
-      <div className="grid grid-cols-7 mb-1">
-        {DAY_NAMES.map((name, i) => (
-          <div
-            key={name}
-            className={`text-center text-xs font-semibold py-2 ${
-              i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'
-            }`}
-          >
-            {name}
-          </div>
-        ))}
-      </div>
-
-      {/* 달력 그리드 */}
-      <div className="flex-1 grid grid-cols-7 grid-rows-6 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
-        {calendarCells.map((cell, i) => {
-          const dateKey = toDateKey(cell.year, cell.month, cell.day);
-          const plan = planMap.get(dateKey);
-          const dayOfWeek = new Date(cell.year, cell.month, cell.day).getDay();
-          const isToday = dateKey === new Date().toISOString().slice(0, 10);
-
-          // 타겟 필터 적용
-          const hasPlan = plan && (!filterTarget || plan.targets.some(t => t.targetType === filterTarget));
-
-          return (
-            <div
-              key={i}
-              onClick={() => (hasPlan && plan ? setSelectedPlan(plan) : undefined)}
-              className={`
-                bg-white p-1.5 min-h-[90px] flex flex-col transition-colors
-                ${!cell.isCurrentMonth ? 'bg-gray-50/80' : ''}
-                ${hasPlan ? 'cursor-pointer hover:bg-blue-50/50' : ''}
-                ${isToday ? 'ring-2 ring-inset ring-primary-400' : ''}
-              `}
-            >
-              {/* 날짜 숫자 */}
-              <div className="flex items-center justify-between mb-1">
-                <span
-                  className={`text-xs font-medium leading-none ${
-                    !cell.isCurrentMonth
-                      ? 'text-gray-300'
-                      : isToday
-                        ? 'text-white bg-primary-500 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold'
-                        : dayOfWeek === 0
-                          ? 'text-red-400'
-                          : dayOfWeek === 6
-                            ? 'text-blue-400'
-                            : 'text-gray-500'
-                  }`}
-                >
-                  {cell.day}
-                </span>
-                {hasPlan && plan && (
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                      plan.cycleType === '화수목' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
-                    }`}
-                  >
-                    {plan.cycleType}
-                  </span>
-                )}
-              </div>
-
-              {/* 식단 요약 */}
-              {hasPlan && plan && <CalendarCell plan={plan} filterTarget={filterTarget} />}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 범례 */}
-      <div className="flex items-center gap-4 mt-3 px-1">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
-          <span className="text-[11px] text-gray-500">화수목</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-orange-100 border border-orange-200" />
-          <span className="text-[11px] text-gray-500">금토월</span>
-        </div>
-        <span className="text-[11px] text-gray-400 ml-auto">날짜를 클릭하면 상세 식단을 볼 수 있습니다</span>
-      </div>
-    </div>
-  );
-};
-
-// ── 달력 셀 내부 ──
-const CalendarCell: React.FC<{ plan: HistoricalMealPlan; filterTarget: string }> = ({ plan, filterTarget }) => {
-  const targets = filterTarget ? plan.targets.filter(t => t.targetType === filterTarget) : plan.targets;
-
-  // 대표 메뉴 3개 추출
-  const previewMenus: string[] = [];
-  for (const t of targets) {
-    for (const item of t.items) {
-      // 메뉴명에서 숫자(용량) 제거하여 짧게
-      const shortName = item.name.replace(/_[^\s]+/g, '').replace(/\s+\d+$/, '');
-      if (!previewMenus.includes(shortName)) {
-        previewMenus.push(shortName);
-        if (previewMenus.length >= 3) break;
-      }
-    }
-    if (previewMenus.length >= 3) break;
-  }
-
-  const totalItems = targets.reduce((s, t) => s + t.items.length, 0);
-
-  return (
-    <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
-      {previewMenus.map((name, i) => (
-        <p key={i} className="text-[10px] text-gray-600 truncate leading-tight">
-          {name}
-        </p>
-      ))}
-      <p className="text-[9px] text-gray-400 mt-auto">
-        {targets.length}타겟 {totalItems}품
-      </p>
-    </div>
-  );
-};
-
-// ── 상세 뷰 ──
-const DetailView: React.FC<{
-  plan: HistoricalMealPlan;
-  filterTarget: string;
-  onBack: () => void;
-  onNavigate: (dir: -1 | 1) => void;
-  hasPrev: boolean;
-  hasNext: boolean;
-}> = ({ plan, filterTarget, onBack, onNavigate, hasPrev, hasNext }) => {
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return `${d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} (${DAY_NAMES[d.getDay()]})`;
-  };
-
-  const targets = filterTarget ? plan.targets.filter(t => t.targetType === filterTarget) : plan.targets;
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Calendar className="w-4 h-4" /> 달력으로
-          </button>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">{formatDate(plan.date)}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span
-                className={`inline-flex px-2.5 py-0.5 text-xs font-bold rounded-full ${
-                  plan.cycleType === '화수목' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
-                }`}
-              >
-                {plan.cycleType}
-              </span>
-              <span className="text-sm text-gray-500">
-                {targets.length}개 타겟 | {targets.reduce((s, t) => s + t.items.length, 0)}개 메뉴
-              </span>
-              {filterTarget && (
-                <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
-                  {TARGET_LABELS[filterTarget]} 필터 적용
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onNavigate(-1)}
-            disabled={!hasPrev}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="이전 식단"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => onNavigate(1)}
-            disabled={!hasNext}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="다음 식단"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* 타겟별 카드 그리드 */}
-      <div className="flex-1 overflow-y-auto">
-        {targets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-            <UtensilsCrossed className="w-12 h-12 mb-3 opacity-50" />
-            <p className="font-medium">선택한 타겟의 식단이 없습니다</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {targets.map(target => (
-              <TargetCard key={target.targetType} target={target} />
-            ))}
-          </div>
+        {editedPlans.size > 0 && (
+          <span className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
+            {editedPlans.size}건 수정됨
+          </span>
         )}
       </div>
-    </div>
-  );
-};
 
-// ── 타겟 카드 ──
-const TargetCard: React.FC<{ target: HistoricalTargetPlan }> = ({ target }) => {
-  const colorClass = TARGET_COLORS[target.targetType] || 'bg-gray-100 text-gray-600 border-gray-200';
-  const label = TARGET_LABELS[target.targetType] || target.targetType;
+      {/* 주재료 범례 */}
+      <IngredientLegend />
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className={`px-4 py-3 border-b ${colorClass.replace('border-', 'border-b-')}`}>
-        <div className="flex items-center justify-between">
-          <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-lg ${colorClass}`}>{label}</span>
-          <span className="text-xs text-gray-500">{target.items.length}품</span>
+      {/* 테이블 */}
+      {monthPlans.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+          <UtensilsCrossed className="w-12 h-12 mb-3 opacity-50" />
+          <p className="font-medium">이 달의 식단 데이터가 없습니다</p>
         </div>
-      </div>
-      <div className="p-4">
-        <ul className="space-y-1.5">
-          {target.items.map((item, idx) => (
-            <li key={idx} className="flex items-center gap-2 text-sm">
-              <span className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-medium text-gray-500 flex-shrink-0">
-                {idx + 1}
-              </span>
-              <span className="text-gray-700 truncate" title={item.name}>
-                {item.name}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      ) : (
+        <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
+          <table className="w-full border-collapse">
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-gray-50">
+                <th className="sticky left-0 z-30 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
+                  날짜
+                </th>
+                <th className="sticky left-[80px] z-30 bg-gray-50 px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
+                  주기
+                </th>
+                {activeTargets.map(t => (
+                  <th
+                    key={t}
+                    className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200 min-w-[180px]"
+                  >
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${TARGET_COLORS[t] || 'bg-gray-100 text-gray-600'}`}
+                    >
+                      {TARGET_LABELS[t] || t}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {monthPlans.map(plan => {
+                const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
+                return (
+                  <tr key={plan.date} className="border-b border-gray-100 hover:bg-gray-50/30">
+                    {/* 날짜 열 (sticky) */}
+                    <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
+                      {formatDate(plan.date)}
+                    </td>
+                    {/* 주기 열 (sticky) */}
+                    <td className="sticky left-[80px] z-10 bg-white px-2 py-2 border-r border-gray-200 text-center align-top">
+                      <span
+                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                          plan.cycleType === '화수목' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                        }`}
+                      >
+                        {plan.cycleType}
+                      </span>
+                    </td>
+                    {/* 타겟 열들 */}
+                    {activeTargets.map(targetType => {
+                      const target = targetMap.get(targetType);
+                      if (!target) {
+                        return (
+                          <td
+                            key={targetType}
+                            className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
+                          >
+                            —
+                          </td>
+                        );
+                      }
+                      const items = getItems(plan.date, targetType, target.items);
+                      return (
+                        <td key={targetType} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                          <TableCell
+                            items={items}
+                            date={plan.date}
+                            targetType={targetType}
+                            editedKeys={editedKeys}
+                            onSwap={(itemIndex, currentName) =>
+                              setSwapTarget({ date: plan.date, targetType, itemIndex, currentName })
+                            }
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* 교체 모달 */}
+      {swapTarget && (
+        <SwapModal currentName={swapTarget.currentName} onSelect={handleSwap} onClose={() => setSwapTarget(null)} />
+      )}
     </div>
   );
 };

@@ -29,75 +29,89 @@ const DEFAULT_USER: UserProfile = {
   role: 'manager',
 };
 
+const fetchRoleFromProfiles = async (supabase: ReturnType<typeof getSupabase>, userId: string): Promise<UserRole> => {
+  if (!supabase) return 'operator';
+  const { data } = await (supabase as NonNullable<typeof supabase>)
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+  return (data?.role as UserRole) || 'operator';
+};
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const isOfflineMode = !isSupabaseConfigured();
+  const isOfflineMode = !isSupabaseConfigured() && import.meta.env.DEV;
 
   useEffect(() => {
-    if (isOfflineMode) {
-      setUser(DEFAULT_USER);
+    if (!isSupabaseConfigured()) {
+      if (import.meta.env.DEV) {
+        setUser(DEFAULT_USER);
+      }
       setIsLoading(false);
       return;
     }
 
     const supabase = getSupabase();
     if (!supabase) {
-      setUser(DEFAULT_USER);
+      if (import.meta.env.DEV) {
+        setUser(DEFAULT_USER);
+      }
       setIsLoading(false);
       return;
     }
 
     // 현재 세션 확인
-    supabase.auth
-      .getSession()
-      .then(
-        ({
-          data: { session },
-        }: {
-          data: {
-            session: {
-              user: {
-                id: string;
-                email?: string;
-                user_metadata?: { display_name?: string; role?: string; avatar_url?: string };
-              };
-            } | null;
-          };
-        }) => {
-          if (session?.user) {
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              displayName: session.user.user_metadata?.display_name || session.user.email || '',
-              role: (session.user.user_metadata?.role as UserRole) || 'operator',
-              avatarUrl: session.user.user_metadata?.avatar_url,
-            });
-          }
-          setIsLoading(false);
+    supabase.auth.getSession().then(
+      async ({
+        data: { session },
+      }: {
+        data: {
+          session: {
+            user: {
+              id: string;
+              email?: string;
+              user_metadata?: { display_name?: string; avatar_url?: string };
+            };
+          } | null;
+        };
+      }) => {
+        if (session?.user) {
+          const role = await fetchRoleFromProfiles(supabase, session.user.id);
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            displayName: session.user.user_metadata?.display_name || session.user.email || '',
+            role,
+            avatarUrl: session.user.user_metadata?.avatar_url,
+          });
         }
-      );
+        setIsLoading(false);
+      }
+    );
 
     // 인증 상태 변경 리스너
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (
+      async (
         _event: string,
         session: {
           user: {
             id: string;
             email?: string;
-            user_metadata?: { display_name?: string; role?: string; avatar_url?: string };
+            user_metadata?: { display_name?: string; avatar_url?: string };
           };
         } | null
       ) => {
         if (session?.user) {
+          const role = await fetchRoleFromProfiles(supabase, session.user.id);
           setUser({
             id: session.user.id,
             email: session.user.email || '',
             displayName: session.user.user_metadata?.display_name || session.user.email || '',
-            role: (session.user.user_metadata?.role as UserRole) || 'operator',
+            role,
             avatarUrl: session.user.user_metadata?.avatar_url,
           });
         } else {
@@ -118,8 +132,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const supabase = getSupabase();
       if (!supabase) {
-        setUser(DEFAULT_USER);
-        return { success: true };
+        if (import.meta.env.DEV) {
+          setUser(DEFAULT_USER);
+          return { success: true };
+        }
+        return { success: false, error: 'Service unavailable' };
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email, password });
