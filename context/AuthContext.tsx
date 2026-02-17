@@ -82,6 +82,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role,
             avatarUrl: session.user.user_metadata?.avatar_url,
           });
+        } else {
+          // 세션 없으면 자동로그인 (임시 - 추후 Google 로그인 구현 시 제거)
+          setUser(DEFAULT_USER);
         }
         setIsLoading(false);
       }
@@ -111,7 +114,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             avatarUrl: session.user.user_metadata?.avatar_url,
           });
         } else {
-          setUser(null);
+          // 세션 없으면 자동로그인 유지 (임시)
+          setUser(DEFAULT_USER);
         }
       }
     );
