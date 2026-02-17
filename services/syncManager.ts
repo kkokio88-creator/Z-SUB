@@ -28,8 +28,8 @@ export type SyncResult = {
 export const pushMenuDB = async (menuItems: MenuItem[]): Promise<SyncResult> => {
   try {
     const rows = [MENU_DB_HEADERS, ...menuItems.map(menuItemToRow)];
-    const result = await pushSheetData('메뉴DB', rows);
-    await logSync('push', '메뉴DB', menuItems.length, 'success');
+    const result = await pushSheetData('반찬', rows);
+    await logSync('push', '반찬', menuItems.length, 'success');
     addSyncRecord({
       target: 'SHEETS',
       result: 'success',
@@ -37,7 +37,7 @@ export const pushMenuDB = async (menuItems: MenuItem[]): Promise<SyncResult> => 
     });
     return { success: result.success, rowCount: menuItems.length };
   } catch (err) {
-    await logSync('push', '메뉴DB', 0, 'error', String(err));
+    await logSync('push', '반찬', 0, 'error', String(err));
     addSyncRecord({
       target: 'SHEETS',
       result: 'error',
@@ -54,12 +54,12 @@ export const pullMenuDB = async (): Promise<{
   error?: string;
 }> => {
   try {
-    const data = await getSheetData('메뉴DB');
+    const data = await getSheetData('반찬');
     if (!data.data || data.data.length <= 1) {
       return { success: true, items: [] };
     }
     const items = data.data.slice(1).map(rowToMenuItem);
-    await logSync('pull', '메뉴DB', items.length, 'success');
+    await logSync('pull', '반찬', items.length, 'success');
     addSyncRecord({
       target: 'SHEETS',
       result: 'success',
@@ -67,7 +67,7 @@ export const pullMenuDB = async (): Promise<{
     });
     return { success: true, items };
   } catch (err) {
-    await logSync('pull', '메뉴DB', 0, 'error', String(err));
+    await logSync('pull', '반찬', 0, 'error', String(err));
     addSyncRecord({
       target: 'SHEETS',
       result: 'error',
@@ -116,11 +116,11 @@ export const pullPlanConfigs = async (): Promise<{
 export const pushMealPlan = async (plan: MonthlyMealPlan): Promise<SyncResult> => {
   try {
     const rows = mealPlanToRows(plan);
-    await appendSheetData('식단데이터', [MEAL_PLAN_HEADERS, ...rows]);
-    await logSync('push', '식단데이터', rows.length, 'success');
+    await appendSheetData('식단_히스토리', [MEAL_PLAN_HEADERS, ...rows]);
+    await logSync('push', '식단_히스토리', rows.length, 'success');
     return { success: true, rowCount: rows.length };
   } catch (err) {
-    await logSync('push', '식단데이터', 0, 'error', String(err));
+    await logSync('push', '식단_히스토리', 0, 'error', String(err));
     return { success: false, rowCount: 0, error: String(err) };
   }
 };
@@ -133,15 +133,15 @@ export const pullHistoricalPlans = async (): Promise<{
   error?: string;
 }> => {
   try {
-    const data = await getSheetData('식단데이터');
+    const data = await getSheetData('식단_히스토리');
     if (!data.data || data.data.length <= 1) {
       return { success: true, plans: [] };
     }
     const plans = rowsToHistoricalPlans(data.data.slice(1));
-    await logSync('pull', '식단데이터', plans.length, 'success');
+    await logSync('pull', '식단_히스토리', plans.length, 'success');
     return { success: true, plans };
   } catch (err) {
-    await logSync('pull', '식단데이터', 0, 'error', String(err));
+    await logSync('pull', '식단_히스토리', 0, 'error', String(err));
     return { success: false, plans: [], error: String(err) };
   }
 };
