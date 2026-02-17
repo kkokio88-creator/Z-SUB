@@ -1,34 +1,5 @@
 // Vercel Serverless Function: /api/sheets/*
-// 프로덕션 환경에서 Google Sheets API 프록시 역할
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-let sheetsModule: typeof import('@googleapis/sheets') | null = null;
-
-async function getSheetsModule() {
-  if (!sheetsModule) {
-    sheetsModule = await import('@googleapis/sheets');
-  }
-  return sheetsModule;
-}
-
-async function getAuthorizedSheets() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_PRIVATE_KEY;
-  const sheetId = process.env.GOOGLE_SPREADSHEET_ID;
-
-  if (!email || !key || !sheetId) return null;
-
-  const { auth, sheets } = await getSheetsModule();
-
-  const jwtAuth = new auth.JWT({
-    email,
-    key: key.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-
-  return { sheets: sheets({ version: 'v4', auth: jwtAuth }), spreadsheetId: sheetId };
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -49,53 +20,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  try {
-    const url = new URL(req.url || '', `https://${req.headers.host}`);
-    const pathParts = url.pathname.replace('/api/sheets/', '').split('/').filter(Boolean);
+  const url = new URL(req.url || '', `https://${req.headers.host}`);
+  const pathParts = url.pathname.replace('/api/sheets/', '').split('/').filter(Boolean);
 
-    // GET /api/sheets/status
-    if (pathParts[0] === 'status') {
-      const client = await getAuthorizedSheets();
-      if (!client) {
+  // GET /api/sheets/status - 먼저 기본 테스트
+  if (pathParts[0] === 'status') {
+    try {
+      const { auth, sheets } = await import('@googleapis/sheets');
+
+      const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+      const key = process.env.GOOGLE_PRIVATE_KEY;
+      const sheetId = process.env.GOOGLE_SPREADSHEET_ID;
+
+      if (!email || !key || !sheetId) {
         return res.status(200).json({
           connected: false,
           message: 'Google Sheets 환경변수가 설정되지 않았습니다.',
-          envCheck: {
-            email: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            key: !!process.env.GOOGLE_PRIVATE_KEY,
-            sheetId: !!process.env.GOOGLE_SPREADSHEET_ID,
-          },
+          envCheck: { email: !!email, key: !!key, sheetId: !!sheetId },
         });
       }
-      try {
-        const result = await client.sheets.spreadsheets.get({
-          spreadsheetId: client.spreadsheetId,
-        });
-        const title = result.data.properties?.title || '(제목 없음)';
-        return res.status(200).json({ connected: true, message: `연결 성공: "${title}"` });
-      } catch (err) {
-        return res.status(200).json({
-          connected: false,
-          message: `연결 실패: ${err instanceof Error ? err.message : String(err)}`,
-        });
-      }
+
+      const jwtAuth = new auth.JWT({
+        email,
+        key: key.replace(/\\n/g, '\n'),
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      const sheetsClient = sheets({ version: 'v4', auth: jwtAuth });
+      const result = await sheetsClient.spreadsheets.get({
+        spreadsheetId: sheetId,
+      });
+      const title = result.data.properties?.title || '(제목 없음)';
+      return res.status(200).json({ connected: true, message: `연결 성공: "${title}"` });
+    } catch (err) {
+      return res.status(200).json({
+        connected: false,
+        message: `오류: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  // 나머지 Sheets CRUD
+  if (pathParts.length < 1) {
+    return res.status(400).json({ error: 'Sheet name required' });
+  }
+
+  try {
+    const { auth, sheets } = await import('@googleapis/sheets');
+
+    const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const key = process.env.GOOGLE_PRIVATE_KEY;
+    const sheetId = process.env.GOOGLE_SPREADSHEET_ID;
+
+    if (!email || !key || !sheetId) {
+      return res.status(503).json({ error: 'Google Sheets 미설정', success: false });
     }
 
-    if (pathParts.length < 1) {
-      return res.status(400).json({ error: 'Sheet name required' });
-    }
+    const jwtAuth = new auth.JWT({
+      email,
+      key: key.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
 
+    const sheetsClient = sheets({ version: 'v4', auth: jwtAuth });
     const sheetName = decodeURIComponent(pathParts[0]);
     const isAppend = pathParts[1] === 'append';
-    const client = await getAuthorizedSheets();
-
-    if (!client) {
-      return res.status(503).json({ error: 'Google Sheets 미설정', sheetName, success: false });
-    }
 
     if (req.method === 'GET') {
-      const result = await client.sheets.spreadsheets.values.get({
-        spreadsheetId: client.spreadsheetId,
+      const result = await sheetsClient.spreadsheets.values.get({
+        spreadsheetId: sheetId,
         range: `${sheetName}!A:Z`,
       });
       return res.status(200).json({ sheetName, data: result.data.values || [] });
@@ -106,17 +99,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!data || !Array.isArray(data)) {
         return res.status(400).json({ error: 'data 배열이 필요합니다.', sheetName, success: false });
       }
-      await client.sheets.spreadsheets.values.clear({
-        spreadsheetId: client.spreadsheetId,
+      await sheetsClient.spreadsheets.values.clear({
+        spreadsheetId: sheetId,
         range: `${sheetName}!A:Z`,
       });
-      await client.sheets.spreadsheets.values.update({
-        spreadsheetId: client.spreadsheetId,
+      await sheetsClient.spreadsheets.values.update({
+        spreadsheetId: sheetId,
         range: `${sheetName}!A1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: data },
       });
-      return res.status(200).json({ sheetName, success: true, message: `${data.length}행 업데이트 완료` });
+      return res.status(200).json({
+        sheetName,
+        success: true,
+        message: `${data.length}행 업데이트 완료`,
+      });
     }
 
     if (req.method === 'PUT' && isAppend) {
@@ -124,13 +121,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!rows || !Array.isArray(rows)) {
         return res.status(400).json({ error: 'rows 배열이 필요합니다.', sheetName, success: false });
       }
-      await client.sheets.spreadsheets.values.append({
-        spreadsheetId: client.spreadsheetId,
+      await sheetsClient.spreadsheets.values.append({
+        spreadsheetId: sheetId,
         range: `${sheetName}!A:Z`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: rows },
       });
-      return res.status(200).json({ sheetName, success: true, message: `${rows.length}행 추가 완료` });
+      return res.status(200).json({
+        sheetName,
+        success: true,
+        message: `${rows.length}행 추가 완료`,
+      });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
@@ -138,7 +139,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({
       success: false,
       error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
     });
   }
 }
