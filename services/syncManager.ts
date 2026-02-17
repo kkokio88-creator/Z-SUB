@@ -58,7 +58,7 @@ export const pullMenuDB = async (): Promise<{
     if (!data.data || data.data.length <= 1) {
       return { success: true, items: [] };
     }
-    const items = data.data.slice(1).map(rowToMenuItem);
+    const items = data.data.slice(1).map((row, i) => rowToMenuItem(row, i));
     await logSync('pull', '반찬', items.length, 'success');
     addSyncRecord({
       target: 'SHEETS',
@@ -137,7 +137,7 @@ export const pullHistoricalPlans = async (): Promise<{
     if (!data.data || data.data.length <= 1) {
       return { success: true, plans: [] };
     }
-    const plans = rowsToHistoricalPlans(data.data.slice(1));
+    const plans = rowsToHistoricalPlans(data.data);
     await logSync('pull', '식단_히스토리', plans.length, 'success');
     return { success: true, plans };
   } catch (err) {

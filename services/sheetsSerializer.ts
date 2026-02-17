@@ -42,23 +42,45 @@ export const menuItemToRow = (item: MenuItem): string[] => [
   item.imageUrl || '',
 ];
 
-// 셀 배열 -> MenuItem
-export const rowToMenuItem = (row: string[]): MenuItem => ({
-  id: row[0],
-  code: row[1] || undefined,
-  name: row[2],
-  category: row[3] as MenuCategory,
-  cost: Number(row[4]) || 0,
-  recommendedPrice: Number(row[5]) || 0,
-  tastes: cellToArray(row[6]) as TasteProfile[],
-  season: (row[7] as Season) || Season.ALL,
-  tags: cellToArray(row[8]),
-  isSpicy: row[9] === 'true',
-  mainIngredient: row[10] || 'vegetable',
-  process: Number(row[11]) || 0,
-  weight: Number(row[12]) || 0,
-  isUnused: row[13] === 'true',
-  imageUrl: row[14] || undefined,
+// ── 실제 반찬 시트 컬럼 매핑 ──
+// [0]구분 [1]메뉴명 [2]공정 [3]품목코드 [4]용량(g) [5]가격 [6]원가
+// [7]시즌 [8]미사용 [9]매운맛 [10]대용량갯수 [11]비고
+
+const GUBUN_TO_CATEGORY: Record<string, MenuCategory> = {
+  국: MenuCategory.SOUP,
+  시즌국: MenuCategory.SOUP,
+  메인: MenuCategory.MAIN,
+  밥류: MenuCategory.MAIN,
+  볶음: MenuCategory.SIDE,
+  조림: MenuCategory.SIDE,
+  무침: MenuCategory.SIDE,
+  전: MenuCategory.SIDE,
+  장아찌: MenuCategory.SIDE,
+  김치: MenuCategory.SIDE,
+  협업: MenuCategory.DESSERT,
+};
+
+const parseNumber = (val: string | undefined): number => {
+  if (!val) return 0;
+  return Number(val.replace(/,/g, '')) || 0;
+};
+
+// 셀 배열 -> MenuItem (실제 반찬 시트 형식)
+export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => ({
+  id: row[3] || `item_${index}`,
+  code: row[3] || undefined,
+  name: row[1] || '',
+  category: GUBUN_TO_CATEGORY[row[0]] || MenuCategory.SIDE,
+  cost: parseNumber(row[6]),
+  recommendedPrice: parseNumber(row[5]),
+  tastes: [],
+  season: row[7] === 'TRUE' ? Season.ALL : Season.ALL,
+  tags: row[11] ? [row[11]] : [],
+  isSpicy: row[9] === 'TRUE',
+  mainIngredient: 'vegetable',
+  process: Number(row[2]) || 0,
+  weight: parseNumber(row[4]),
+  isUnused: row[8] === 'TRUE',
 });
 
 // 메뉴DB 헤더
@@ -161,40 +183,71 @@ export const MEAL_PLAN_HEADERS = [
   'createdAt',
 ];
 
-// ── 식단데이터 시트 → HistoricalMealPlan[] 변환 ──
-// 시트 컬럼: date, cycleType, target, menuName, process, code, price, cost
-export const rowsToHistoricalPlans = (rows: string[][]): HistoricalMealPlan[] => {
+// ── 식단_히스토리 시트 → HistoricalMealPlan[] 변환 ──
+// 와이드 포맷: [0-9]메타, [10+]타겟별 12컬럼(메뉴명,공정,품목코드,가격,원가,미사용,...)
+// 헤더 row[0]: "실속 식단메뉴명", "실속 식단공정", ... → 타겟명 추출
+// 데이터 row[3]=날짜(YYYY-MM-DD), row[4]=요일(화수목/금토월)
+
+const COLS_PER_TARGET = 12;
+const DATA_START_COL = 10;
+
+export const rowsToHistoricalPlans = (allRows: string[][]): HistoricalMealPlan[] => {
+  if (allRows.length < 3) return [];
+
+  // 헤더(row 0)에서 타겟명 추출
+  const headerRow = allRows[0];
+  const targetNames: string[] = [];
+  for (let col = DATA_START_COL; col < headerRow.length; col += COLS_PER_TARGET) {
+    const cell = headerRow[col] || '';
+    const name = cell.replace(/메뉴명$/, '').trim();
+    if (name) targetNames.push(name);
+  }
+
+  if (targetNames.length === 0) return [];
+
+  // 데이터 행은 row[2]부터 (row[0]=헤더, row[1]=서브헤더)
+  const dataRows = allRows.slice(2);
   const planMap = new Map<string, HistoricalMealPlan>();
 
-  for (const row of rows) {
-    const date = row[0];
-    const cycleType = (row[1] || '화수목') as CycleType;
-    const targetType = row[2] as TargetType;
-    const menuName = row[3] || '';
-    const process = Number(row[4]) || 0;
-    const code = row[5] || '';
-    const price = Number(row[6]) || 0;
-    const cost = Number(row[7]) || 0;
+  for (const row of dataRows) {
+    const date = row[3];
+    const cycleRaw = row[4];
+    if (!date || !cycleRaw || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
 
-    if (!date || !targetType || !menuName) continue;
-
+    const cycleType = (cycleRaw === '금토월' ? '금토월' : '화수목') as CycleType;
     const key = `${date}|${cycleType}`;
+
     if (!planMap.has(key)) {
       planMap.set(key, { date, cycleType, targets: [] });
     }
     const plan = planMap.get(key)!;
 
-    let targetPlan = plan.targets.find(t => t.targetType === targetType);
-    if (!targetPlan) {
-      targetPlan = { targetType, items: [], totalPrice: 0, totalCost: 0, itemCount: 0 };
-      plan.targets.push(targetPlan);
-    }
+    for (let ti = 0; ti < targetNames.length; ti++) {
+      const baseCol = DATA_START_COL + ti * COLS_PER_TARGET;
+      const menuName = (row[baseCol] || '').trim();
+      if (!menuName) continue;
 
-    const item: HistoricalMenuItem = { name: menuName, process, code, price, cost };
-    targetPlan.items.push(item);
-    targetPlan.totalPrice += price;
-    targetPlan.totalCost += cost;
-    targetPlan.itemCount = targetPlan.items.length;
+      const targetName = targetNames[ti];
+      const matchedTarget = Object.values(TargetType).find(t => t === targetName) || (targetName as TargetType);
+
+      let targetPlan = plan.targets.find(t => t.targetType === matchedTarget);
+      if (!targetPlan) {
+        targetPlan = { targetType: matchedTarget, items: [], totalPrice: 0, totalCost: 0, itemCount: 0 };
+        plan.targets.push(targetPlan);
+      }
+
+      const item: HistoricalMenuItem = {
+        name: menuName,
+        process: Number(row[baseCol + 1]) || 0,
+        code: row[baseCol + 2] || '',
+        price: parseNumber(row[baseCol + 3]),
+        cost: parseNumber(row[baseCol + 4]),
+      };
+      targetPlan.items.push(item);
+      targetPlan.totalPrice += item.price;
+      targetPlan.totalCost += item.cost;
+      targetPlan.itemCount = targetPlan.items.length;
+    }
   }
 
   return Array.from(planMap.values()).sort((a, b) => a.date.localeCompare(b.date));

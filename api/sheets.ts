@@ -90,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       const result = await sheetsClient.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${sheetName}!A:Z`,
+        range: sheetName,
       });
       return res.status(200).json({ sheetName, data: result.data.values || [] });
     }
@@ -102,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       await sheetsClient.spreadsheets.values.clear({
         spreadsheetId: sheetId,
-        range: `${sheetName}!A:Z`,
+        range: sheetName,
       });
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: sheetId,
@@ -124,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       await sheetsClient.spreadsheets.values.append({
         spreadsheetId: sheetId,
-        range: `${sheetName}!A:Z`,
+        range: sheetName,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: rows },
       });
