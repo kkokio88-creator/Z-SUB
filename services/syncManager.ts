@@ -58,7 +58,10 @@ export const pullMenuDB = async (): Promise<{
     if (!data.data || data.data.length <= 1) {
       return { success: true, items: [] };
     }
-    const items = data.data.slice(1).map((row, i) => rowToMenuItem(row, i));
+    const items = data.data
+      .slice(1)
+      .filter(row => row[1] && row[1].trim())
+      .map((row, i) => rowToMenuItem(row, i));
     await logSync('pull', '반찬', items.length, 'success');
     addSyncRecord({
       target: 'SHEETS',

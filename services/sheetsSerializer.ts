@@ -66,22 +66,27 @@ const parseNumber = (val: string | undefined): number => {
 };
 
 // 셀 배열 -> MenuItem (실제 반찬 시트 형식)
-export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => ({
-  id: row[3] || `item_${index}`,
-  code: row[3] || undefined,
-  name: row[1] || '',
-  category: GUBUN_TO_CATEGORY[row[0]] || MenuCategory.SIDE,
-  cost: parseNumber(row[6]),
-  recommendedPrice: parseNumber(row[5]),
-  tastes: [],
-  season: row[7] === 'TRUE' ? Season.ALL : Season.ALL,
-  tags: row[11] ? [row[11]] : [],
-  isSpicy: row[9] === 'TRUE',
-  mainIngredient: 'vegetable',
-  process: Number(row[2]) || 0,
-  weight: parseNumber(row[4]),
-  isUnused: row[8] === 'TRUE',
-});
+export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => {
+  const gubun = (row[0] || '').trim();
+  const tags = [row[11] ? row[11].trim() : '', gubun && !GUBUN_TO_CATEGORY[gubun] ? gubun : ''].filter(Boolean);
+
+  return {
+    id: row[3] ? row[3].trim() : `item_${index}`,
+    code: row[3] ? row[3].trim() : undefined,
+    name: (row[1] || '').trim(),
+    category: GUBUN_TO_CATEGORY[gubun] || MenuCategory.SIDE,
+    cost: parseNumber(row[6]),
+    recommendedPrice: parseNumber(row[5]),
+    tastes: [],
+    season: Season.ALL,
+    tags,
+    isSpicy: row[9] === 'TRUE',
+    mainIngredient: 'vegetable',
+    process: Number(row[2]) || 0,
+    weight: parseNumber(row[4]),
+    isUnused: row[8] === 'TRUE',
+  };
+};
 
 // 메뉴DB 헤더
 export const MENU_DB_HEADERS = [
