@@ -42,22 +42,18 @@ const fetchRoleFromProfiles = async (supabase: ReturnType<typeof getSupabase>, u
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const isOfflineMode = !isSupabaseConfigured() && import.meta.env.DEV;
+  const isOfflineMode = !isSupabaseConfigured();
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
-      if (import.meta.env.DEV) {
-        setUser(DEFAULT_USER);
-      }
+      setUser(DEFAULT_USER);
       setIsLoading(false);
       return;
     }
 
     const supabase = getSupabase();
     if (!supabase) {
-      if (import.meta.env.DEV) {
-        setUser(DEFAULT_USER);
-      }
+      setUser(DEFAULT_USER);
       setIsLoading(false);
       return;
     }
@@ -132,11 +128,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const supabase = getSupabase();
       if (!supabase) {
-        if (import.meta.env.DEV) {
-          setUser(DEFAULT_USER);
-          return { success: true };
-        }
-        return { success: false, error: 'Service unavailable' };
+        setUser(DEFAULT_USER);
+        return { success: true };
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email, password });
