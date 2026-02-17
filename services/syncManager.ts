@@ -159,6 +159,6 @@ export const logSync = async (
     const logRow = [new Date().toISOString(), direction, sheetName, String(rowCount), status, error || ''];
     await appendSheetData('동기화로그', [logRow]);
   } catch {
-    console.error('동기화 로그 기록 실패');
+    // 동기화로그 시트 미존재 시 무시
   }
 };
