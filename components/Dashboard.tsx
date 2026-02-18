@@ -75,7 +75,8 @@ const Dashboard: React.FC = () => {
           }
 
           const count = available.length;
-          const weeksNeeded = needed * 4; // 4주치
+          // 60일 비중복 기준: 60일 ≈ 9주, 화수목+금토월 2개 주기
+          const weeksNeeded = needed * Math.ceil(60 / 7); // 9주치
           const status = count >= weeksNeeded * 2 ? 'ok' : count >= weeksNeeded ? 'warn' : 'danger';
           checks.push({ cat, required: needed, available: count, status });
         }
@@ -225,7 +226,7 @@ const Dashboard: React.FC = () => {
           <h3 className="text-lg font-bold text-gray-800">식단 구성 가능 여부</h3>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          {Object.keys(TARGET_CONFIGS).length}개 타겟별 카테고리 메뉴 충분도 (4주 기준)
+          {Object.keys(TARGET_CONFIGS).length}개 타겟별 카테고리 메뉴 충분도 (60일 비중복 기준)
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

@@ -51,9 +51,10 @@ const SCOPE_BADGE_COLORS = {
 interface PlanReviewPanelProps {
   planId: string;
   onFinalized?: () => void;
+  onStatusChange?: () => void;
 }
 
-const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }) => {
+const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized, onStatusChange }) => {
   const { user } = useAuth();
   const { addToast } = useToast();
   const [review, setReview] = useState<PlanReviewRecord | null>(() => getReview(planId));
@@ -70,7 +71,8 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
     const result = requestReview(planId, user?.displayName || '사용자');
     setReview(result);
     addToast({ type: 'success', title: '검토 요청 완료', message: '3개 부서에 검토 요청이 전송되었습니다.' });
-  }, [planId, user, addToast]);
+    onStatusChange?.();
+  }, [planId, user, addToast, onStatusChange]);
 
   const handleDeptReview = useCallback(
     (dept: ReviewDepartment, approved: boolean) => {
@@ -84,9 +86,10 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
           title: `${DEPARTMENT_LABELS[dept]} ${approved ? '승인' : '반려'}`,
           message: approved ? '검토가 완료되었습니다.' : '반려 사유가 기록되었습니다.',
         });
+        onStatusChange?.();
       }
     },
-    [planId, user, reviewComment, addToast]
+    [planId, user, reviewComment, addToast, onStatusChange]
   );
 
   const handleFinalize = useCallback(() => {
@@ -94,9 +97,10 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
     if (result) {
       setReview({ ...result });
       addToast({ type: 'success', title: '최종 등록 완료', message: '식단이 최종 확정되었습니다.' });
+      onStatusChange?.();
       onFinalized?.();
     }
-  }, [planId, addToast, onFinalized]);
+  }, [planId, addToast, onFinalized, onStatusChange]);
 
   const handleResolveComment = useCallback(
     (commentId: string) => {

@@ -1,6 +1,77 @@
 import { TARGET_CONFIGS } from '../constants';
 import { WeeklyCyclePlan, MenuCategory, MenuItem, TargetType, MonthlyMealPlan, CycleType } from '../types';
 
+// ── 유사메뉴 감지 ──
+// 한국어 메뉴명에서 핵심 키워드를 추출하여 유사도 판정
+const MENU_KEYWORDS = [
+  '장조림',
+  '볶음',
+  '조림',
+  '찌개',
+  '된장',
+  '김치',
+  '제육',
+  '불고기',
+  '갈비',
+  '탕수',
+  '깐풍',
+  '카레',
+  '스테이크',
+  '함박',
+  '돈까스',
+  '가스',
+  '튀김',
+  '전',
+  '무침',
+  '샐러드',
+  '나물',
+  '잡채',
+  '비빔',
+  '덮밥',
+  '볶음밥',
+  '두부',
+  '계란',
+  '달걀',
+  '오므라이스',
+  '미역국',
+  '소고기',
+  '돼지',
+  '닭',
+  '생선',
+  '고등어',
+  '갈치',
+  '연어',
+  '새우',
+  '오징어',
+];
+
+export const isSimilarMenu = (nameA: string, nameB: string): boolean => {
+  if (nameA === nameB) return true;
+  const a = nameA.replace(/\s+/g, '');
+  const b = nameB.replace(/\s+/g, '');
+
+  // 한쪽이 다른 쪽을 포함 (장조림 ⊂ 닭가슴살장조림)
+  if (a.length >= 2 && b.length >= 2) {
+    if (a.includes(b) || b.includes(a)) return true;
+  }
+
+  // 공통 키워드 2글자 이상 매칭 (된장찌개 ↔ 된장국)
+  const matchedKeywords: string[] = [];
+  for (const kw of MENU_KEYWORDS) {
+    if (a.includes(kw) && b.includes(kw)) {
+      matchedKeywords.push(kw);
+    }
+  }
+  if (matchedKeywords.length > 0) {
+    // 공통 키워드가 메뉴명의 상당 부분을 차지하는 경우만 유사로 판정
+    const longestMatch = matchedKeywords.reduce((l, k) => (k.length > l.length ? k : l), '');
+    const shorter = Math.min(a.length, b.length);
+    if (longestMatch.length >= 2 && longestMatch.length >= shorter * 0.4) return true;
+  }
+
+  return false;
+};
+
 // Fisher-Yates shuffle for unbiased randomization
 const shuffle = <T>(array: T[]): T[] => {
   const result = [...array];
@@ -18,7 +89,8 @@ const generateWeeklyCycle = (
   menuDB: MenuItem[],
   usedItemIds: Set<string>,
   prevWeekIngredients: Set<string>,
-  enableDuplicationCheck: boolean
+  enableDuplicationCheck: boolean,
+  prevWeekMenuNames: string[] = []
 ): WeeklyCyclePlan => {
   const config = TARGET_CONFIGS[target];
   const warnings: string[] = [];
@@ -61,11 +133,15 @@ const generateWeeklyCycle = (
       return bMatch - aMatch; // More matches first
     });
 
-    // We take top items, but randomized slightly to avoid same deterministic output
-    // If strict ingredient rules, we might fail to find items. Here we do best effort.
-    // Let's create a pool of candidates that don't repeat ingredients if possible.
-    const nonRepeatingCandidates = prioritized.filter(i => !prevWeekIngredients.has(i.mainIngredient));
-    const finalPool = nonRepeatingCandidates.length >= (count as number) ? nonRepeatingCandidates : prioritized;
+    // Filter out items similar to previous week's menus
+    const nonSimilarCandidates = prioritized.filter(
+      i => !prevWeekMenuNames.some(prevName => isSimilarMenu(i.name, prevName))
+    );
+
+    // Also filter by non-repeating ingredients
+    const nonRepeatingCandidates = nonSimilarCandidates.filter(i => !prevWeekIngredients.has(i.mainIngredient));
+    const fallbackPool = nonSimilarCandidates.length >= (count as number) ? nonSimilarCandidates : prioritized;
+    const finalPool = nonRepeatingCandidates.length >= (count as number) ? nonRepeatingCandidates : fallbackPool;
 
     const selected = shuffle(finalPool).slice(0, count as number);
 
@@ -168,12 +244,22 @@ export const generateMonthlyMealPlan = (
   const usedItemIds = new Set<string>();
   const weeks: WeeklyCyclePlan[] = [];
   let prevWeekIngredients = new Set<string>();
+  let prevWeekMenuNames: string[] = [];
 
   for (let i = 1; i <= 4; i++) {
-    const weekPlan = generateWeeklyCycle(i, target, menuDB, usedItemIds, prevWeekIngredients, enableDuplicationCheck);
+    const weekPlan = generateWeeklyCycle(
+      i,
+      target,
+      menuDB,
+      usedItemIds,
+      prevWeekIngredients,
+      enableDuplicationCheck,
+      prevWeekMenuNames
+    );
 
     weekPlan.items.forEach(item => usedItemIds.add(item.id));
     prevWeekIngredients = new Set(weekPlan.items.map(item => item.mainIngredient).filter(ing => ing !== 'vegetable'));
+    prevWeekMenuNames = weekPlan.items.map(item => item.name);
 
     weeks.push(weekPlan);
   }

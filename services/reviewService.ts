@@ -117,7 +117,10 @@ const saveComments = (comments: Record<string, ReviewComment[]>): void => {
   localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
 };
 
-export const addReviewComment = (planId: string, comment: Omit<ReviewComment, 'id' | 'createdAt'>): ReviewComment => {
+export const addReviewComment = (
+  planId: string,
+  comment: Omit<ReviewComment, 'id' | 'createdAt'> & { parentId?: string }
+): ReviewComment => {
   const allComments = loadComments();
   const planComments = allComments[planId] || [];
 

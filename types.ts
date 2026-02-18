@@ -181,6 +181,7 @@ export interface PlanReviewRecord {
 // 인라인 코멘트 시스템
 export interface ReviewComment {
   id: string;
+  parentId?: string; // 쓰레드 답글용: 부모 코멘트 ID
   department: ReviewDepartment;
   reviewer: string;
   scope: 'plan' | 'week' | 'item';
