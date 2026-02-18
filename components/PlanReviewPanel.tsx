@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquare,
-  Plus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -20,7 +19,6 @@ import {
   submitDepartmentReview,
   finalizeReview,
   DEPARTMENT_LABELS,
-  addReviewComment,
   getReviewComments,
   resolveComment,
 } from '../services/reviewService';
@@ -65,12 +63,6 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
 
   // Inline Comments State
   const [comments, setComments] = useState<ReviewComment[]>(() => getReviewComments(planId));
-  const [showCommentForm, setShowCommentForm] = useState(false);
-  const [newCommentDept, setNewCommentDept] = useState<ReviewDepartment>('quality');
-  const [newCommentScope, setNewCommentScope] = useState<'plan' | 'week' | 'item'>('plan');
-  const [newCommentScopeKey, setNewCommentScopeKey] = useState('');
-  const [newCommentText, setNewCommentText] = useState('');
-  const [newCommentStatus, setNewCommentStatus] = useState<'comment' | 'issue'>('comment');
 
   const unresolvedCount = comments.filter(c => c.status !== 'resolved').length;
 
@@ -105,31 +97,6 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
       onFinalized?.();
     }
   }, [planId, addToast, onFinalized]);
-
-  const handleAddComment = useCallback(() => {
-    if (!newCommentText.trim()) return;
-
-    const scopeKey = newCommentScope === 'plan' ? planId : newCommentScopeKey;
-    if (!scopeKey) {
-      addToast({ type: 'error', title: '입력 오류', message: 'scope 키를 입력하세요.' });
-      return;
-    }
-
-    const created = addReviewComment(planId, {
-      department: newCommentDept,
-      reviewer: user?.displayName || '사용자',
-      scope: newCommentScope,
-      scopeKey,
-      comment: newCommentText,
-      status: newCommentStatus,
-    });
-
-    setComments(prev => [...prev, created]);
-    setNewCommentText('');
-    setNewCommentScopeKey('');
-    setShowCommentForm(false);
-    addToast({ type: 'success', title: '코멘트 추가', message: '코멘트가 등록되었습니다.' });
-  }, [planId, newCommentDept, newCommentScope, newCommentScopeKey, newCommentText, newCommentStatus, user, addToast]);
 
   const handleResolveComment = useCallback(
     (commentId: string) => {
@@ -276,85 +243,11 @@ const PlanReviewPanel: React.FC<PlanReviewPanelProps> = ({ planId, onFinalized }
             <div className="flex items-center justify-between mb-3">
               <h5 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-gray-500" />
-                인라인 코멘트
+                코멘트
                 {comments.length > 0 && <span className="text-xs font-normal text-gray-400">({comments.length})</span>}
               </h5>
-              {review.status !== 'finalized' && (
-                <button
-                  onClick={() => setShowCommentForm(!showCommentForm)}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100"
-                >
-                  <Plus className="w-3 h-3" /> 코멘트 추가
-                </button>
-              )}
+              <span className="text-[10px] text-gray-400">메뉴를 클릭하여 코멘트를 추가하세요</span>
             </div>
-
-            {/* Comment Form */}
-            {showCommentForm && (
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 mb-3 space-y-2">
-                <div className="flex gap-2 flex-wrap">
-                  <select
-                    value={newCommentDept}
-                    onChange={e => setNewCommentDept(e.target.value as ReviewDepartment)}
-                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-                  >
-                    <option value="quality">품질팀</option>
-                    <option value="development">개발팀</option>
-                    <option value="process">공정팀</option>
-                  </select>
-                  <select
-                    value={newCommentScope}
-                    onChange={e => {
-                      setNewCommentScope(e.target.value as 'plan' | 'week' | 'item');
-                      setNewCommentScopeKey('');
-                    }}
-                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-                  >
-                    <option value="plan">식단 전체</option>
-                    <option value="week">주차</option>
-                    <option value="item">메뉴</option>
-                  </select>
-                  {newCommentScope !== 'plan' && (
-                    <input
-                      type="text"
-                      value={newCommentScopeKey}
-                      onChange={e => setNewCommentScopeKey(e.target.value)}
-                      placeholder={newCommentScope === 'week' ? 'A-1, B-2...' : 'A-1-돈까스'}
-                      className="text-xs border border-gray-200 rounded px-2 py-1 bg-white flex-1 min-w-[120px]"
-                    />
-                  )}
-                  <select
-                    value={newCommentStatus}
-                    onChange={e => setNewCommentStatus(e.target.value as 'comment' | 'issue')}
-                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-                  >
-                    <option value="comment">의견</option>
-                    <option value="issue">이슈</option>
-                  </select>
-                </div>
-                <textarea
-                  value={newCommentText}
-                  onChange={e => setNewCommentText(e.target.value)}
-                  placeholder="코멘트를 입력하세요..."
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none"
-                  rows={2}
-                />
-                <div className="flex gap-2 justify-end">
-                  <button
-                    onClick={() => setShowCommentForm(false)}
-                    className="px-3 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={handleAddComment}
-                    className="px-3 py-1 text-xs font-bold text-white bg-blue-600 rounded hover:bg-blue-700"
-                  >
-                    등록
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Comments List */}
             {comments.length === 0 ? (

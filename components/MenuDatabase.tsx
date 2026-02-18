@@ -18,7 +18,7 @@ import {
 import ImportDialog from './ImportDialog';
 import BulkEditDialog from './BulkEditDialog';
 import MenuDetailModal from './MenuDetailModal';
-import { MenuCategory, MenuItem, Season } from '../types';
+import { MenuCategory, MenuItem, Season, TasteProfile } from '../types';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +28,20 @@ import { autoClassifyBatch } from '../services/autoClassifyService';
 
 const PAGE_SIZE = 50;
 
-type SortField = 'name' | 'category' | 'recommendedPrice' | 'cost' | 'process' | 'weight';
+const INGREDIENT_LABELS: Record<string, string> = {
+  beef: '소고기',
+  pork: '한돈',
+  chicken: '닭',
+  fish: '생선',
+  tofu: '두부',
+  egg: '달걀',
+  potato: '감자',
+  seaweed: '해조류',
+  mushroom: '버섯',
+  vegetable: '채소',
+};
+
+type SortField = 'name' | 'category' | 'recommendedPrice' | 'cost' | 'season' | 'mainIngredient' | 'weight';
 type SortDir = 'asc' | 'desc';
 
 const MenuDatabase: React.FC = () => {
@@ -112,9 +125,13 @@ const MenuDatabase: React.FC = () => {
           valA = a.cost;
           valB = b.cost;
           break;
-        case 'process':
-          valA = a.process || 0;
-          valB = b.process || 0;
+        case 'season':
+          valA = a.season;
+          valB = b.season;
+          break;
+        case 'mainIngredient':
+          valA = a.mainIngredient;
+          valB = b.mainIngredient;
           break;
         case 'weight':
           valA = a.weight || 0;
@@ -569,10 +586,12 @@ const MenuDatabase: React.FC = () => {
                   className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
               </th>
-              <SortHeader field="category" label="구분" className="text-left w-28" />
-              <SortHeader field="name" label="메뉴명" className="text-left" />
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-28">품목코드</th>
-              <SortHeader field="process" label="공정" className="text-center w-16" />
+              <SortHeader field="category" label="구분" className="text-left w-24" />
+              <SortHeader field="name" label="메뉴명" className="text-left w-36" />
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-24">품목코드</th>
+              <SortHeader field="season" label="계절성" className="text-center w-20" />
+              <SortHeader field="mainIngredient" label="주재료" className="text-center w-20" />
+              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-28">맛속성</th>
               <SortHeader field="weight" label="용량" className="text-right w-16" />
               <SortHeader field="recommendedPrice" label="가격" className="text-right w-20" />
               <SortHeader field="cost" label="원가" className="text-right w-20" />
@@ -583,7 +602,7 @@ const MenuDatabase: React.FC = () => {
           <tbody className="divide-y divide-gray-100">
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-gray-400 text-sm">
+                <td colSpan={12} className="text-center py-12 text-gray-400 text-sm">
                   검색 결과가 없습니다.
                 </td>
               </tr>
@@ -625,8 +644,53 @@ const MenuDatabase: React.FC = () => {
                   <td className="px-3 py-2">
                     <span className="font-mono text-xs text-gray-500">{item.code || '\u2014'}</span>
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    <span className="text-xs text-gray-600">{item.process || '\u2014'}</span>
+                  <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                    <select
+                      value={item.season}
+                      onChange={e => handleUpdateItem(item.id, 'season', e.target.value as Season)}
+                      className="text-[11px] bg-transparent border border-transparent hover:border-gray-200 rounded px-1 py-0.5 focus:ring-primary-500 cursor-pointer"
+                    >
+                      {Object.values(Season).map(s => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                    <select
+                      value={item.mainIngredient}
+                      onChange={e => handleUpdateItem(item.id, 'mainIngredient', e.target.value)}
+                      className="text-[11px] bg-transparent border border-transparent hover:border-gray-200 rounded px-1 py-0.5 focus:ring-primary-500 cursor-pointer"
+                    >
+                      {Object.entries(INGREDIENT_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-1.5 py-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-wrap gap-0.5">
+                      {Object.values(TasteProfile).map(taste => (
+                        <button
+                          key={taste}
+                          onClick={() => {
+                            const newTastes = item.tastes.includes(taste)
+                              ? item.tastes.filter(t => t !== taste)
+                              : [...item.tastes, taste];
+                            handleUpdateItem(item.id, 'tastes', newTastes);
+                          }}
+                          className={`px-1 py-0.5 text-[9px] rounded border transition-colors ${
+                            item.tastes.includes(taste)
+                              ? 'bg-primary-100 text-primary-700 border-primary-200 font-bold'
+                              : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'
+                          }`}
+                        >
+                          {taste.replace('맛', '').replace('함', '')}
+                        </button>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right">
                     <span className="text-xs text-gray-600">{item.weight ? `${item.weight}g` : '\u2014'}</span>

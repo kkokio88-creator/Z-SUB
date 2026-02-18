@@ -220,15 +220,18 @@ const MergedTableCell: React.FC<{
 }> = ({ baseItems, plusItems, plusBadge, date, baseTarget, plusTarget, editedKeys, onSwap }) => {
   const [expanded, setExpanded] = useState(false);
 
-  // 공통 메뉴와 plus 전용 메뉴 구분
-  const baseNameSet = new Set(baseItems.map(i => cleanMenuName(i.name)));
+  // 공통 메뉴와 plus 전용 메뉴 구분 (숫자 포함 메뉴명 제외)
+  const baseNameSet = new Set(baseItems.filter(i => !/\d/.test(i.name)).map(i => cleanMenuName(i.name)));
   const allItems: { item: HistoricalMenuItem; isPlusOnly: boolean; targetType: string; idx: number }[] = [];
 
   baseItems.forEach((item, idx) => {
-    allItems.push({ item, isPlusOnly: false, targetType: baseTarget, idx });
+    if (!/\d/.test(item.name)) {
+      allItems.push({ item, isPlusOnly: false, targetType: baseTarget, idx });
+    }
   });
 
   plusItems.forEach((item, idx) => {
+    if (/\d/.test(item.name)) return;
     const cleanName = cleanMenuName(item.name);
     if (!baseNameSet.has(cleanName)) {
       allItems.push({ item, isPlusOnly: true, targetType: plusTarget, idx });
@@ -301,21 +304,28 @@ const TableCell: React.FC<{
   onSwap: (itemIndex: number, currentName: string) => void;
 }> = ({ items, date, targetType, editedKeys, onSwap }) => {
   const [expanded, setExpanded] = useState(false);
-  const displayItems = expanded ? items : items.slice(0, 6);
-  const hasMore = items.length > 6;
+
+  // 숫자가 포함된 메뉴명은 반찬이 아니므로 필터링 (원본 인덱스 유지)
+  const validItems = useMemo(
+    () => items.map((item, idx) => ({ item, originalIdx: idx })).filter(({ item }) => !/\d/.test(item.name)),
+    [items]
+  );
+
+  const displayItems = expanded ? validItems : validItems.slice(0, 6);
+  const hasMore = validItems.length > 6;
 
   return (
     <div className="space-y-0.5">
-      {displayItems.map((item, idx) => {
+      {displayItems.map(({ item, originalIdx }) => {
         const ingredient = detectIngredient(item.name);
         const colors = INGREDIENT_COLORS[ingredient];
-        const isEdited = editedKeys.has(`${date}|${targetType}|${idx}`);
+        const isEdited = editedKeys.has(`${date}|${targetType}|${originalIdx}`);
         const displayName = cleanMenuName(item.name);
 
         return (
           <div
-            key={idx}
-            onClick={() => onSwap(idx, item.name)}
+            key={originalIdx}
+            onClick={() => onSwap(originalIdx, item.name)}
             className={`px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
             title={item.name}
           >
@@ -334,7 +344,7 @@ const TableCell: React.FC<{
           }}
           className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
         >
-          +{items.length - 6}개 더보기
+          +{validItems.length - 6}개 더보기
         </button>
       )}
       {hasMore && expanded && (

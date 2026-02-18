@@ -19,6 +19,8 @@ import {
   Printer,
   Download,
   FileText,
+  MessageSquare,
+  Replace,
 } from 'lucide-react';
 import { MAJOR_INGREDIENTS, TARGET_CONFIGS } from '../constants';
 import { useMenu } from '../context/MenuContext';
@@ -33,6 +35,7 @@ import PlanDiffView from './PlanDiffView';
 import PlanReviewPanel from './PlanReviewPanel';
 import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportService';
 import { pushMealPlan } from '../services/syncManager';
+import { addReviewComment } from '../services/reviewService';
 
 // History & Diff types
 
@@ -66,6 +69,21 @@ const MealPlanner: React.FC = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showDiffView, setShowDiffView] = useState(false);
   const [diffBeforePlan, setDiffBeforePlan] = useState<MonthlyMealPlan | null>(null);
+
+  // Action Chooser State (메뉴 클릭 시 대체메뉴/코멘트 선택)
+  const [menuActionTarget, setMenuActionTarget] = useState<{
+    cycle: 'A' | 'B';
+    weekIndex: number;
+    item: MenuItem;
+  } | null>(null);
+
+  // Comment Form State
+  const [commentTarget, setCommentTarget] = useState<{
+    cycle: 'A' | 'B';
+    weekIndex: number;
+    item: MenuItem;
+  } | null>(null);
+  const [commentText, setCommentText] = useState('');
 
   const handleGenerate = () => {
     setIsGenerating(true);
@@ -142,13 +160,52 @@ const MealPlanner: React.FC = () => {
     setShowReviewModal(true);
   };
 
-  const openSwapModal = (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
+  // 메뉴 클릭 시 액션 선택 모달 열기
+  const handleMenuItemClick = (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
+    setMenuActionTarget({ cycle, weekIndex, item });
+  };
+
+  // 대체메뉴 선정 선택
+  const openSwapFromAction = () => {
+    if (!menuActionTarget) return;
+    const { cycle, weekIndex, item } = menuActionTarget;
     const plan = plans[cycle];
     if (!plan) return;
     const activeMenu = menuItems.filter(m => !m.isUnused);
     const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu);
     setSwapTarget({ cycle, weekIndex, item });
     setSwapCandidates(candidates);
+    setMenuActionTarget(null);
+  };
+
+  // 식단 코멘트 선택
+  const openCommentFromAction = () => {
+    if (!menuActionTarget) return;
+    setCommentTarget(menuActionTarget);
+    setCommentText('');
+    setMenuActionTarget(null);
+  };
+
+  // 코멘트 등록
+  const handleSubmitComment = () => {
+    if (!commentTarget || !commentText.trim() || !plans.A) return;
+    const cycleLabel = commentTarget.cycle === 'A' ? '화수목' : '금토월';
+    const scopeKey = `${cycleLabel}-${commentTarget.weekIndex}-${commentTarget.item.name}`;
+    addReviewComment(plans.A.id, {
+      department: 'quality',
+      reviewer: user?.displayName || '사용자',
+      scope: 'item',
+      scopeKey,
+      comment: commentText,
+      status: 'comment',
+    });
+    addToast({
+      type: 'success',
+      title: '코멘트 등록',
+      message: `${commentTarget.item.name}에 코멘트가 추가되었습니다.`,
+    });
+    setCommentTarget(null);
+    setCommentText('');
   };
 
   const performSwap = (newItem: MenuItem) => {
@@ -208,7 +265,7 @@ const MealPlanner: React.FC = () => {
 
     const confirmOverwrite = await confirm({
       title: 'MIS 시스템 등록',
-      message: `${monthLabel} ${target} 식단(A조+B조)을 MIS에 등록하시겠습니까?`,
+      message: `${monthLabel} ${target} 식단(화수목+금토월)을 MIS에 등록하시겠습니까?`,
       confirmLabel: '등록',
       variant: 'warning',
     });
@@ -294,22 +351,26 @@ const MealPlanner: React.FC = () => {
     }
   };
 
+  // 채소를 제외한 주요 식재료 목록
+  const trackedIngredients = useMemo(() => MAJOR_INGREDIENTS.filter(ing => ing.key !== 'vegetable'), []);
+
   // Helper: Per-week Ingredient Counts
   const ingredientCountsByWeek = useMemo(() => {
     if (!plans.A || !plans.B) return null;
     const result: Record<string, Record<string, number>> = {};
     const total: Record<string, number> = {};
-    MAJOR_INGREDIENTS.forEach(ing => (total[ing.key] = 0));
+    trackedIngredients.forEach(ing => (total[ing.key] = 0));
 
     const processPlan = (plan: MonthlyMealPlan, label: string) => {
       plan.weeks.forEach(week => {
         const key = `${label}-${week.weekIndex}`;
         const counts: Record<string, number> = {};
-        MAJOR_INGREDIENTS.forEach(ing => (counts[ing.key] = 0));
+        trackedIngredients.forEach(ing => (counts[ing.key] = 0));
         week.items.forEach(item => {
-          if (counts[item.mainIngredient] !== undefined) {
-            counts[item.mainIngredient]++;
-            total[item.mainIngredient]++;
+          const ingKey = item.mainIngredient;
+          if (counts[ingKey] !== undefined) {
+            counts[ingKey]++;
+            total[ingKey]++;
           }
         });
         result[key] = counts;
@@ -320,7 +381,7 @@ const MealPlanner: React.FC = () => {
     processPlan(plans.B, 'B');
     result['total'] = total;
     return result;
-  }, [plans.A, plans.B]);
+  }, [plans.A, plans.B, trackedIngredients]);
   const currentBudgetCap = TARGET_CONFIGS[target].budgetCap;
   const targetPrice = TARGET_CONFIGS[target].targetPrice;
 
@@ -379,7 +440,7 @@ const MealPlanner: React.FC = () => {
                   return (
                     <div
                       key={item.id}
-                      onClick={() => openSwapModal(cycleKey, week.weekIndex, item)}
+                      onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
                       className={`flex items-center gap-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer transition-all ${
                         isExtra
                           ? 'border border-amber-300 bg-amber-50/50'
@@ -492,7 +553,7 @@ const MealPlanner: React.FC = () => {
               className={`flex items-center gap-2 px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-xl font-bold shadow-lg transition-all active:scale-95 ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
             >
               {isGenerating ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-              {isGenerating ? '식단 생성 중...' : '통합 식단(A조/B조) 자동 생성'}
+              {isGenerating ? '식단 생성 중...' : '통합 식단(화수목/금토월) 자동 생성'}
             </button>
           </div>
         </div>
@@ -591,7 +652,7 @@ const MealPlanner: React.FC = () => {
           </div>
           <h3 className="text-xl font-bold text-gray-800 mb-2">통합 식단 생성 (이중 주기)</h3>
           <p className="text-gray-500 max-w-md">
-            A조(화수목) 및 B조(금토월) 식단을 동시에 생성하고,
+            화수목 및 금토월 식단을 동시에 생성하고,
             <br />두 식단 간의 식재료 중복을 체크하여 다양성을 확보합니다.
           </p>
         </div>
@@ -599,10 +660,10 @@ const MealPlanner: React.FC = () => {
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto pb-6">
             {/* Cycle A Row */}
-            {plans.A && renderCycleRow('화수목 (A조)', plans.A, 'A')}
+            {plans.A && renderCycleRow('화수목', plans.A, 'A')}
 
             {/* Cycle B Row */}
-            {plans.B && renderCycleRow('금토월 (B조)', plans.B, 'B')}
+            {plans.B && renderCycleRow('금토월', plans.B, 'B')}
 
             {/* Ingredient Matrix - Per Week Table */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -634,7 +695,7 @@ const MealPlanner: React.FC = () => {
                         </th>
                         {[1, 2, 3, 4].map(w => (
                           <th key={`A-${w}`} className="px-2 py-2 text-center font-semibold text-blue-600 min-w-[48px]">
-                            A{w}주
+                            화{w}주
                           </th>
                         ))}
                         <th className="px-1 py-2 w-px bg-gray-200"></th>
@@ -643,7 +704,7 @@ const MealPlanner: React.FC = () => {
                             key={`B-${w}`}
                             className="px-2 py-2 text-center font-semibold text-purple-600 min-w-[48px]"
                           >
-                            B{w}주
+                            금{w}주
                           </th>
                         ))}
                         <th className="px-1 py-2 w-px bg-gray-200"></th>
@@ -651,7 +712,7 @@ const MealPlanner: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {MAJOR_INGREDIENTS.map(ing => {
+                      {trackedIngredients.map(ing => {
                         const totalCount = ingredientCountsByWeek['total']?.[ing.key] || 0;
                         return (
                           <tr key={ing.key} className="border-b border-gray-100 hover:bg-gray-50/50">
@@ -687,7 +748,7 @@ const MealPlanner: React.FC = () => {
                 </div>
               )}
               <p className="text-xs text-gray-400 mt-2 text-center">
-                * A조와 B조를 모두 구독하는 고객을 위해 주차별 재료 분포를 확인하세요.
+                * 화수목과 금토월을 모두 구독하는 고객을 위해 주차별 재료 분포를 확인하세요.
               </p>
             </div>
 
@@ -720,7 +781,9 @@ const MealPlanner: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg text-gray-800">메뉴 교체하기 ({swapTarget.cycle}타입)</h3>
+                <h3 className="font-bold text-lg text-gray-800">
+                  메뉴 교체하기 ({swapTarget.cycle === 'A' ? '화수목' : '금토월'})
+                </h3>
                 <p className="text-xs text-gray-500">
                   현재 메뉴: <span className="font-bold text-blue-600">{swapTarget.item.name}</span>
                 </p>
@@ -896,6 +959,118 @@ const MealPlanner: React.FC = () => {
       {/* 6. Diff View Modal */}
       {showDiffView && diffBeforePlan && plans.A && (
         <PlanDiffView before={diffBeforePlan} after={plans.A} onClose={() => setShowDiffView(false)} />
+      )}
+
+      {/* 7. Action Chooser Modal (메뉴 클릭 시) */}
+      {menuActionTarget && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setMenuActionTarget(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800">{menuActionTarget.item.name}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {menuActionTarget.cycle === 'A' ? '화수목' : '금토월'} {menuActionTarget.weekIndex}주차
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMenuActionTarget(null)}
+                  className="p-1.5 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 space-y-3">
+              <button
+                onClick={openSwapFromAction}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all text-left group"
+              >
+                <div className="w-11 h-11 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+                  <Replace className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <div className="font-bold text-gray-800 text-sm">대체메뉴 선정</div>
+                  <div className="text-xs text-gray-500 mt-0.5">다른 메뉴로 교체합니다</div>
+                </div>
+              </button>
+              <button
+                onClick={openCommentFromAction}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all text-left group"
+              >
+                <div className="w-11 h-11 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors">
+                  <MessageSquare className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="font-bold text-gray-800 text-sm">식단 코멘트</div>
+                  <div className="text-xs text-gray-500 mt-0.5">이 메뉴에 의견을 남깁니다</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. Comment Modal */}
+      {commentTarget && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setCommentTarget(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800">식단 코멘트</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {commentTarget.cycle === 'A' ? '화수목' : '금토월'} {commentTarget.weekIndex}주차 ·{' '}
+                    <span className="font-medium text-gray-700">{commentTarget.item.name}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCommentTarget(null)}
+                  className="p-1.5 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <textarea
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="이 메뉴에 대한 의견을 입력하세요..."
+                className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 resize-none"
+                rows={4}
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setCommentTarget(null)}
+                  className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSubmitComment}
+                  disabled={!commentText.trim()}
+                  className="px-4 py-2 text-sm font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  코멘트 등록
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
