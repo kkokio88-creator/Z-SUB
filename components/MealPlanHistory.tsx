@@ -1,9 +1,26 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Search, X, UtensilsCrossed, RefreshCw } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  UtensilsCrossed,
+  RefreshCw,
+  Shield,
+  Clock,
+  CheckCircle,
+} from 'lucide-react';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { useMenu } from '../context/MenuContext';
 import { TargetType } from '../types';
-import type { HistoricalMenuItem, HistoricalTargetPlan } from '../types';
+import type { HistoricalMenuItem, HistoricalTargetPlan, HistoricalMealPlan, PlanReviewRecord } from '../types';
+import {
+  makeReviewKey,
+  buildReviewStatusMap,
+  getFilterStatus,
+  type ReviewFilterCategory,
+} from '../services/historyReviewService';
+import HistoryReviewModal from './HistoryReviewModal';
 
 // ── 상수 ──
 
@@ -478,6 +495,15 @@ const MealPlanHistory: React.FC = () => {
   const [viewYear, setViewYear] = useState(() => parseInt(latestDate.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => parseInt(latestDate.slice(5, 7)) - 1);
 
+  // Review state
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilterCategory>('all');
+  const [selectedReview, setSelectedReview] = useState<HistoricalMealPlan | null>(null);
+  const [reviewStatusMap, setReviewStatusMap] = useState<Map<string, PlanReviewRecord>>(() => buildReviewStatusMap());
+
+  const refreshReviewStatus = useCallback(() => {
+    setReviewStatusMap(buildReviewStatusMap());
+  }, []);
+
   // 편집 상태: key = "date|targetType|itemIndex", value = 교체된 메뉴명
   const [editedPlans, setEditedPlans] = useState<Map<string, string>>(new Map());
   const editedKeys = useMemo(() => new Set(editedPlans.keys()), [editedPlans]);
@@ -491,10 +517,33 @@ const MealPlanHistory: React.FC = () => {
   } | null>(null);
 
   // 현재 월의 식단 필터링
-  const monthPlans = useMemo(() => {
+  const allMonthPlans = useMemo(() => {
     const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
     return HISTORICAL_MEAL_PLANS.filter(p => p.date.startsWith(prefix));
   }, [viewYear, viewMonth]);
+
+  // 필터 카운트
+  const filterCounts = useMemo(() => {
+    const counts = { all: allMonthPlans.length, pending: 0, in_progress: 0, completed: 0 };
+    for (const p of allMonthPlans) {
+      const key = makeReviewKey(p.date, p.cycleType);
+      const record = reviewStatusMap.get(key);
+      const cat = record ? getFilterStatus(record.status) : 'pending';
+      counts[cat]++;
+    }
+    return counts;
+  }, [allMonthPlans, reviewStatusMap]);
+
+  // 필터 적용
+  const monthPlans = useMemo(() => {
+    if (reviewFilter === 'all') return allMonthPlans;
+    return allMonthPlans.filter(p => {
+      const key = makeReviewKey(p.date, p.cycleType);
+      const record = reviewStatusMap.get(key);
+      const cat = record ? getFilterStatus(record.status) : 'pending';
+      return cat === reviewFilter;
+    });
+  }, [allMonthPlans, reviewFilter, reviewStatusMap]);
 
   // 해당 월에 데이터가 있는 타겟 기반으로 컬럼 정의 (병합 그룹 기준)
   const columns = useMemo((): ColumnDef[] => {
@@ -662,6 +711,31 @@ const MealPlanHistory: React.FC = () => {
         )}
       </div>
 
+      {/* 검토 상태 필터 바 */}
+      <div className="flex items-center gap-2 mb-3">
+        {(
+          [
+            { key: 'all' as const, label: '전체', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+            { key: 'pending' as const, label: '검토 대기', color: 'bg-yellow-50 text-yellow-700 border-yellow-300' },
+            { key: 'in_progress' as const, label: '검토중', color: 'bg-blue-50 text-blue-700 border-blue-300' },
+            { key: 'completed' as const, label: '검토 완료', color: 'bg-green-50 text-green-700 border-green-300' },
+          ] as const
+        ).map(f => (
+          <button
+            key={f.key}
+            onClick={() => setReviewFilter(f.key)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+              reviewFilter === f.key
+                ? f.color + ' ring-1 ring-offset-1'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {f.label}
+            <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-white/60">{filterCounts[f.key]}</span>
+          </button>
+        ))}
+      </div>
+
       {/* 주재료 범례 */}
       <IngredientLegend />
 
@@ -681,6 +755,9 @@ const MealPlanHistory: React.FC = () => {
                 </th>
                 <th className="sticky left-[80px] z-30 bg-gray-50 px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
                   주기
+                </th>
+                <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[90px]">
+                  검토상태
                 </th>
                 {columns.map((col, idx) => (
                   <th
@@ -714,6 +791,42 @@ const MealPlanHistory: React.FC = () => {
                       >
                         {plan.cycleType}
                       </span>
+                    </td>
+                    {/* 검토상태 열 */}
+                    <td className="px-2 py-2 border-r border-gray-200 text-center align-top">
+                      {(() => {
+                        const rKey = makeReviewKey(plan.date, plan.cycleType);
+                        const record = reviewStatusMap.get(rKey);
+                        const cat = record ? getFilterStatus(record.status) : ('pending' as const);
+                        const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
+                          pending: {
+                            cls: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200',
+                            label: '검토 대기',
+                            icon: Clock,
+                          },
+                          in_progress: {
+                            cls: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
+                            label: '검토중',
+                            icon: Shield,
+                          },
+                          completed: {
+                            cls: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200',
+                            label: '검토 완료',
+                            icon: CheckCircle,
+                          },
+                        };
+                        const s = styles[cat];
+                        const StatusIcon = s.icon;
+                        return (
+                          <button
+                            onClick={() => setSelectedReview(plan)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors ${s.cls}`}
+                          >
+                            <StatusIcon className="w-3 h-3" />
+                            {s.label}
+                          </button>
+                        );
+                      })()}
                     </td>
                     {/* 컬럼 렌더링 */}
                     {columns.map((col, colIdx) => {
@@ -795,6 +908,16 @@ const MealPlanHistory: React.FC = () => {
           menuItems={menuItems}
           onSelect={handleSwap}
           onClose={() => setSwapTarget(null)}
+        />
+      )}
+
+      {/* 검토 모달 */}
+      {selectedReview && (
+        <HistoryReviewModal
+          plan={selectedReview}
+          reviewKey={makeReviewKey(selectedReview.date, selectedReview.cycleType)}
+          onClose={() => setSelectedReview(null)}
+          onStatusChange={refreshReviewStatus}
         />
       )}
     </div>

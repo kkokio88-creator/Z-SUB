@@ -1,6 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TargetType, MonthlyMealPlan, MenuItem, MenuCategory, ExpertReview } from '../types';
-import type { ReviewComment } from '../types';
 import { generateMonthlyMealPlan, getSwapCandidates } from '../services/engine';
 import { getExpertReview } from '../services/geminiService';
 import {
@@ -20,16 +19,8 @@ import {
   Printer,
   Download,
   FileText,
-  MessageSquare,
   Replace,
-  Eye,
-  Send,
-  Reply,
-  CheckCircle,
-  Shield,
-  Beaker,
-  Factory,
-  Table,
+  Upload,
 } from 'lucide-react';
 import { MAJOR_INGREDIENTS, TARGET_CONFIGS } from '../constants';
 import { useMenu } from '../context/MenuContext';
@@ -41,25 +32,15 @@ import { useAuth } from '../context/AuthContext';
 import { loadHistory, saveVersion, type PlanVersion } from '../services/historyService';
 import PlanHistory from './PlanHistory';
 import PlanDiffView from './PlanDiffView';
-import PlanReviewPanel from './PlanReviewPanel';
 import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportService';
 import { pushMealPlan } from '../services/syncManager';
-import {
-  addReviewComment,
-  getReviewComments,
-  getReview,
-  requestReview,
-  resolveComment,
-  DEPARTMENT_LABELS,
-} from '../services/reviewService';
-import type { PlanReviewRecord, ReviewDepartment } from '../types';
-
-// History & Diff types
+import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 
 const MealPlanner: React.FC = () => {
   const { menuItems } = useMenu();
   const { addToast, confirm } = useToast();
   const { user } = useAuth();
+  const { refresh: refreshHistory } = useHistoricalPlans();
   const [target, setTarget] = useState<TargetType>(TargetType.KIDS);
   const [monthLabel, setMonthLabel] = useState<string>('3월');
   const [checkDupes, setCheckDupes] = useState<boolean>(true);
@@ -87,31 +68,8 @@ const MealPlanner: React.FC = () => {
   const [showDiffView, setShowDiffView] = useState(false);
   const [diffBeforePlan, setDiffBeforePlan] = useState<MonthlyMealPlan | null>(null);
 
-  // Action Chooser State (메뉴 클릭 시 대체메뉴/코멘트 선택)
-  const [menuActionTarget, setMenuActionTarget] = useState<{
-    cycle: 'A' | 'B';
-    weekIndex: number;
-    item: MenuItem;
-  } | null>(null);
-
-  // Comment Form State
-  const [commentTarget, setCommentTarget] = useState<{
-    cycle: 'A' | 'B';
-    weekIndex: number;
-    item: MenuItem;
-  } | null>(null);
-  const [commentText, setCommentText] = useState('');
-
-  // Inline Comments State (loaded per plan)
-  const [planComments, setPlanComments] = useState<ReviewComment[]>([]);
-  const [replyTarget, setReplyTarget] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
-
-  // View Mode: 'card' (default) or 'grid' (table review)
-  const [viewMode, setViewMode] = useState<'card' | 'grid'>('card');
-
-  // Review status (top bar)
-  const [reviewRecord, setReviewRecord] = useState<PlanReviewRecord | null>(null);
+  // Track swap changes for ZPPS sync
+  const [swapChanges, setSwapChanges] = useState<MenuChange[]>([]);
 
   const handleGenerate = () => {
     setIsGenerating(true);
@@ -127,8 +85,6 @@ const MealPlanner: React.FC = () => {
       const planB = generateMonthlyMealPlan(target, monthLabel, '금토월', checkDupes, activeMenu);
       setPlans({ A: planA, B: planB });
       setIsGenerating(false);
-      setPlanComments(getReviewComments(planA.id));
-      setReviewRecord(getReview(planA.id));
       addAuditEntry({
         action: 'plan.generate',
         userId: user?.id || '',
@@ -190,124 +146,41 @@ const MealPlanner: React.FC = () => {
     setShowReviewModal(true);
   };
 
-  // 메뉴 클릭 시 액션 선택 모달 열기
-  const handleMenuItemClick = (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
-    setMenuActionTarget({ cycle, weekIndex, item });
+  // 히스토리에 등록
+  const handleRegisterToHistory = async () => {
+    if (!plans.A || !plans.B) return;
+
+    const confirmed = await confirm({
+      title: '히스토리에 등록',
+      message: `${monthLabel} ${target} 식단(화수목+금토월)을 히스토리에 등록하시겠습니까?\n등록 후 히스토리 탭에서 검토를 진행할 수 있습니다.`,
+      confirmLabel: '등록',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
+
+    try {
+      await pushMealPlan(plans.A);
+      await pushMealPlan(plans.B);
+      await refreshHistory();
+      addToast({
+        type: 'success',
+        title: '히스토리 등록 완료',
+        message: '식단이 히스토리에 등록되었습니다. 히스토리 탭에서 검토를 진행하세요.',
+      });
+    } catch {
+      addToast({ type: 'error', title: '등록 실패', message: '히스토리 등록 중 오류가 발생했습니다.' });
+    }
   };
 
-  // 대체메뉴 선정 선택
-  const openSwapFromAction = () => {
-    if (!menuActionTarget) return;
-    const { cycle, weekIndex, item } = menuActionTarget;
+  // 메뉴 클릭 시 직접 대체메뉴 모달 열기
+  const handleMenuItemClick = (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
     const plan = plans[cycle];
     if (!plan) return;
     const activeMenu = menuItems.filter(m => !m.isUnused);
     const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu);
     setSwapTarget({ cycle, weekIndex, item });
     setSwapCandidates(candidates);
-    setMenuActionTarget(null);
   };
-
-  // 식단 코멘트 선택
-  const openCommentFromAction = () => {
-    if (!menuActionTarget) return;
-    setCommentTarget(menuActionTarget);
-    setCommentText('');
-    setMenuActionTarget(null);
-  };
-
-  // 코멘트 등록
-  const handleSubmitComment = () => {
-    if (!commentTarget || !commentText.trim() || !plans.A) return;
-    const cycleLabel = commentTarget.cycle === 'A' ? '화수목' : '금토월';
-    const scopeKey = `${cycleLabel}-${commentTarget.weekIndex}-${commentTarget.item.name}`;
-    addReviewComment(plans.A.id, {
-      department: 'quality',
-      reviewer: user?.displayName || '사용자',
-      scope: 'item',
-      scopeKey,
-      comment: commentText,
-      status: 'comment',
-    });
-    addToast({
-      type: 'success',
-      title: '코멘트 등록',
-      message: `${commentTarget.item.name}에 코멘트가 추가되었습니다.`,
-    });
-    setCommentTarget(null);
-    setCommentText('');
-    // Refresh comments
-    if (plans.A) setPlanComments(getReviewComments(plans.A.id));
-  };
-
-  // 쓰레드 답글 등록
-  const handleSubmitReply = useCallback(() => {
-    if (!replyTarget || !replyText.trim() || !plans.A) return;
-    const parentComment = planComments.find(c => c.id === replyTarget);
-    if (!parentComment) return;
-    addReviewComment(plans.A.id, {
-      parentId: replyTarget,
-      department: parentComment.department,
-      reviewer: user?.displayName || '사용자',
-      scope: parentComment.scope,
-      scopeKey: parentComment.scopeKey,
-      comment: replyText,
-      status: 'comment',
-    });
-    setReplyTarget(null);
-    setReplyText('');
-    setPlanComments(getReviewComments(plans.A.id));
-  }, [replyTarget, replyText, plans.A, planComments, user]);
-
-  // 코멘트 해결 처리
-  const handleResolveComment = useCallback(
-    (commentId: string) => {
-      if (!plans.A) return;
-      resolveComment(plans.A.id, commentId);
-      setPlanComments(getReviewComments(plans.A.id));
-    },
-    [plans.A]
-  );
-
-  // Load comments when plan changes
-  const refreshComments = useCallback(() => {
-    if (plans.A) {
-      setPlanComments(getReviewComments(plans.A.id));
-      setReviewRecord(getReview(plans.A.id));
-    }
-  }, [plans.A]);
-
-  // Memo: comments grouped by scopeKey for inline display
-  const commentsByScope = useMemo(() => {
-    const map: Record<string, ReviewComment[]> = {};
-    for (const c of planComments) {
-      if (!c.parentId) {
-        if (!map[c.scopeKey]) map[c.scopeKey] = [];
-        map[c.scopeKey].push(c);
-      }
-    }
-    return map;
-  }, [planComments]);
-
-  // Memo: replies grouped by parentId
-  const repliesByParent = useMemo(() => {
-    const map: Record<string, ReviewComment[]> = {};
-    for (const c of planComments) {
-      if (c.parentId) {
-        if (!map[c.parentId]) map[c.parentId] = [];
-        map[c.parentId].push(c);
-      }
-    }
-    return map;
-  }, [planComments]);
-
-  // 검토 요청
-  const handleRequestReviewFromPlanner = useCallback(() => {
-    if (!plans.A) return;
-    const result = requestReview(plans.A.id, user?.displayName || '사용자');
-    setReviewRecord(result);
-    addToast({ type: 'success', title: '검토 요청 완료', message: '3개 부서에 검토 요청이 전송되었습니다.' });
-  }, [plans.A, user, addToast]);
 
   const performSwap = (newItem: MenuItem) => {
     if (!swapTarget) return;
@@ -406,9 +279,6 @@ const MealPlanner: React.FC = () => {
     }
   };
 
-  // Track swap changes for ZPPS sync
-  const [swapChanges, setSwapChanges] = useState<MenuChange[]>([]);
-
   const handleSyncToZPPS = async () => {
     if (unsavedChangesCount === 0 || swapChanges.length === 0) return;
 
@@ -493,9 +363,6 @@ const MealPlanner: React.FC = () => {
     ? Object.values(parentConfig.composition).reduce((sum, n) => sum + (n || 0), 0)
     : null;
 
-  // 검토 완료 여부 확인 (finalized)
-  const isFinalized = reviewRecord?.status === 'finalized';
-
   // Render a Single Cycle Row
   const renderCycleRow = (cycleLabel: string, plan: MonthlyMealPlan, cycleKey: 'A' | 'B') => (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
@@ -527,18 +394,7 @@ const MealPlanner: React.FC = () => {
           const isOverBudget = week.totalCost > currentBudgetCap;
 
           return (
-            <div
-              key={week.weekIndex}
-              className={`p-3 flex flex-col group h-full relative ${isFinalized ? 'select-none' : ''}`}
-            >
-              {/* 검토완료 블러 오버레이 */}
-              {isFinalized && (
-                <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex items-center justify-center rounded">
-                  <span className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded-full border border-green-200 flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" /> 검토완료
-                  </span>
-                </div>
-              )}
+            <div key={week.weekIndex} className="p-3 flex flex-col group h-full">
               <div className="flex justify-between items-start mb-3">
                 <span className="text-sm font-bold text-gray-800">{week.weekIndex}주차</span>
                 <div className="text-right">
@@ -552,10 +408,6 @@ const MealPlanner: React.FC = () => {
               <div className="space-y-1 flex-1">
                 {week.items.map((item, itemIdx) => {
                   const isExtra = parentItemCount !== null && itemIdx >= parentItemCount;
-                  const scopeKey = `${cycleLabel}-${week.weekIndex}-${item.name}`;
-                  const itemComments = commentsByScope[scopeKey] || [];
-                  const hasComments = itemComments.length > 0;
-                  const unresolvedCount = itemComments.filter(c => c.status !== 'resolved').length;
 
                   return (
                     <div key={item.id}>
@@ -564,9 +416,7 @@ const MealPlanner: React.FC = () => {
                         className={`flex items-center gap-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer transition-all ${
                           isExtra
                             ? 'border border-amber-300 bg-amber-50/50'
-                            : hasComments
-                              ? 'border border-blue-200 bg-blue-50/30'
-                              : 'border border-transparent hover:border-gray-200'
+                            : 'border border-transparent hover:border-gray-200'
                         }`}
                       >
                         <span
@@ -585,97 +435,7 @@ const MealPlanner: React.FC = () => {
                           </span>
                         )}
                         {item.isSpicy && <Flame className="w-3 h-3 text-red-400" />}
-                        {hasComments && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-blue-600 flex-shrink-0">
-                            <MessageSquare className="w-3 h-3" />
-                            {unresolvedCount > 0 && unresolvedCount}
-                          </span>
-                        )}
                       </div>
-
-                      {/* Inline Comments Thread */}
-                      {hasComments && (
-                        <div className="ml-5 mt-1 mb-2 space-y-1">
-                          {itemComments.map(comment => (
-                            <div
-                              key={comment.id}
-                              className="text-[11px] rounded border border-gray-100 bg-gray-50/80 p-1.5"
-                            >
-                              <div className="flex items-center gap-1 mb-0.5">
-                                <span className="font-medium text-gray-600">{comment.reviewer}</span>
-                                <span className="text-gray-300">·</span>
-                                <span className="text-gray-400">{DEPARTMENT_LABELS[comment.department]}</span>
-                                {comment.status === 'resolved' && (
-                                  <span className="px-1 py-0 rounded text-[9px] font-bold bg-green-100 text-green-600">
-                                    해결
-                                  </span>
-                                )}
-                                {comment.status !== 'resolved' && (
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      handleResolveComment(comment.id);
-                                    }}
-                                    className="ml-auto text-[9px] text-green-600 hover:underline"
-                                  >
-                                    해결
-                                  </button>
-                                )}
-                              </div>
-                              <p className="text-gray-700">{comment.comment}</p>
-
-                              {/* Replies */}
-                              {(repliesByParent[comment.id] || []).map(reply => (
-                                <div key={reply.id} className="ml-3 mt-1 pl-2 border-l-2 border-blue-200 text-[10px]">
-                                  <span className="font-medium text-gray-600">{reply.reviewer}</span>
-                                  <span className="text-gray-300 mx-1">·</span>
-                                  <span className="text-gray-500">{reply.comment}</span>
-                                </div>
-                              ))}
-
-                              {/* Reply input */}
-                              {replyTarget === comment.id ? (
-                                <div className="mt-1 flex gap-1">
-                                  <input
-                                    type="text"
-                                    value={replyText}
-                                    onChange={e => setReplyText(e.target.value)}
-                                    placeholder="답글 입력..."
-                                    className="flex-1 text-[10px] border border-gray-200 rounded px-2 py-1"
-                                    onClick={e => e.stopPropagation()}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') {
-                                        e.stopPropagation();
-                                        handleSubmitReply();
-                                      }
-                                    }}
-                                  />
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      handleSubmitReply();
-                                    }}
-                                    className="px-2 py-1 text-[10px] font-bold text-white bg-blue-500 rounded hover:bg-blue-600"
-                                  >
-                                    <Send className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    setReplyTarget(comment.id);
-                                    setReplyText('');
-                                  }}
-                                  className="mt-0.5 text-[10px] text-blue-500 hover:underline flex items-center gap-0.5"
-                                >
-                                  <Reply className="w-2.5 h-2.5" /> 답글
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -778,6 +538,17 @@ const MealPlanner: React.FC = () => {
               <Server className="w-3 h-3" /> 시스템 연동 센터
             </div>
 
+            {/* 히스토리 등록 Button */}
+            <button
+              onClick={handleRegisterToHistory}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-all"
+            >
+              <Upload className="w-3 h-3" />
+              히스토리에 등록
+            </button>
+
+            <div className="w-px h-6 bg-gray-200 mx-1" />
+
             {/* MIS Button */}
             <button
               onClick={handleRegisterToMIS}
@@ -872,217 +643,11 @@ const MealPlanner: React.FC = () => {
       ) : (
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto pb-6">
-            {/* Review Status Bar (상단 검토현황) */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h4 className="text-sm font-bold text-gray-800">검토현황</h4>
-                  {reviewRecord ? (
-                    <>
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          reviewRecord.status === 'finalized'
-                            ? 'bg-green-100 text-green-700'
-                            : reviewRecord.status === 'approved'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                        }`}
-                      >
-                        {reviewRecord.status === 'draft'
-                          ? '초안'
-                          : reviewRecord.status === 'review_requested'
-                            ? '검토 중'
-                            : reviewRecord.status === 'approved'
-                              ? '승인 완료'
-                              : '최종 등록'}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {reviewRecord.departments.map(dept => {
-                          const DeptIcon =
-                            dept.department === 'quality'
-                              ? Shield
-                              : dept.department === 'development'
-                                ? Beaker
-                                : Factory;
-                          return (
-                            <div
-                              key={dept.department}
-                              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
-                                dept.status === 'approved'
-                                  ? 'bg-green-50 text-green-700 border border-green-200'
-                                  : dept.status === 'rejected'
-                                    ? 'bg-red-50 text-red-700 border border-red-200'
-                                    : 'bg-gray-50 text-gray-500 border border-gray-200'
-                              }`}
-                            >
-                              <DeptIcon className="w-3 h-3" />
-                              {DEPARTMENT_LABELS[dept.department]}
-                              {dept.status === 'approved' && <CheckCircle className="w-3 h-3" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {planComments.filter(c => !c.parentId && c.status !== 'resolved').length > 0 && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
-                          <MessageSquare className="w-3 h-3" />
-                          미해결 {planComments.filter(c => !c.parentId && c.status !== 'resolved').length}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-400">검토 요청 전</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                    <button
-                      onClick={() => setViewMode('card')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
-                        viewMode === 'card' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      <LayoutGrid className="w-3.5 h-3.5 inline mr-1" />
-                      카드
-                    </button>
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
-                        viewMode === 'grid' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      <Table className="w-3.5 h-3.5 inline mr-1" />
-                      그리드
-                    </button>
-                  </div>
-                  {!reviewRecord && (
-                    <button
-                      onClick={handleRequestReviewFromPlanner}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm"
-                    >
-                      <Send className="w-3.5 h-3.5" /> 검토 요청
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            {/* Cycle A Row */}
+            {plans.A && renderCycleRow('화수목', plans.A, 'A')}
 
-            {viewMode === 'card' ? (
-              <>
-                {/* Cycle A Row */}
-                {plans.A && renderCycleRow('화수목', plans.A, 'A')}
-
-                {/* Cycle B Row */}
-                {plans.B && renderCycleRow('금토월', plans.B, 'B')}
-              </>
-            ) : (
-              /* Grid Review View */
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
-                <div className="bg-gray-50 border-b border-gray-200 p-3">
-                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                    <Table className="w-4 h-4 text-gray-500" /> 전체 식단 그리드 뷰
-                  </h4>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 sticky left-0 bg-gray-50 min-w-[80px]">
-                          주기
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">주차</th>
-                        {Array.from(
-                          {
-                            length: Math.max(
-                              ...(plans.A?.weeks.map(w => w.items.length) || [0]),
-                              ...(plans.B?.weeks.map(w => w.items.length) || [0])
-                            ),
-                          },
-                          (_, i) => (
-                            <th
-                              key={i}
-                              className="px-3 py-2 text-center text-xs font-semibold text-gray-500 min-w-[120px]"
-                            >
-                              메뉴 {i + 1}
-                            </th>
-                          )
-                        )}
-                        <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">원가</th>
-                        <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">코멘트</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {[
-                        ...(plans.A
-                          ? plans.A.weeks.map(w => ({ cycle: '화수목' as const, cycleKey: 'A' as const, week: w }))
-                          : []),
-                        ...(plans.B
-                          ? plans.B.weeks.map(w => ({ cycle: '금토월' as const, cycleKey: 'B' as const, week: w }))
-                          : []),
-                      ].map(({ cycle, cycleKey, week }) => {
-                        const weekCommentCount = week.items.reduce((sum, item) => {
-                          const key = `${cycle}-${week.weekIndex}-${item.name}`;
-                          return sum + (commentsByScope[key]?.filter(c => c.status !== 'resolved').length || 0);
-                        }, 0);
-                        return (
-                          <tr
-                            key={`${cycleKey}-${week.weekIndex}`}
-                            className={`hover:bg-gray-50/50 ${isFinalized ? 'opacity-50' : ''}`}
-                          >
-                            <td
-                              className={`px-3 py-2 text-xs font-bold sticky left-0 bg-white ${cycleKey === 'A' ? 'text-blue-700' : 'text-purple-700'}`}
-                            >
-                              {cycle}
-                            </td>
-                            <td className="px-3 py-2 text-center text-xs font-medium text-gray-700">
-                              {week.weekIndex}주
-                            </td>
-                            {week.items.map((item, idx) => {
-                              const scopeKey = `${cycle}-${week.weekIndex}-${item.name}`;
-                              const hasC = (commentsByScope[scopeKey]?.length || 0) > 0;
-                              return (
-                                <td
-                                  key={idx}
-                                  onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
-                                  className={`px-2 py-2 text-xs cursor-pointer hover:bg-blue-50 transition-colors ${hasC ? 'bg-blue-50/50' : ''}`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    <span
-                                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                        item.category === MenuCategory.SOUP
-                                          ? 'bg-blue-500'
-                                          : item.category === MenuCategory.MAIN
-                                            ? 'bg-orange-500'
-                                            : 'bg-green-500'
-                                      }`}
-                                    />
-                                    <span className="truncate">{item.name}</span>
-                                    {hasC && <MessageSquare className="w-2.5 h-2.5 text-blue-500 flex-shrink-0" />}
-                                  </div>
-                                  <div className="text-[10px] text-gray-400 mt-0.5">{item.cost.toLocaleString()}원</div>
-                                </td>
-                              );
-                            })}
-                            <td className="px-3 py-2 text-center text-xs font-bold text-gray-700">
-                              {week.totalCost.toLocaleString()}원
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {weekCommentCount > 0 ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
-                                  <MessageSquare className="w-2.5 h-2.5" /> {weekCommentCount}
-                                </span>
-                              ) : (
-                                <span className="text-gray-300">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* Cycle B Row */}
+            {plans.B && renderCycleRow('금토월', plans.B, 'B')}
 
             {/* Ingredient Matrix - Per Week Table */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -1170,26 +735,6 @@ const MealPlanner: React.FC = () => {
                 * 화수목과 금토월을 모두 구독하는 고객을 위해 주차별 재료 분포를 확인하세요.
               </p>
             </div>
-
-            {/* Review Panel (부서별 상세 검토) */}
-            {plans.A && (
-              <div className="mt-6">
-                <PlanReviewPanel
-                  planId={plans.A.id}
-                  onFinalized={async () => {
-                    if (plans.A) await pushMealPlan(plans.A);
-                    if (plans.B) await pushMealPlan(plans.B);
-                    refreshComments();
-                    addToast({
-                      type: 'success',
-                      title: '시트 동기화 완료',
-                      message: '확정된 식단이 시트에 등록되었습니다.',
-                    });
-                  }}
-                  onStatusChange={refreshComments}
-                />
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1380,118 +925,6 @@ const MealPlanner: React.FC = () => {
       {/* 6. Diff View Modal */}
       {showDiffView && diffBeforePlan && plans.A && (
         <PlanDiffView before={diffBeforePlan} after={plans.A} onClose={() => setShowDiffView(false)} />
-      )}
-
-      {/* 7. Action Chooser Modal (메뉴 클릭 시) */}
-      {menuActionTarget && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-          onClick={() => setMenuActionTarget(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-lg text-gray-800">{menuActionTarget.item.name}</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {menuActionTarget.cycle === 'A' ? '화수목' : '금토월'} {menuActionTarget.weekIndex}주차
-                  </p>
-                </div>
-                <button
-                  onClick={() => setMenuActionTarget(null)}
-                  className="p-1.5 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-                >
-                  <X className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-            </div>
-            <div className="p-4 space-y-3">
-              <button
-                onClick={openSwapFromAction}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all text-left group"
-              >
-                <div className="w-11 h-11 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-                  <Replace className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <div className="font-bold text-gray-800 text-sm">대체메뉴 선정</div>
-                  <div className="text-xs text-gray-500 mt-0.5">다른 메뉴로 교체합니다</div>
-                </div>
-              </button>
-              <button
-                onClick={openCommentFromAction}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all text-left group"
-              >
-                <div className="w-11 h-11 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors">
-                  <MessageSquare className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <div className="font-bold text-gray-800 text-sm">식단 코멘트</div>
-                  <div className="text-xs text-gray-500 mt-0.5">이 메뉴에 의견을 남깁니다</div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 8. Comment Modal */}
-      {commentTarget && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-          onClick={() => setCommentTarget(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-lg text-gray-800">식단 코멘트</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {commentTarget.cycle === 'A' ? '화수목' : '금토월'} {commentTarget.weekIndex}주차 ·{' '}
-                    <span className="font-medium text-gray-700">{commentTarget.item.name}</span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => setCommentTarget(null)}
-                  className="p-1.5 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-                >
-                  <X className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-            </div>
-            <div className="p-5 space-y-4">
-              <textarea
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                placeholder="이 메뉴에 대한 의견을 입력하세요..."
-                className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 resize-none"
-                rows={4}
-                autoFocus
-              />
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => setCommentTarget(null)}
-                  className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleSubmitComment}
-                  disabled={!commentText.trim()}
-                  className="px-4 py-2 text-sm font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  코멘트 등록
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

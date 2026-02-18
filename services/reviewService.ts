@@ -11,6 +11,8 @@ const DEPARTMENT_LABELS: Record<ReviewDepartment, string> = {
 
 export { DEPARTMENT_LABELS };
 
+export const getAllReviews = (): PlanReviewRecord[] => loadReviews();
+
 const loadReviews = (): PlanReviewRecord[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
