@@ -122,6 +122,11 @@ const generateWeeklyCycle = (
     // Spicy filter for kids targets (uses config bannedTags already, but double-check isSpicy flag)
     if ((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && item.isSpicy) return false;
 
+    // Required tags filter (e.g., 아이선호 for kids, 시니어 for senior)
+    if (config.requiredTags.length > 0) {
+      if (!item.tags.some(tag => config.requiredTags.includes(tag))) return false;
+    }
+
     return true;
   });
 
@@ -175,6 +180,11 @@ const generateWeeklyCycle = (
     );
     const selected = shuffle(topPool).slice(0, count as number);
 
+    // 갯수 미달 경고
+    if (selected.length < (count as number)) {
+      warnings.push(`갯수 미달: ${category} ${count}개 필요, ${selected.length}개만 선택됨`);
+    }
+
     // 선택 후 ingredientCount 업데이트
     selected.forEach(item => {
       if (item.mainIngredient !== 'vegetable') {
@@ -223,12 +233,24 @@ const createSubsetPlan = (parentPlan: MonthlyMealPlan, childTarget: TargetType):
       const category = cat as MenuCategory;
       const parentItemsInCategory = parentWeek.items.filter(i => i.category === category);
 
-      // If we need fewer items than parent, we take a subset.
-      // Logic: Take the first N items (assuming parent was shuffled/prioritized already).
-      // Or we could try to keep the "most expensive" ones to match value,
-      // but usually the basic plan drops the "extra" sides.
+      // 자식 타겟의 bannedTags + requiredTags 필터링
+      const filteredItems = parentItemsInCategory.filter(item => {
+        if (childConfig.bannedTags.length > 0) {
+          if (item.tags.some(tag => childConfig.bannedTags.includes(tag))) return false;
+        }
+        if (childConfig.requiredTags.length > 0) {
+          if (!item.tags.some(tag => childConfig.requiredTags.includes(tag))) return false;
+        }
+        return true;
+      });
 
-      const selected = parentItemsInCategory.slice(0, count as number);
+      const selected = filteredItems.slice(0, count as number);
+
+      // 갯수 미달 경고
+      if (selected.length < (count as number)) {
+        warnings.push(`갯수 미달: ${category} ${count}개 필요, ${selected.length}개만 선택됨`);
+      }
+
       childItems = [...childItems, ...selected];
     });
 
@@ -289,6 +311,7 @@ const boostWeekPrice = (
           m.recommendedPrice > cheapest.item.recommendedPrice &&
           m.recommendedPrice <= maxReplacementPrice &&
           !config.bannedTags.some(t => m.tags.includes(t)) &&
+          (config.requiredTags.length === 0 || m.tags.some(t => config.requiredTags.includes(t))) &&
           !((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy)
       )
       .sort((a, b) => b.recommendedPrice - a.recommendedPrice)[0];
@@ -404,6 +427,11 @@ export const getSwapCandidates = (
 
     // Banned tags
     if (config.bannedTags.some(t => item.tags.includes(t))) return false;
+
+    // Required tags
+    if (config.requiredTags.length > 0) {
+      if (!item.tags.some(t => config.requiredTags.includes(t))) return false;
+    }
 
     // Spicy filter for kids targets
     if (

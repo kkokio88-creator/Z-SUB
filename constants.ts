@@ -22,6 +22,7 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
     bannedTags: ['매운맛', '얼큰함'],
     requiredTags: ['아이선호'],
+    parentTarget: TargetType.KIDS_PLUS, // KIDS는 KIDS_PLUS의 서브셋
   },
   [TargetType.KIDS_PLUS]: {
     target: TargetType.KIDS_PLUS,
@@ -31,7 +32,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 6 },
     bannedTags: ['매운맛'],
     requiredTags: ['아이선호'],
-    parentTarget: TargetType.KIDS, // Explicit inheritance
   },
   [TargetType.SIDE_ONLY]: {
     target: TargetType.SIDE_ONLY,
@@ -78,7 +78,7 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.MAIN]: 2, [MenuCategory.SIDE]: 3 }, // 국 없음, 메인 2개
     bannedTags: [],
     requiredTags: [],
-    parentTarget: TargetType.YOUTH,
+    // parentTarget 제거: YOUTH(MAIN:1)에서 MAIN:2를 뽑을 수 없는 비호환 구성
   },
   [TargetType.VALUE]: {
     target: TargetType.VALUE,
@@ -97,6 +97,7 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 2, [MenuCategory.MAIN]: 2, [MenuCategory.SIDE]: 2 },
     bannedTags: [],
     requiredTags: [],
+    parentTarget: TargetType.FAMILY_PLUS, // FAMILY는 FAMILY_PLUS의 서브셋
   },
   [TargetType.FAMILY_PLUS]: {
     target: TargetType.FAMILY_PLUS,
@@ -106,7 +107,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 2, [MenuCategory.MAIN]: 2, [MenuCategory.SIDE]: 4 },
     bannedTags: [],
     requiredTags: [],
-    parentTarget: TargetType.FAMILY,
   },
   [TargetType.FIRST_MEET]: {
     target: TargetType.FIRST_MEET,
@@ -125,7 +125,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 5 },
     bannedTags: ['매운맛', '질김'],
     requiredTags: [],
-    parentTarget: TargetType.TODDLER,
   },
   [TargetType.TODDLER]: {
     target: TargetType.TODDLER,
@@ -135,6 +134,7 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
     bannedTags: ['매운맛', '질김'],
     requiredTags: [],
+    parentTarget: TargetType.TODDLER_PLUS, // TODDLER는 TODDLER_PLUS의 서브셋
   },
   [TargetType.CHILD_PLUS]: {
     target: TargetType.CHILD_PLUS,
@@ -144,7 +144,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 6 },
     bannedTags: ['매운맛'],
     requiredTags: [],
-    parentTarget: TargetType.CHILD,
   },
   [TargetType.CHILD]: {
     target: TargetType.CHILD,
@@ -154,5 +153,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
     bannedTags: ['매운맛'],
     requiredTags: [],
+    parentTarget: TargetType.CHILD_PLUS, // CHILD는 CHILD_PLUS의 서브셋
   },
 };
