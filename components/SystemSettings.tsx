@@ -8,7 +8,9 @@ import {
   FileSpreadsheet,
   Server,
   Activity,
+  Settings,
 } from 'lucide-react';
+import PlanManagement from './PlanManagement';
 import { useToast } from '../context/ToastContext';
 import { checkSheetsConnection } from '../services/sheetsService';
 import { checkMISHealth } from '../services/misService';
@@ -16,7 +18,7 @@ import { checkZPPSHealth } from '../services/zppsService';
 
 const SystemSettings: React.FC = () => {
   const { addToast } = useToast();
-  const [activeSection, setActiveSection] = useState<'algorithm' | 'integration'>('algorithm');
+  const [activeSection, setActiveSection] = useState<'algorithm' | 'integration' | 'policy'>('algorithm');
 
   // AI Algorithm State
   const [aiManual, setAiManual] = useState('');
@@ -152,6 +154,12 @@ const SystemSettings: React.FC = () => {
           >
             <Server className="w-4 h-4" /> 시스템 연동 (API)
           </button>
+          <button
+            onClick={() => setActiveSection('policy')}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'policy' ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            <Settings className="w-4 h-4" /> 식단 정책
+          </button>
         </nav>
         <div className="p-4 border-t border-gray-100 text-center">
           <div className="text-[10px] text-gray-400">Z-SUB System v2.5.0</div>
@@ -166,21 +174,26 @@ const SystemSettings: React.FC = () => {
             <h2 className="text-xl font-bold text-gray-800">
               {activeSection === 'algorithm' && 'AI 식단 구성 매뉴얼'}
               {activeSection === 'integration' && '외부 시스템 및 데이터 연동'}
+              {activeSection === 'policy' && '식단 정책 및 구성 설정'}
             </h2>
             <p className="text-sm text-gray-500 mt-1">
               {activeSection === 'algorithm' && 'AI가 식단을 생성할 때 반드시 준수해야 할 자연어 규칙을 설정합니다.'}
               {activeSection === 'integration' && 'MIS, ZPPS 및 구글 시트와의 실시간 데이터 동기화 상태를 관리합니다.'}
+              {activeSection === 'policy' &&
+                '기본 식단과 파생된 옵션 상품을 그룹별로 관리하고, 원가율 정책을 수립합니다.'}
             </p>
           </div>
-          <button
-            onClick={handleSave}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-black transition-all shadow-md active:scale-95"
-          >
-            <Save className="w-4 h-4" /> 설정 저장
-          </button>
+          {activeSection !== 'policy' && (
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-black transition-all shadow-md active:scale-95"
+            >
+              <Save className="w-4 h-4" /> 설정 저장
+            </button>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className={`flex-1 overflow-y-auto ${activeSection === 'policy' ? 'p-0' : 'p-8'}`}>
           {/* 1. Algorithm Section */}
           {activeSection === 'algorithm' && (
             <div className="space-y-6 max-w-4xl h-full flex flex-col">
@@ -208,7 +221,10 @@ const SystemSettings: React.FC = () => {
             </div>
           )}
 
-          {/* 2. Integration Section */}
+          {/* 2. Policy Section */}
+          {activeSection === 'policy' && <PlanManagement />}
+
+          {/* 3. Integration Section */}
           {activeSection === 'integration' && (
             <div className="space-y-8 max-w-3xl">
               {/* Gemini Status */}

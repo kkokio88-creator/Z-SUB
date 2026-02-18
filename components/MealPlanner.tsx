@@ -406,6 +406,9 @@ const MealPlanner: React.FC = () => {
         {plan.weeks.map(week => {
           const costRatio = ((week.totalCost / targetPrice) * 100).toFixed(1);
           const isOverBudget = week.totalCost > currentBudgetCap;
+          const isPriceCompliant = week.totalPrice > targetPrice;
+          const priceDiff = week.totalPrice - targetPrice;
+          const savingsPercent = week.totalPrice > 0 ? ((priceDiff / week.totalPrice) * 100).toFixed(1) : '0.0';
 
           return (
             <div key={week.weekIndex} className="p-3 flex flex-col group h-full">
@@ -416,6 +419,34 @@ const MealPlanner: React.FC = () => {
                     {week.totalCost.toLocaleString()}원
                   </div>
                   <div className="text-[10px] text-gray-400">({costRatio}%)</div>
+                </div>
+              </div>
+
+              {/* 정책 판매가 vs 단품합산 비교 */}
+              <div
+                className={`mb-3 p-2 rounded-lg border text-[11px] ${
+                  isPriceCompliant ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <div className="flex justify-between text-gray-500">
+                  <span>정책 판매가</span>
+                  <span className="font-medium">{targetPrice.toLocaleString()}원</span>
+                </div>
+                <div className="flex justify-between text-gray-500 mt-0.5">
+                  <span>단품합산</span>
+                  <span className="font-medium">{week.totalPrice.toLocaleString()}원</span>
+                </div>
+                <div
+                  className={`border-t mt-1.5 pt-1.5 flex justify-between font-bold ${
+                    isPriceCompliant ? 'border-green-200 text-green-700' : 'border-red-200 text-red-600'
+                  }`}
+                >
+                  <span>{isPriceCompliant ? '✓ 할인 적용' : '✗ 할인 미달'}</span>
+                  <span>
+                    {isPriceCompliant ? '-' : '+'}
+                    {Math.abs(priceDiff).toLocaleString()}원
+                    <span className="font-normal text-[10px] ml-0.5">({savingsPercent}%)</span>
+                  </span>
                 </div>
               </div>
 
