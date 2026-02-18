@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,17 +9,29 @@ import {
   Shield,
   Clock,
   CheckCircle,
+  MessageSquare,
+  Replace,
+  Send,
 } from 'lucide-react';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { useMenu } from '../context/MenuContext';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { TargetType } from '../types';
-import type { HistoricalMenuItem, HistoricalTargetPlan, HistoricalMealPlan, PlanReviewRecord } from '../types';
+import type {
+  HistoricalMenuItem,
+  HistoricalTargetPlan,
+  HistoricalMealPlan,
+  PlanReviewRecord,
+  ReviewComment,
+} from '../types';
 import {
   makeReviewKey,
   buildReviewStatusMap,
   getFilterStatus,
   type ReviewFilterCategory,
 } from '../services/historyReviewService';
+import { addReviewComment, getReviewComments } from '../services/reviewService';
 import HistoryReviewModal from './HistoryReviewModal';
 
 // ── 상수 ──
@@ -115,7 +127,6 @@ const TARGET_MERGE_MAP: MergeGroup[] = [
   },
 ];
 
-// 단독 식단 (병합 없음)
 const STANDALONE_TARGETS = [TargetType.VALUE, TargetType.SIDE_ONLY, TargetType.FIRST_MEET];
 
 type ColumnDef = { type: 'standalone'; target: TargetType } | { type: 'merged'; group: MergeGroup };
@@ -125,15 +136,15 @@ const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 // ── 주재료 감지 ──
 
 const INGREDIENT_KEYWORDS: Record<string, string[]> = {
-  beef: ['소고기', '한우', '불고기', '갈비', '사골'],
-  pork: ['한돈', '돼지', '제육', '삼겹', '탕수'],
-  chicken: ['닭', '치킨'],
-  fish: ['동태', '오징어', '새우', '어묵', '참치', '멸치', '황태', '맛살'],
+  beef: ['소고기', '한우', '불고기', '갈비', '사골', '차돌', '설렁탕'],
+  pork: ['한돈', '돼지', '제육', '삼겹', '탕수', '수육', '족발', '보쌈'],
+  chicken: ['닭', '치킨', '닭볶음', '닭갈비'],
+  fish: ['동태', '오징어', '새우', '어묵', '참치', '멸치', '황태', '맛살', '고등어', '갈치', '조기', '꽁치', '연어'],
   tofu: ['두부', '순두부'],
-  egg: ['계란', '달걀', '메추리알'],
+  egg: ['계란', '달걀', '메추리알', '에그'],
   potato: ['감자', '고구마'],
-  seaweed: ['미역', '파래', '김무침'],
-  mushroom: ['버섯', '표고', '느타리'],
+  seaweed: ['미역', '파래', '김무침', '다시마', '해초'],
+  mushroom: ['버섯', '표고', '느타리', '팽이', '새송이'],
   vegetable: ['나물', '시래기', '애호박', '양배추', '콩나물'],
 };
 
@@ -200,11 +211,21 @@ function detectIngredient(name: string): string {
   return 'other';
 }
 
-function cleanMenuName(name: string): string {
-  return name
-    .replace(/_냉장|_반조리|_냉동/g, '')
-    .replace(/\s+\d+$/, '')
-    .trim();
+// 노이즈 필터: 순수 숫자, 빈값, 시스템 메시지만 제외
+const NOISE_PATTERNS = ['갯수미달', '개수미달', '미달'];
+function isValidMenuItem(name: string): boolean {
+  if (!name || !name.trim()) return false;
+  if (/^\d+$/.test(name.trim())) return false; // 순수 숫자만 제외
+  if (NOISE_PATTERNS.some(p => name.includes(p))) return false;
+  return true;
+}
+
+// 메뉴명에서 수량과 클린명 추출
+function parseMenuItem(name: string): { cleanName: string; quantity: number | null } {
+  const stripped = name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+  const match = stripped.match(/^(.+?)\s+(\d+)$/);
+  if (match) return { cleanName: match[1].trim(), quantity: parseInt(match[2]) };
+  return { cleanName: stripped, quantity: null };
 }
 
 // ── 주재료 범례 ──
@@ -223,6 +244,49 @@ const IngredientLegend: React.FC = () => (
   </div>
 );
 
+// ── 메뉴 아이템 행 (공통) ──
+
+const MenuItemRow: React.FC<{
+  item: HistoricalMenuItem;
+  idx: number;
+  date: string;
+  targetType: string;
+  isEdited: boolean;
+  isPlusOnly?: boolean;
+  plusBadge?: string;
+  commentCount: number;
+  onAction: (targetType: string, itemIndex: number, menuName: string) => void;
+}> = ({ item, idx, date, targetType, isEdited, isPlusOnly, plusBadge, commentCount, onAction }) => {
+  const ingredient = detectIngredient(item.name);
+  const colors = INGREDIENT_COLORS[ingredient];
+  const { cleanName, quantity } = parseMenuItem(item.name);
+
+  return (
+    <div
+      onClick={() => onAction(targetType, idx, item.name)}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
+      title={item.name}
+    >
+      <span className={`${colors.text} truncate flex-1`}>{cleanName}</span>
+      {quantity !== null && (
+        <span className="px-1 py-0 text-[9px] font-bold text-gray-500 bg-white/70 rounded shrink-0">{quantity}</span>
+      )}
+      {isPlusOnly && plusBadge && (
+        <span className="px-1 py-0 text-[9px] font-medium text-amber-700 bg-amber-100 rounded shrink-0">
+          {plusBadge}
+        </span>
+      )}
+      {isEdited && <span className="text-[9px] text-amber-600 font-medium shrink-0">수정</span>}
+      {commentCount > 0 && (
+        <span className="flex items-center gap-0.5 text-[9px] text-blue-600 shrink-0">
+          <MessageSquare className="w-2.5 h-2.5" />
+          {commentCount}
+        </span>
+      )}
+    </div>
+  );
+};
+
 // ── 병합 셀 컴포넌트 ──
 
 const MergedTableCell: React.FC<{
@@ -233,56 +297,48 @@ const MergedTableCell: React.FC<{
   baseTarget: string;
   plusTarget: string;
   editedKeys: Set<string>;
-  onSwap: (targetType: string, itemIndex: number, currentName: string) => void;
-}> = ({ baseItems, plusItems, plusBadge, date, baseTarget, plusTarget, editedKeys, onSwap }) => {
+  commentCounts: Map<string, number>;
+  onAction: (targetType: string, itemIndex: number, menuName: string) => void;
+}> = ({ baseItems, plusItems, plusBadge, date, baseTarget, plusTarget, editedKeys, commentCounts, onAction }) => {
   const [expanded, setExpanded] = useState(false);
 
-  // 공통 메뉴와 plus 전용 메뉴 구분 (숫자 포함 메뉴명 제외)
-  const baseNameSet = new Set(baseItems.filter(i => !/\d/.test(i.name)).map(i => cleanMenuName(i.name)));
+  const baseNameSet = new Set(baseItems.filter(i => isValidMenuItem(i.name)).map(i => parseMenuItem(i.name).cleanName));
   const allItems: { item: HistoricalMenuItem; isPlusOnly: boolean; targetType: string; idx: number }[] = [];
 
   baseItems.forEach((item, idx) => {
-    if (!/\d/.test(item.name)) {
+    if (isValidMenuItem(item.name)) {
       allItems.push({ item, isPlusOnly: false, targetType: baseTarget, idx });
     }
   });
 
   plusItems.forEach((item, idx) => {
-    if (/\d/.test(item.name)) return;
-    const cleanName = cleanMenuName(item.name);
+    if (!isValidMenuItem(item.name)) return;
+    const { cleanName } = parseMenuItem(item.name);
     if (!baseNameSet.has(cleanName)) {
       allItems.push({ item, isPlusOnly: true, targetType: plusTarget, idx });
     }
   });
 
-  const displayItems = expanded ? allItems : allItems.slice(0, 6);
-  const hasMore = allItems.length > 6;
+  const displayItems = expanded ? allItems : allItems.slice(0, 8);
+  const hasMore = allItems.length > 8;
 
   return (
     <div className="space-y-0.5">
       {displayItems.map((entry, displayIdx) => {
-        const ingredient = detectIngredient(entry.item.name);
-        const colors = INGREDIENT_COLORS[ingredient];
-        const isEdited = editedKeys.has(`${date}|${entry.targetType}|${entry.idx}`);
-        const displayName = cleanMenuName(entry.item.name);
-
+        const cKey = `${entry.targetType}-${entry.idx}-${parseMenuItem(entry.item.name).cleanName}`;
         return (
-          <div
+          <MenuItemRow
             key={`${entry.targetType}-${entry.idx}-${displayIdx}`}
-            onClick={() => onSwap(entry.targetType, entry.idx, entry.item.name)}
-            className={`px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
-            title={entry.item.name}
-          >
-            <span className={`${colors.text} truncate block`}>
-              {displayName}
-              {entry.isPlusOnly && (
-                <span className="ml-1 bg-amber-100 text-amber-700 text-[9px] px-1 rounded font-medium">
-                  {plusBadge}
-                </span>
-              )}
-              {isEdited && <span className="ml-1 text-[9px] text-amber-600 font-medium">수정</span>}
-            </span>
-          </div>
+            item={entry.item}
+            idx={entry.idx}
+            date={date}
+            targetType={entry.targetType}
+            isEdited={editedKeys.has(`${date}|${entry.targetType}|${entry.idx}`)}
+            isPlusOnly={entry.isPlusOnly}
+            plusBadge={plusBadge}
+            commentCount={commentCounts.get(cKey) || 0}
+            onAction={onAction}
+          />
         );
       })}
       {hasMore && !expanded && (
@@ -291,9 +347,9 @@ const MergedTableCell: React.FC<{
             e.stopPropagation();
             setExpanded(true);
           }}
-          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
+          className="text-[10px] text-blue-500 hover:text-blue-700 font-medium pl-1"
         >
-          +{allItems.length - 6}개 더보기
+          +{allItems.length - 8}개 더보기
         </button>
       )}
       {hasMore && expanded && (
@@ -318,39 +374,34 @@ const TableCell: React.FC<{
   date: string;
   targetType: string;
   editedKeys: Set<string>;
-  onSwap: (itemIndex: number, currentName: string) => void;
-}> = ({ items, date, targetType, editedKeys, onSwap }) => {
+  commentCounts: Map<string, number>;
+  onAction: (targetType: string, itemIndex: number, menuName: string) => void;
+}> = ({ items, date, targetType, editedKeys, commentCounts, onAction }) => {
   const [expanded, setExpanded] = useState(false);
 
-  // 숫자가 포함된 메뉴명은 반찬이 아니므로 필터링 (원본 인덱스 유지)
   const validItems = useMemo(
-    () => items.map((item, idx) => ({ item, originalIdx: idx })).filter(({ item }) => !/\d/.test(item.name)),
+    () => items.map((item, idx) => ({ item, originalIdx: idx })).filter(({ item }) => isValidMenuItem(item.name)),
     [items]
   );
 
-  const displayItems = expanded ? validItems : validItems.slice(0, 6);
-  const hasMore = validItems.length > 6;
+  const displayItems = expanded ? validItems : validItems.slice(0, 8);
+  const hasMore = validItems.length > 8;
 
   return (
     <div className="space-y-0.5">
       {displayItems.map(({ item, originalIdx }) => {
-        const ingredient = detectIngredient(item.name);
-        const colors = INGREDIENT_COLORS[ingredient];
-        const isEdited = editedKeys.has(`${date}|${targetType}|${originalIdx}`);
-        const displayName = cleanMenuName(item.name);
-
+        const cKey = `${targetType}-${originalIdx}-${parseMenuItem(item.name).cleanName}`;
         return (
-          <div
+          <MenuItemRow
             key={originalIdx}
-            onClick={() => onSwap(originalIdx, item.name)}
-            className={`px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
-            title={item.name}
-          >
-            <span className={`${colors.text} truncate block`}>
-              {displayName}
-              {isEdited && <span className="ml-1 text-[9px] text-amber-600 font-medium">수정</span>}
-            </span>
-          </div>
+            item={item}
+            idx={originalIdx}
+            date={date}
+            targetType={targetType}
+            isEdited={editedKeys.has(`${date}|${targetType}|${originalIdx}`)}
+            commentCount={commentCounts.get(cKey) || 0}
+            onAction={(tt, ii, name) => onAction(tt, ii, name)}
+          />
         );
       })}
       {hasMore && !expanded && (
@@ -359,9 +410,9 @@ const TableCell: React.FC<{
             e.stopPropagation();
             setExpanded(true);
           }}
-          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
+          className="text-[10px] text-blue-500 hover:text-blue-700 font-medium pl-1"
         >
-          +{validItems.length - 6}개 더보기
+          +{validItems.length - 8}개 더보기
         </button>
       )}
       {hasMore && expanded && (
@@ -406,7 +457,6 @@ const SwapModal: React.FC<{
         className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* 헤더 */}
         <div className="px-5 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-gray-800">메뉴 교체</h3>
@@ -415,10 +465,8 @@ const SwapModal: React.FC<{
             </button>
           </div>
           <p className="text-sm text-gray-500 mb-3">
-            현재: <span className="font-medium text-gray-700">{cleanMenuName(currentName)}</span>
+            현재: <span className="font-medium text-gray-700">{parseMenuItem(currentName).cleanName}</span>
           </p>
-
-          {/* 검색 */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -430,8 +478,6 @@ const SwapModal: React.FC<{
               autoFocus
             />
           </div>
-
-          {/* 주재료 필터 */}
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(INGREDIENT_COLORS)
               .filter(([k]) => k !== 'other')
@@ -439,19 +485,13 @@ const SwapModal: React.FC<{
                 <button
                   key={key}
                   onClick={() => setIngredientFilter(f => (f === key ? '' : key))}
-                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
-                    ingredientFilter === key
-                      ? `${val.bg} ${val.text} border-current font-bold`
-                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                  }`}
+                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${ingredientFilter === key ? `${val.bg} ${val.text} border-current font-bold` : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
                 >
                   {val.label}
                 </button>
               ))}
           </div>
         </div>
-
-        {/* 후보 목록 */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {candidates.length === 0 ? (
             <p className="text-center text-sm text-gray-400 py-8">검색 결과 없음</p>
@@ -486,11 +526,132 @@ const SwapModal: React.FC<{
   );
 };
 
+// ── 액션 선택 모달 ──
+
+const ActionModal: React.FC<{
+  menuName: string;
+  onComment: () => void;
+  onSwap: () => void;
+  onClose: () => void;
+}> = ({ menuName, onComment, onSwap, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="bg-white rounded-xl shadow-xl w-72 overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-sm font-bold text-gray-800 truncate">{parseMenuItem(menuName).cleanName}</p>
+      </div>
+      <div className="p-2 space-y-1">
+        <button
+          onClick={onComment}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 text-left transition-colors"
+        >
+          <MessageSquare className="w-4 h-4 text-blue-500" />
+          <div>
+            <div className="text-sm font-medium text-gray-800">의견 남기기</div>
+            <div className="text-[11px] text-gray-400">이 메뉴에 코멘트 작성</div>
+          </div>
+        </button>
+        <button
+          onClick={onSwap}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-orange-50 text-left transition-colors"
+        >
+          <Replace className="w-4 h-4 text-orange-500" />
+          <div>
+            <div className="text-sm font-medium text-gray-800">메뉴 변경</div>
+            <div className="text-[11px] text-gray-400">다른 메뉴로 교체</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// ── 코멘트 모달 ──
+
+const CommentModal: React.FC<{
+  planKey: string;
+  scopeKey: string;
+  menuName: string;
+  comments: ReviewComment[];
+  onSubmit: (text: string) => void;
+  onClose: () => void;
+}> = ({ planKey, scopeKey, menuName, comments, onSubmit, onClose }) => {
+  const [text, setText] = useState('');
+
+  const scopeComments = useMemo(
+    () => comments.filter(c => c.scopeKey === scopeKey).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [comments, scopeKey]
+  );
+
+  const handleSubmit = () => {
+    if (!text.trim()) return;
+    onSubmit(text.trim());
+    setText('');
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[70vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+          <div>
+            <p className="text-sm font-bold text-gray-800">{parseMenuItem(menuName).cleanName}</p>
+            <p className="text-[11px] text-gray-400">코멘트 ({scopeComments.length})</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* 기존 코멘트 */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          {scopeComments.length === 0 ? (
+            <p className="text-center text-sm text-gray-300 py-4">아직 코멘트가 없습니다</p>
+          ) : (
+            scopeComments.map(c => (
+              <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-gray-700">{c.reviewer}</span>
+                  <span className="text-[10px] text-gray-400">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
+                </div>
+                <p className="text-sm text-gray-600">{c.comment}</p>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 입력 */}
+        <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+          <input
+            type="text"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            placeholder="의견을 입력하세요..."
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            autoFocus
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!text.trim()}
+            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── 메인 컴포넌트 ──
 
 const MealPlanHistory: React.FC = () => {
   const { plans: HISTORICAL_MEAL_PLANS, isLoading, refresh } = useHistoricalPlans();
   const { menuItems } = useMenu();
+  const { user } = useAuth();
+  const { addToast } = useToast();
   const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date || '2025-01-01';
   const [viewYear, setViewYear] = useState(() => parseInt(latestDate.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => parseInt(latestDate.slice(5, 7)) - 1);
@@ -504,25 +665,61 @@ const MealPlanHistory: React.FC = () => {
     setReviewStatusMap(buildReviewStatusMap());
   }, []);
 
-  // 편집 상태: key = "date|targetType|itemIndex", value = 교체된 메뉴명
+  // 편집 상태
   const [editedPlans, setEditedPlans] = useState<Map<string, string>>(new Map());
   const editedKeys = useMemo(() => new Set(editedPlans.keys()), [editedPlans]);
 
-  // 교체 모달 상태
+  // 액션/교체/코멘트 상태
+  const [actionTarget, setActionTarget] = useState<{
+    date: string;
+    cycleType: string;
+    targetType: string;
+    itemIndex: number;
+    menuName: string;
+  } | null>(null);
   const [swapTarget, setSwapTarget] = useState<{
     date: string;
     targetType: string;
     itemIndex: number;
     currentName: string;
   } | null>(null);
+  const [commentTarget, setCommentTarget] = useState<{ planKey: string; scopeKey: string; menuName: string } | null>(
+    null
+  );
 
-  // 현재 월의 식단 필터링
+  // 코멘트 캐시: planKey → ReviewComment[]
+  const [commentCache, setCommentCache] = useState<Record<string, ReviewComment[]>>({});
+
+  const loadCommentsForPlan = useCallback((planKey: string) => {
+    const comments = getReviewComments(planKey);
+    setCommentCache(prev => ({ ...prev, [planKey]: comments }));
+  }, []);
+
+  // 코멘트 카운트 맵: scopeKey → count
+  const commentCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const comments of Object.values(commentCache)) {
+      for (const c of comments) {
+        map.set(c.scopeKey, (map.get(c.scopeKey) || 0) + 1);
+      }
+    }
+    return map;
+  }, [commentCache]);
+
+  // 월 변경 시 코멘트 로드
   const allMonthPlans = useMemo(() => {
     const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
     return HISTORICAL_MEAL_PLANS.filter(p => p.date.startsWith(prefix));
   }, [viewYear, viewMonth]);
 
-  // 필터 카운트
+  useEffect(() => {
+    for (const p of allMonthPlans) {
+      const key = makeReviewKey(p.date, p.cycleType);
+      if (!commentCache[key]) loadCommentsForPlan(key);
+    }
+  }, [allMonthPlans]);
+
+  // 필터
   const filterCounts = useMemo(() => {
     const counts = { all: allMonthPlans.length, pending: 0, in_progress: 0, completed: 0 };
     for (const p of allMonthPlans) {
@@ -534,7 +731,6 @@ const MealPlanHistory: React.FC = () => {
     return counts;
   }, [allMonthPlans, reviewStatusMap]);
 
-  // 필터 적용
   const monthPlans = useMemo(() => {
     if (reviewFilter === 'all') return allMonthPlans;
     return allMonthPlans.filter(p => {
@@ -545,44 +741,29 @@ const MealPlanHistory: React.FC = () => {
     });
   }, [allMonthPlans, reviewFilter, reviewStatusMap]);
 
-  // 해당 월에 데이터가 있는 타겟 기반으로 컬럼 정의 (병합 그룹 기준)
   const columns = useMemo((): ColumnDef[] => {
     const targetSet = new Set<string>();
     for (const plan of monthPlans) {
-      for (const target of plan.targets) {
-        targetSet.add(target.targetType);
-      }
+      for (const target of plan.targets) targetSet.add(target.targetType);
     }
-
     const result: ColumnDef[] = [];
-
-    // 병합 그룹 확인
     const usedTargets = new Set<string>();
     for (const group of TARGET_MERGE_MAP) {
-      const hasBase = targetSet.has(group.baseTarget);
-      const hasPlus = targetSet.has(group.plusTarget);
-      if (hasBase || hasPlus) {
+      if (targetSet.has(group.baseTarget) || targetSet.has(group.plusTarget)) {
         result.push({ type: 'merged', group });
         usedTargets.add(group.baseTarget);
         usedTargets.add(group.plusTarget);
       }
     }
-
-    // 단독 타겟
     for (const target of STANDALONE_TARGETS) {
       if (targetSet.has(target) && !usedTargets.has(target)) {
         result.push({ type: 'standalone', target });
         usedTargets.add(target);
       }
     }
-
-    // 나머지 (예상 외의 타겟)
     for (const t of targetSet) {
-      if (!usedTargets.has(t)) {
-        result.push({ type: 'standalone', target: t as TargetType });
-      }
+      if (!usedTargets.has(t)) result.push({ type: 'standalone', target: t as TargetType });
     }
-
     return result;
   }, [monthPlans]);
 
@@ -596,7 +777,6 @@ const MealPlanHistory: React.FC = () => {
       return m - 1;
     });
   }, []);
-
   const goToNextMonth = useCallback(() => {
     setViewMonth(m => {
       if (m === 11) {
@@ -606,14 +786,12 @@ const MealPlanHistory: React.FC = () => {
       return m + 1;
     });
   }, []);
-
   const goToToday = useCallback(() => {
     const now = new Date();
     setViewYear(now.getFullYear());
     setViewMonth(now.getMonth());
   }, []);
 
-  // 아이템 가져오기 (편집 반영)
   const getItems = useCallback(
     (date: string, targetType: string, items: HistoricalMenuItem[]): HistoricalMenuItem[] => {
       return items.map((item, idx) => {
@@ -640,60 +818,85 @@ const MealPlanHistory: React.FC = () => {
     [swapTarget]
   );
 
-  // 날짜 포맷: "11.05(화)"
+  // 액션 핸들러
+  const handleMenuAction = useCallback(
+    (date: string, cycleType: string, targetType: string, itemIndex: number, menuName: string) => {
+      setActionTarget({ date, cycleType, targetType, itemIndex, menuName });
+    },
+    []
+  );
+
+  const handleChooseComment = useCallback(() => {
+    if (!actionTarget) return;
+    const planKey = makeReviewKey(actionTarget.date, actionTarget.cycleType);
+    const { cleanName } = parseMenuItem(actionTarget.menuName);
+    const scopeKey = `${actionTarget.targetType}-${actionTarget.itemIndex}-${cleanName}`;
+    setCommentTarget({ planKey, scopeKey, menuName: actionTarget.menuName });
+    setActionTarget(null);
+  }, [actionTarget]);
+
+  const handleChooseSwap = useCallback(() => {
+    if (!actionTarget) return;
+    setSwapTarget({
+      date: actionTarget.date,
+      targetType: actionTarget.targetType,
+      itemIndex: actionTarget.itemIndex,
+      currentName: actionTarget.menuName,
+    });
+    setActionTarget(null);
+  }, [actionTarget]);
+
+  const handleSubmitComment = useCallback(
+    (text: string) => {
+      if (!commentTarget) return;
+      addReviewComment(commentTarget.planKey, {
+        department: 'quality',
+        reviewer: user?.displayName || '익명',
+        scope: 'item',
+        scopeKey: commentTarget.scopeKey,
+        comment: text,
+        status: 'comment',
+      });
+      loadCommentsForPlan(commentTarget.planKey);
+      addToast({ type: 'success', title: '코멘트 등록', message: '의견이 등록되었습니다.' });
+    },
+    [commentTarget, user, loadCommentsForPlan, addToast]
+  );
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    const month = d.getMonth() + 1;
-    const day = d.getDate();
-    const dow = DAY_NAMES[d.getDay()];
-    return `${month}.${String(day).padStart(2, '0')}(${dow})`;
+    return `${d.getMonth() + 1}.${String(d.getDate()).padStart(2, '0')}(${DAY_NAMES[d.getDay()]})`;
   };
 
-  // 컬럼 헤더 라벨 가져오기
-  const getColumnLabel = (col: ColumnDef): string => {
-    if (col.type === 'standalone') {
-      return TARGET_LABELS[col.target] || col.target;
-    }
-    return col.group.groupLabel;
-  };
-
-  const getColumnColor = (col: ColumnDef): string => {
-    if (col.type === 'standalone') {
-      return TARGET_COLORS[col.target] || 'bg-gray-100 text-gray-600';
-    }
-    return col.group.color;
-  };
+  const getColumnLabel = (col: ColumnDef): string =>
+    col.type === 'standalone' ? TARGET_LABELS[col.target] || col.target : col.group.groupLabel;
+  const getColumnColor = (col: ColumnDef): string =>
+    col.type === 'standalone' ? TARGET_COLORS[col.target] || 'bg-gray-100 text-gray-600' : col.group.color;
 
   return (
     <div className="h-full flex flex-col">
-      {/* 헤더: 월 네비게이션 */}
+      {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <button
-            onClick={goToPrevMonth}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={goToPrevMonth} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
           <h2 className="text-2xl font-bold text-gray-800 min-w-[160px] text-center">
             {viewYear}년 {viewMonth + 1}월
           </h2>
-          <button
-            onClick={goToNextMonth}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={goToNextMonth} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
             <ChevronRight className="w-5 h-5 text-gray-600" />
           </button>
           <button
             onClick={goToToday}
-            className="ml-2 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="ml-2 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             오늘
           </button>
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="ml-2 p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="ml-2 p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
             title="시트에서 새로고침"
           >
             <RefreshCw className={`w-4 h-4 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
@@ -711,7 +914,7 @@ const MealPlanHistory: React.FC = () => {
         )}
       </div>
 
-      {/* 검토 상태 필터 바 */}
+      {/* 필터 */}
       <div className="flex items-center gap-2 mb-3">
         {(
           [
@@ -724,11 +927,7 @@ const MealPlanHistory: React.FC = () => {
           <button
             key={f.key}
             onClick={() => setReviewFilter(f.key)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
-              reviewFilter === f.key
-                ? f.color + ' ring-1 ring-offset-1'
-                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-            }`}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${reviewFilter === f.key ? f.color + ' ring-1 ring-offset-1' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
           >
             {f.label}
             <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-white/60">{filterCounts[f.key]}</span>
@@ -736,7 +935,6 @@ const MealPlanHistory: React.FC = () => {
         ))}
       </div>
 
-      {/* 주재료 범례 */}
       <IngredientLegend />
 
       {/* 테이블 */}
@@ -777,27 +975,22 @@ const MealPlanHistory: React.FC = () => {
               {monthPlans.map(plan => {
                 const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
                 return (
-                  <tr key={plan.date} className="border-b border-gray-100 hover:bg-gray-50/30">
-                    {/* 날짜 열 (sticky) */}
+                  <tr key={`${plan.date}-${plan.cycleType}`} className="border-b border-gray-100 hover:bg-gray-50/30">
                     <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
                       {formatDate(plan.date)}
                     </td>
-                    {/* 주기 열 (sticky) */}
                     <td className="sticky left-[80px] z-10 bg-white px-2 py-2 border-r border-gray-200 text-center align-top">
                       <span
-                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                          plan.cycleType === '화수목' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
-                        }`}
+                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${plan.cycleType === '화수목' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}
                       >
                         {plan.cycleType}
                       </span>
                     </td>
-                    {/* 검토상태 열 */}
                     <td className="px-2 py-2 border-r border-gray-200 text-center align-top">
                       {(() => {
                         const rKey = makeReviewKey(plan.date, plan.cycleType);
                         const record = reviewStatusMap.get(rKey);
-                        const cat = record ? getFilterStatus(record.status) : ('pending' as const);
+                        const cat = record ? getFilterStatus(record.status) : 'pending';
                         const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
                           pending: {
                             cls: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200',
@@ -828,11 +1021,10 @@ const MealPlanHistory: React.FC = () => {
                         );
                       })()}
                     </td>
-                    {/* 컬럼 렌더링 */}
                     {columns.map((col, colIdx) => {
                       if (col.type === 'standalone') {
                         const target = targetMap.get(col.target);
-                        if (!target) {
+                        if (!target)
                           return (
                             <td
                               key={colIdx}
@@ -841,7 +1033,6 @@ const MealPlanHistory: React.FC = () => {
                               —
                             </td>
                           );
-                        }
                         const items = getItems(plan.date, col.target, target.items);
                         return (
                           <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
@@ -850,19 +1041,15 @@ const MealPlanHistory: React.FC = () => {
                               date={plan.date}
                               targetType={col.target}
                               editedKeys={editedKeys}
-                              onSwap={(itemIndex, currentName) =>
-                                setSwapTarget({ date: plan.date, targetType: col.target, itemIndex, currentName })
-                              }
+                              commentCounts={commentCounts}
+                              onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
                             />
                           </td>
                         );
                       }
-
-                      // Merged column
                       const baseData = targetMap.get(col.group.baseTarget);
                       const plusData = targetMap.get(col.group.plusTarget);
-
-                      if (!baseData && !plusData) {
+                      if (!baseData && !plusData)
                         return (
                           <td
                             key={colIdx}
@@ -871,11 +1058,8 @@ const MealPlanHistory: React.FC = () => {
                             —
                           </td>
                         );
-                      }
-
                       const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
                       const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
-
                       return (
                         <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
                           <MergedTableCell
@@ -886,9 +1070,8 @@ const MealPlanHistory: React.FC = () => {
                             baseTarget={col.group.baseTarget}
                             plusTarget={col.group.plusTarget}
                             editedKeys={editedKeys}
-                            onSwap={(targetType, itemIndex, currentName) =>
-                              setSwapTarget({ date: plan.date, targetType, itemIndex, currentName })
-                            }
+                            commentCounts={commentCounts}
+                            onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
                           />
                         </td>
                       );
@@ -899,6 +1082,28 @@ const MealPlanHistory: React.FC = () => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* 액션 선택 모달 */}
+      {actionTarget && (
+        <ActionModal
+          menuName={actionTarget.menuName}
+          onComment={handleChooseComment}
+          onSwap={handleChooseSwap}
+          onClose={() => setActionTarget(null)}
+        />
+      )}
+
+      {/* 코멘트 모달 */}
+      {commentTarget && (
+        <CommentModal
+          planKey={commentTarget.planKey}
+          scopeKey={commentTarget.scopeKey}
+          menuName={commentTarget.menuName}
+          comments={commentCache[commentTarget.planKey] || []}
+          onSubmit={handleSubmitComment}
+          onClose={() => setCommentTarget(null)}
+        />
       )}
 
       {/* 교체 모달 */}
