@@ -31,7 +31,7 @@ import {
   getFilterStatus,
   type ReviewFilterCategory,
 } from '../services/historyReviewService';
-import { addReviewComment, getReviewComments } from '../services/reviewService';
+import { addReviewComment, getReviewComments, resolveComment } from '../services/reviewService';
 import HistoryReviewModal from './HistoryReviewModal';
 
 // ── 상수 ──
@@ -278,22 +278,41 @@ const MenuItemRow: React.FC<{
         </span>
       )}
       {isEdited && <span className="text-[9px] text-amber-600 font-medium shrink-0">수정</span>}
-      {commentCount > 0 && (
-        <span className="relative group/comment flex items-center gap-0.5 text-[9px] text-blue-600 shrink-0">
-          <MessageSquare className="w-2.5 h-2.5" />
-          {commentCount}
-          {recentComments && recentComments.length > 0 && (
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-48 p-2 bg-gray-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
-              {recentComments.slice(-2).map((c, i) => (
-                <span key={i} className="block mb-1 last:mb-0">
-                  <span className="font-bold">{c.reviewer}:</span>{' '}
-                  {c.comment.length > 30 ? c.comment.slice(0, 30) + '...' : c.comment}
+      {commentCount > 0 &&
+        (() => {
+          const hasIssue = recentComments?.some(c => c.status === 'issue');
+          const allResolved =
+            recentComments && recentComments.length > 0 && recentComments.every(c => c.status === 'resolved');
+          const iconColor = allResolved ? 'text-green-600' : hasIssue ? 'text-amber-600' : 'text-blue-600';
+          return (
+            <span className={`relative group/comment flex items-center gap-0.5 text-[9px] ${iconColor} shrink-0`}>
+              <MessageSquare className="w-2.5 h-2.5" />
+              {commentCount}
+              {recentComments && recentComments.length > 0 && (
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-48 p-2 bg-gray-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
+                  {recentComments.slice(-2).map((c, i) => {
+                    const statusColor =
+                      c.status === 'resolved'
+                        ? 'text-green-400'
+                        : c.status === 'issue'
+                          ? 'text-amber-400'
+                          : 'text-white';
+                    const statusPrefix = c.status === 'resolved' ? '\u2713 ' : c.status === 'issue' ? '! ' : '';
+                    return (
+                      <span key={i} className={`block mb-1 last:mb-0 ${statusColor}`}>
+                        <span className="font-bold">
+                          {statusPrefix}
+                          {c.reviewer}:
+                        </span>{' '}
+                        {c.comment.length > 30 ? c.comment.slice(0, 30) + '...' : c.comment}
+                      </span>
+                    );
+                  })}
                 </span>
-              ))}
+              )}
             </span>
-          )}
-        </span>
-      )}
+          );
+        })()}
     </div>
   );
 };
@@ -848,7 +867,7 @@ const MealPlanHistory: React.FC = () => {
     (newName: string) => {
       if (!swapTarget) return;
       const key = `${swapTarget.date}|${swapTarget.targetType}|${swapTarget.itemIndex}`;
-      const oldName = parseMenuItem(swapTarget.currentName).cleanName;
+      const oldCleanName = parseMenuItem(swapTarget.currentName).cleanName;
       const newCleanName = parseMenuItem(newName).cleanName;
 
       setEditedPlans(prev => {
@@ -857,22 +876,34 @@ const MealPlanHistory: React.FC = () => {
         return next;
       });
 
-      // 자동 대댓글: 메뉴 변경 알림
       const planKey = makeReviewKey(swapTarget.date, swapTarget.cycleType);
-      const scopeKey = `${swapTarget.targetType}-${swapTarget.itemIndex}-${newCleanName}`;
+      const oldScopeKey = `${swapTarget.targetType}-${swapTarget.itemIndex}-${oldCleanName}`;
+
+      // 원본 scopeKey로 기존 댓글 조회 → resolved 처리
+      const existingComments = (commentCache[planKey] || []).filter(
+        c => c.scopeKey === oldScopeKey && c.status !== 'resolved'
+      );
+
+      for (const c of existingComments) {
+        resolveComment(planKey, c.id);
+      }
+
+      // 가장 최근 댓글에 대댓글로 변경 내역 추가 (원본 scopeKey 유지)
+      const latestComment = existingComments[existingComments.length - 1];
       addReviewComment(planKey, {
+        parentId: latestComment?.id,
         department: 'quality',
-        reviewer: '시스템',
+        reviewer: user?.displayName || '시스템',
         scope: 'item',
-        scopeKey,
-        comment: `메뉴 변경: "${oldName}" → "${newCleanName}". 재검토 요청드립니다.`,
-        status: 'issue',
+        scopeKey: oldScopeKey,
+        comment: `메뉴 변경 완료: "${oldCleanName}" → "${newCleanName}"`,
+        status: 'resolved',
       });
       loadCommentsForPlan(planKey);
 
       setSwapTarget(null);
     },
-    [swapTarget, loadCommentsForPlan]
+    [swapTarget, loadCommentsForPlan, commentCache, user]
   );
 
   // 액션 핸들러

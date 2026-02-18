@@ -83,6 +83,13 @@ const shuffle = <T>(array: T[]): T[] => {
 };
 
 // Generate a single week cycle (e.g., Week 1 of Tue-Thu)
+// 메뉴명 정규화: 냉장/반조리/냉동 태그 + 후미 숫자 제거
+const normalizeMenuName = (name: string): string =>
+  name
+    .replace(/_냉장|_반조리|_냉동/g, '')
+    .replace(/\s+\d+$/, '')
+    .trim();
+
 const generateWeeklyCycle = (
   weekIndex: number,
   target: TargetType,
@@ -90,7 +97,8 @@ const generateWeeklyCycle = (
   usedItemIds: Set<string>,
   prevWeekIngredients: Set<string>,
   enableDuplicationCheck: boolean,
-  prevWeekMenuNames: string[] = []
+  prevWeekMenuNames: string[] = [],
+  excludedNames?: Set<string>
 ): WeeklyCyclePlan => {
   const config = TARGET_CONFIGS[target];
   const warnings: string[] = [];
@@ -101,6 +109,9 @@ const generateWeeklyCycle = (
   const availableMenu = menuDB.filter(item => {
     // 60-day duplication check
     if (enableDuplicationCheck && usedItemIds.has(item.id)) return false;
+
+    // 히스토리 60일 중복 제외
+    if (excludedNames && excludedNames.has(normalizeMenuName(item.name))) return false;
 
     // Ban tags
     if (config.bannedTags.length > 0) {
@@ -144,14 +155,20 @@ const generateWeeklyCycle = (
     const fallbackPool = nonSimilarCandidates.length >= (count as number) ? nonSimilarCandidates : prioritized;
     const finalPool = nonRepeatingCandidates.length >= (count as number) ? nonRepeatingCandidates : fallbackPool;
 
-    // 동일 식재료 3개 초과 방지 (채소 제외)
+    // 동일 식재료 2개 초과 방지 (채소 제외)
     const ingredientCapped = finalPool.filter(
-      item => item.mainIngredient === 'vegetable' || (ingredientCount[item.mainIngredient] || 0) < 3
+      item => item.mainIngredient === 'vegetable' || (ingredientCount[item.mainIngredient] || 0) < 2
     );
     const pickPool = ingredientCapped.length >= (count as number) ? ingredientCapped : finalPool;
 
+    // 같은 주 내 이미 선택된 메뉴와 유사한 것 제거
+    const nonSimilarToSelected = pickPool.filter(
+      item => !selectedItems.some(sel => isSimilarMenu(item.name, sel.name))
+    );
+    const safePool = nonSimilarToSelected.length >= (count as number) ? nonSimilarToSelected : pickPool;
+
     // 가격 우선 선택: 고가 아이템 상위 풀에서 랜덤 (다양성 + 가격 보장)
-    const priceSorted = [...pickPool].sort((a, b) => b.recommendedPrice - a.recommendedPrice);
+    const priceSorted = [...safePool].sort((a, b) => b.recommendedPrice - a.recommendedPrice);
     const topPool = priceSorted.slice(
       0,
       Math.max((count as number) * 2, Math.min(pickPool.length, (count as number) + 4))
@@ -179,6 +196,9 @@ const generateWeeklyCycle = (
     warnings.push(
       `가격 미달: 단품합산 ${totalPrice.toLocaleString()}원 < 정책가 ${config.targetPrice.toLocaleString()}원`
     );
+  }
+  if (totalPrice > config.targetPrice * 1.1) {
+    warnings.push(`가격 초과: 단품합산 ${totalPrice.toLocaleString()}원 > 정책가 110%`);
   }
 
   return {
@@ -247,21 +267,27 @@ const boostWeekPrice = (
   const config = TARGET_CONFIGS[target];
   const items = [...plan.items];
   const usedIds = new Set([...usedItemIds, ...items.map(i => i.id)]);
+  const ceiling = config.targetPrice * 1.1;
   let attempts = 0;
 
   while (items.reduce((s, i) => s + i.recommendedPrice, 0) < config.targetPrice && attempts < items.length) {
+    const currentTotal = items.reduce((s, i) => s + i.recommendedPrice, 0);
+    if (currentTotal >= ceiling) break;
+
     const sorted = items
       .map((item, idx) => ({ item, idx }))
       .sort((a, b) => a.item.recommendedPrice - b.item.recommendedPrice);
     const cheapest = sorted[attempts];
     if (!cheapest) break;
 
+    const maxReplacementPrice = ceiling - (currentTotal - cheapest.item.recommendedPrice);
     const replacement = menuDB
       .filter(
         m =>
           m.category === cheapest.item.category &&
           !usedIds.has(m.id) &&
           m.recommendedPrice > cheapest.item.recommendedPrice &&
+          m.recommendedPrice <= maxReplacementPrice &&
           !config.bannedTags.some(t => m.tags.includes(t)) &&
           !((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy)
       )
@@ -276,11 +302,14 @@ const boostWeekPrice = (
 
   const totalCost = items.reduce((s, i) => s + i.cost, 0);
   const totalPrice = items.reduce((s, i) => s + i.recommendedPrice, 0);
-  const warnings = plan.warnings.filter(w => !w.includes('가격 미달'));
+  const warnings = plan.warnings.filter(w => !w.includes('가격 미달') && !w.includes('가격 초과'));
   if (totalPrice < config.targetPrice) {
     warnings.push(
       `가격 미달: 단품합산 ${totalPrice.toLocaleString()}원 < 정책가 ${config.targetPrice.toLocaleString()}원`
     );
+  }
+  if (totalPrice > config.targetPrice * 1.1) {
+    warnings.push(`가격 초과: 단품합산 ${totalPrice.toLocaleString()}원 > 정책가 110%`);
   }
   if (totalCost > config.budgetCap) {
     if (!warnings.some(w => w.includes('원가 초과'))) {
@@ -296,7 +325,8 @@ export const generateMonthlyMealPlan = (
   monthLabel: string,
   cycleType: CycleType,
   enableDuplicationCheck: boolean,
-  menuDB: MenuItem[]
+  menuDB: MenuItem[],
+  excludedNames?: Set<string>
 ): MonthlyMealPlan => {
   const config = TARGET_CONFIGS[target];
 
@@ -307,7 +337,8 @@ export const generateMonthlyMealPlan = (
       monthLabel,
       cycleType,
       enableDuplicationCheck,
-      menuDB
+      menuDB,
+      excludedNames
     );
     return createSubsetPlan(parentPlan, target);
   }
@@ -326,7 +357,8 @@ export const generateMonthlyMealPlan = (
       usedItemIds,
       prevWeekIngredients,
       enableDuplicationCheck,
-      prevWeekMenuNames
+      prevWeekMenuNames,
+      excludedNames
     );
 
     // 가격 미달 시 boostWeekPrice로 보정

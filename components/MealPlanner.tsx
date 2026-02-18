@@ -86,7 +86,7 @@ const MealPlanner: React.FC = () => {
   const { menuItems } = useMenu();
   const { addToast, confirm } = useToast();
   const { user } = useAuth();
-  const { registerPlans } = useHistoricalPlans();
+  const { registerPlans, plans: historicalPlans } = useHistoricalPlans();
   const [target, setTarget] = useState<TargetType>(TargetType.KIDS);
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     const now = new Date();
@@ -137,8 +137,28 @@ const MealPlanner: React.FC = () => {
 
     setTimeout(() => {
       const activeMenu = menuItems.filter(item => !item.isUnused);
-      const planA = generateMonthlyMealPlan(target, monthLabel, '화수목', checkDupes, activeMenu);
-      const planB = generateMonthlyMealPlan(target, monthLabel, '금토월', checkDupes, activeMenu);
+
+      // 60일 이내 히스토리 메뉴명 수집 → 중복 방지
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 60);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const excludedNames = new Set<string>();
+      historicalPlans
+        .filter(p => p.date >= cutoffStr)
+        .forEach(p =>
+          p.targets.forEach(t =>
+            t.items.forEach(item => {
+              const clean = item.name
+                .replace(/_냉장|_반조리|_냉동/g, '')
+                .replace(/\s+\d+$/, '')
+                .trim();
+              if (clean) excludedNames.add(clean);
+            })
+          )
+        );
+
+      const planA = generateMonthlyMealPlan(target, monthLabel, '화수목', checkDupes, activeMenu, excludedNames);
+      const planB = generateMonthlyMealPlan(target, monthLabel, '금토월', checkDupes, activeMenu, excludedNames);
       setPlans({ A: planA, B: planB });
       setIsGenerating(false);
       addAuditEntry({
