@@ -150,7 +150,13 @@ const generateWeeklyCycle = (
     );
     const pickPool = ingredientCapped.length >= (count as number) ? ingredientCapped : finalPool;
 
-    const selected = shuffle(pickPool).slice(0, count as number);
+    // 가격 우선 선택: 고가 아이템 상위 풀에서 랜덤 (다양성 + 가격 보장)
+    const priceSorted = [...pickPool].sort((a, b) => b.recommendedPrice - a.recommendedPrice);
+    const topPool = priceSorted.slice(
+      0,
+      Math.max((count as number) * 2, Math.min(pickPool.length, (count as number) + 4))
+    );
+    const selected = shuffle(topPool).slice(0, count as number);
 
     // 선택 후 ingredientCount 업데이트
     selected.forEach(item => {
@@ -231,6 +237,60 @@ const createSubsetPlan = (parentPlan: MonthlyMealPlan, childTarget: TargetType):
   };
 };
 
+// 가격 미달 시 가장 싼 아이템을 같은 카테고리 고가 미사용 아이템으로 교체
+const boostWeekPrice = (
+  plan: WeeklyCyclePlan,
+  target: TargetType,
+  menuDB: MenuItem[],
+  usedItemIds: Set<string>
+): WeeklyCyclePlan => {
+  const config = TARGET_CONFIGS[target];
+  const items = [...plan.items];
+  const usedIds = new Set([...usedItemIds, ...items.map(i => i.id)]);
+  let attempts = 0;
+
+  while (items.reduce((s, i) => s + i.recommendedPrice, 0) < config.targetPrice && attempts < items.length) {
+    const sorted = items
+      .map((item, idx) => ({ item, idx }))
+      .sort((a, b) => a.item.recommendedPrice - b.item.recommendedPrice);
+    const cheapest = sorted[attempts];
+    if (!cheapest) break;
+
+    const replacement = menuDB
+      .filter(
+        m =>
+          m.category === cheapest.item.category &&
+          !usedIds.has(m.id) &&
+          m.recommendedPrice > cheapest.item.recommendedPrice &&
+          !config.bannedTags.some(t => m.tags.includes(t)) &&
+          !((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy)
+      )
+      .sort((a, b) => b.recommendedPrice - a.recommendedPrice)[0];
+
+    if (replacement) {
+      usedIds.add(replacement.id);
+      items[cheapest.idx] = replacement;
+    }
+    attempts++;
+  }
+
+  const totalCost = items.reduce((s, i) => s + i.cost, 0);
+  const totalPrice = items.reduce((s, i) => s + i.recommendedPrice, 0);
+  const warnings = plan.warnings.filter(w => !w.includes('가격 미달'));
+  if (totalPrice < config.targetPrice) {
+    warnings.push(
+      `가격 미달: 단품합산 ${totalPrice.toLocaleString()}원 < 정책가 ${config.targetPrice.toLocaleString()}원`
+    );
+  }
+  if (totalCost > config.budgetCap) {
+    if (!warnings.some(w => w.includes('원가 초과'))) {
+      warnings.push(`원가 초과: ${totalCost.toLocaleString()}원`);
+    }
+  }
+
+  return { ...plan, items, totalCost, totalPrice, isValid: warnings.length === 0, warnings };
+};
+
 export const generateMonthlyMealPlan = (
   target: TargetType,
   monthLabel: string,
@@ -269,19 +329,9 @@ export const generateMonthlyMealPlan = (
       prevWeekMenuNames
     );
 
-    // 가격 미달 시 최대 3회 재시도
-    let retries = 0;
-    while (weekPlan.totalPrice < config.targetPrice && retries < 3) {
-      weekPlan = generateWeeklyCycle(
-        i,
-        target,
-        menuDB,
-        usedItemIds,
-        prevWeekIngredients,
-        enableDuplicationCheck,
-        prevWeekMenuNames
-      );
-      retries++;
+    // 가격 미달 시 boostWeekPrice로 보정
+    if (weekPlan.totalPrice < config.targetPrice) {
+      weekPlan = boostWeekPrice(weekPlan, target, menuDB, usedItemIds);
     }
 
     weekPlan.items.forEach(item => usedItemIds.add(item.id));
@@ -322,6 +372,18 @@ export const getSwapCandidates = (
 
     // Banned tags
     if (config.bannedTags.some(t => item.tags.includes(t))) return false;
+
+    // Spicy filter for kids targets
+    if (
+      (currentPlan.target === TargetType.KIDS ||
+        currentPlan.target === TargetType.KIDS_PLUS ||
+        currentPlan.target === TargetType.TODDLER ||
+        currentPlan.target === TargetType.TODDLER_PLUS ||
+        currentPlan.target === TargetType.CHILD ||
+        currentPlan.target === TargetType.CHILD_PLUS) &&
+      item.isSpicy
+    )
+      return false;
 
     // Main ingredient overlap with previous week
     if (prevIngredients.has(item.mainIngredient) && item.mainIngredient !== 'vegetable') return false;

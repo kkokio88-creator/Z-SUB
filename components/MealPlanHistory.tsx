@@ -680,9 +680,20 @@ const MealPlanHistory: React.FC = () => {
   const { menuItems } = useMenu();
   const { user } = useAuth();
   const { addToast } = useToast();
-  const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date || '2025-01-01';
-  const [viewYear, setViewYear] = useState(() => parseInt(latestDate.slice(0, 4)));
-  const [viewMonth, setViewMonth] = useState(() => parseInt(latestDate.slice(5, 7)) - 1);
+  const [viewYear, setViewYear] = useState(() => {
+    const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date;
+    if (latestDate) return parseInt(latestDate.slice(0, 4));
+    const now = new Date();
+    const nextMonth = now.getMonth() + 2;
+    return nextMonth > 12 ? now.getFullYear() + 1 : now.getFullYear();
+  });
+  const [viewMonth, setViewMonth] = useState(() => {
+    const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date;
+    if (latestDate) return parseInt(latestDate.slice(5, 7)) - 1;
+    const now = new Date();
+    const nextMonth = now.getMonth() + 2;
+    return nextMonth > 12 ? 0 : nextMonth - 1;
+  });
 
   // Review state
   const [reviewFilter, setReviewFilter] = useState<ReviewFilterCategory>('all');

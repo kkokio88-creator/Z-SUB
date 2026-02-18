@@ -88,8 +88,16 @@ const MealPlanner: React.FC = () => {
   const { user } = useAuth();
   const { registerPlans } = useHistoricalPlans();
   const [target, setTarget] = useState<TargetType>(TargetType.KIDS);
-  const [selectedYear, setSelectedYear] = useState<number>(2024);
-  const [selectedMonth, setSelectedMonth] = useState<number>(3);
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    const now = new Date();
+    const nextMonth = now.getMonth() + 2; // 0-based → 1-based + 1
+    return nextMonth > 12 ? now.getFullYear() + 1 : now.getFullYear();
+  });
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => {
+    const now = new Date();
+    const nextMonth = now.getMonth() + 2;
+    return nextMonth > 12 ? 1 : nextMonth;
+  });
   const monthLabel = `${selectedYear}년 ${selectedMonth}월`;
   const [checkDupes, setCheckDupes] = useState<boolean>(true);
 
@@ -529,6 +537,9 @@ const MealPlanner: React.FC = () => {
                           }`}
                         ></span>
                         <span className={`font-medium truncate flex-1 ${ingColor.text}`}>{item.name}</span>
+                        <span className="text-[10px] text-gray-400 shrink-0 ml-1">
+                          {item.recommendedPrice.toLocaleString()}
+                        </span>
                         {isExtra && (
                           <span className="px-1.5 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 rounded border border-amber-200 flex-shrink-0">
                             추가
@@ -590,7 +601,7 @@ const MealPlanner: React.FC = () => {
                 onChange={e => setSelectedYear(Number(e.target.value))}
                 className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-24 p-2.5"
               >
-                {[2024, 2025, 2026].map(y => (
+                {[2024, 2025, 2026, 2027].map(y => (
                   <option key={y} value={y}>
                     {y}년
                   </option>
@@ -863,10 +874,16 @@ const MealPlanner: React.FC = () => {
             <div className="p-5 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-lg text-gray-800">
-                  메뉴 교체하기 ({swapTarget.cycle === 'A' ? '화수목' : '금토월'})
+                  {swapTarget.item.category === MenuCategory.SOUP
+                    ? '🍲 국/찌개'
+                    : swapTarget.item.category === MenuCategory.MAIN
+                      ? '🍖 메인요리'
+                      : '🥗 밑반찬'}{' '}
+                  교체하기 ({swapTarget.cycle === 'A' ? '화수목' : '금토월'})
                 </h3>
                 <p className="text-xs text-gray-500">
                   현재 메뉴: <span className="font-bold text-blue-600">{swapTarget.item.name}</span>
+                  <span className="ml-2 text-gray-400">({swapCandidates.length}개 사용 가능)</span>
                 </p>
               </div>
               <button
@@ -885,41 +902,54 @@ const MealPlanner: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-2 p-2">
-                  {swapCandidates.map(candidate => {
-                    const costDiff = candidate.cost - swapTarget.item.cost;
-                    return (
-                      <button
-                        key={candidate.id}
-                        onClick={() => performSwap(candidate)}
-                        className="w-full bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${candidate.category === MenuCategory.MAIN ? 'bg-orange-100' : 'bg-green-100'}`}
-                          >
-                            {candidate.category === MenuCategory.MAIN ? '🍖' : '🥗'}
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-800">{candidate.name}</div>
-                            <div className="text-xs text-gray-500 flex gap-1 mt-0.5">
-                              <span className="bg-gray-100 px-1.5 py-0.5 rounded">{candidate.mainIngredient}</span>
-                              {candidate.tags.map(t => (
-                                <span key={t} className="bg-gray-100 px-1.5 py-0.5 rounded">
-                                  #{t}
-                                </span>
-                              ))}
+                  {[...swapCandidates]
+                    .sort((a, b) => b.recommendedPrice - a.recommendedPrice)
+                    .map(candidate => {
+                      const priceDiff = candidate.recommendedPrice - swapTarget.item.recommendedPrice;
+                      return (
+                        <button
+                          key={candidate.id}
+                          onClick={() => performSwap(candidate)}
+                          className="w-full bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${candidate.category === MenuCategory.SOUP ? 'bg-blue-100' : candidate.category === MenuCategory.MAIN ? 'bg-orange-100' : 'bg-green-100'}`}
+                            >
+                              {candidate.category === MenuCategory.SOUP
+                                ? '🍲'
+                                : candidate.category === MenuCategory.MAIN
+                                  ? '🍖'
+                                  : '🥗'}
+                            </div>
+                            <div>
+                              <div className="font-bold text-gray-800">{candidate.name}</div>
+                              <div className="text-xs text-gray-500 flex gap-1 mt-0.5">
+                                <span className="bg-gray-100 px-1.5 py-0.5 rounded">{candidate.mainIngredient}</span>
+                                {candidate.isSpicy && (
+                                  <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded">🌶️</span>
+                                )}
+                                {candidate.tags.map(t => (
+                                  <span key={t} className="bg-gray-100 px-1.5 py-0.5 rounded">
+                                    #{t}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-gray-900">{candidate.cost.toLocaleString()}원</div>
-                          <div className={`text-xs font-medium ${costDiff > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                            {costDiff > 0 ? `+${costDiff.toLocaleString()}` : costDiff.toLocaleString()}원
+                          <div className="text-right">
+                            <div className="font-bold text-gray-900">
+                              {candidate.recommendedPrice.toLocaleString()}원
+                            </div>
+                            <div
+                              className={`text-xs font-medium ${priceDiff > 0 ? 'text-green-600' : priceDiff < 0 ? 'text-red-500' : 'text-gray-400'}`}
+                            >
+                              {priceDiff > 0 ? `+${priceDiff.toLocaleString()}` : priceDiff.toLocaleString()}원
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
                 </div>
               )}
             </div>
