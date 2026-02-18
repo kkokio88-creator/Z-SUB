@@ -255,8 +255,9 @@ const MenuItemRow: React.FC<{
   isPlusOnly?: boolean;
   plusBadge?: string;
   commentCount: number;
+  recentComments?: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
-}> = ({ item, idx, date, targetType, isEdited, isPlusOnly, plusBadge, commentCount, onAction }) => {
+}> = ({ item, idx, date, targetType, isEdited, isPlusOnly, plusBadge, commentCount, recentComments, onAction }) => {
   const ingredient = detectIngredient(item.name);
   const colors = INGREDIENT_COLORS[ingredient];
   const { cleanName, quantity } = parseMenuItem(item.name);
@@ -278,9 +279,19 @@ const MenuItemRow: React.FC<{
       )}
       {isEdited && <span className="text-[9px] text-amber-600 font-medium shrink-0">수정</span>}
       {commentCount > 0 && (
-        <span className="flex items-center gap-0.5 text-[9px] text-blue-600 shrink-0">
+        <span className="relative group/comment flex items-center gap-0.5 text-[9px] text-blue-600 shrink-0">
           <MessageSquare className="w-2.5 h-2.5" />
           {commentCount}
+          {recentComments && recentComments.length > 0 && (
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-48 p-2 bg-gray-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
+              {recentComments.slice(-2).map((c, i) => (
+                <span key={i} className="block mb-1 last:mb-0">
+                  <span className="font-bold">{c.reviewer}:</span>{' '}
+                  {c.comment.length > 30 ? c.comment.slice(0, 30) + '...' : c.comment}
+                </span>
+              ))}
+            </span>
+          )}
         </span>
       )}
     </div>
@@ -298,8 +309,20 @@ const MergedTableCell: React.FC<{
   plusTarget: string;
   editedKeys: Set<string>;
   commentCounts: Map<string, number>;
+  allComments: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
-}> = ({ baseItems, plusItems, plusBadge, date, baseTarget, plusTarget, editedKeys, commentCounts, onAction }) => {
+}> = ({
+  baseItems,
+  plusItems,
+  plusBadge,
+  date,
+  baseTarget,
+  plusTarget,
+  editedKeys,
+  commentCounts,
+  allComments,
+  onAction,
+}) => {
   const [expanded, setExpanded] = useState(false);
 
   const baseNameSet = new Set(baseItems.filter(i => isValidMenuItem(i.name)).map(i => parseMenuItem(i.name).cleanName));
@@ -326,6 +349,7 @@ const MergedTableCell: React.FC<{
     <div className="space-y-0.5">
       {displayItems.map((entry, displayIdx) => {
         const cKey = `${entry.targetType}-${entry.idx}-${parseMenuItem(entry.item.name).cleanName}`;
+        const scopeComments = allComments.filter(c => c.scopeKey === cKey);
         return (
           <MenuItemRow
             key={`${entry.targetType}-${entry.idx}-${displayIdx}`}
@@ -337,6 +361,7 @@ const MergedTableCell: React.FC<{
             isPlusOnly={entry.isPlusOnly}
             plusBadge={plusBadge}
             commentCount={commentCounts.get(cKey) || 0}
+            recentComments={scopeComments}
             onAction={onAction}
           />
         );
@@ -375,8 +400,9 @@ const TableCell: React.FC<{
   targetType: string;
   editedKeys: Set<string>;
   commentCounts: Map<string, number>;
+  allComments: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
-}> = ({ items, date, targetType, editedKeys, commentCounts, onAction }) => {
+}> = ({ items, date, targetType, editedKeys, commentCounts, allComments, onAction }) => {
   const [expanded, setExpanded] = useState(false);
 
   const validItems = useMemo(
@@ -391,6 +417,7 @@ const TableCell: React.FC<{
     <div className="space-y-0.5">
       {displayItems.map(({ item, originalIdx }) => {
         const cKey = `${targetType}-${originalIdx}-${parseMenuItem(item.name).cleanName}`;
+        const scopeComments = allComments.filter(c => c.scopeKey === cKey);
         return (
           <MenuItemRow
             key={originalIdx}
@@ -400,6 +427,7 @@ const TableCell: React.FC<{
             targetType={targetType}
             isEdited={editedKeys.has(`${date}|${targetType}|${originalIdx}`)}
             commentCount={commentCounts.get(cKey) || 0}
+            recentComments={scopeComments}
             onAction={(tt, ii, name) => onAction(tt, ii, name)}
           />
         );
@@ -679,6 +707,7 @@ const MealPlanHistory: React.FC = () => {
   } | null>(null);
   const [swapTarget, setSwapTarget] = useState<{
     date: string;
+    cycleType: string;
     targetType: string;
     itemIndex: number;
     currentName: string;
@@ -808,14 +837,31 @@ const MealPlanHistory: React.FC = () => {
     (newName: string) => {
       if (!swapTarget) return;
       const key = `${swapTarget.date}|${swapTarget.targetType}|${swapTarget.itemIndex}`;
+      const oldName = parseMenuItem(swapTarget.currentName).cleanName;
+      const newCleanName = parseMenuItem(newName).cleanName;
+
       setEditedPlans(prev => {
         const next = new Map(prev);
         next.set(key, newName);
         return next;
       });
+
+      // 자동 대댓글: 메뉴 변경 알림
+      const planKey = makeReviewKey(swapTarget.date, swapTarget.cycleType);
+      const scopeKey = `${swapTarget.targetType}-${swapTarget.itemIndex}-${newCleanName}`;
+      addReviewComment(planKey, {
+        department: 'quality',
+        reviewer: '시스템',
+        scope: 'item',
+        scopeKey,
+        comment: `메뉴 변경: "${oldName}" → "${newCleanName}". 재검토 요청드립니다.`,
+        status: 'issue',
+      });
+      loadCommentsForPlan(planKey);
+
       setSwapTarget(null);
     },
-    [swapTarget]
+    [swapTarget, loadCommentsForPlan]
   );
 
   // 액션 핸들러
@@ -839,6 +885,7 @@ const MealPlanHistory: React.FC = () => {
     if (!actionTarget) return;
     setSwapTarget({
       date: actionTarget.date,
+      cycleType: actionTarget.cycleType,
       targetType: actionTarget.targetType,
       itemIndex: actionTarget.itemIndex,
       currentName: actionTarget.menuName,
@@ -974,8 +1021,15 @@ const MealPlanHistory: React.FC = () => {
             <tbody>
               {monthPlans.map(plan => {
                 const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
+                const rowRKey = makeReviewKey(plan.date, plan.cycleType);
+                const rowRecord = reviewStatusMap.get(rowRKey);
+                const rowCat = rowRecord ? getFilterStatus(rowRecord.status) : 'pending';
+                const isCompleted = rowCat === 'completed';
                 return (
-                  <tr key={`${plan.date}-${plan.cycleType}`} className="border-b border-gray-100 hover:bg-gray-50/30">
+                  <tr
+                    key={`${plan.date}-${plan.cycleType}`}
+                    className={`border-b border-gray-100 hover:bg-gray-50/30 ${isCompleted ? 'opacity-60 bg-gray-50/50' : ''}`}
+                  >
                     <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
                       {formatDate(plan.date)}
                     </td>
@@ -1010,14 +1064,42 @@ const MealPlanHistory: React.FC = () => {
                         };
                         const s = styles[cat];
                         const StatusIcon = s.icon;
+                        const DEPT_LABELS: Record<string, string> = {
+                          quality: '품질',
+                          development: '개발',
+                          process: '공정',
+                        };
                         return (
-                          <button
-                            onClick={() => setSelectedReview(plan)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors ${s.cls}`}
-                          >
-                            <StatusIcon className="w-3 h-3" />
-                            {s.label}
-                          </button>
+                          <div className="flex flex-col items-center gap-1">
+                            <button
+                              onClick={() => setSelectedReview(plan)}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors ${s.cls}`}
+                            >
+                              <StatusIcon className="w-3 h-3" />
+                              {s.label}
+                            </button>
+                            {record && record.departments && record.departments.length > 0 && (
+                              <div className="flex flex-col gap-0.5 mt-0.5">
+                                {record.departments.map(dept => (
+                                  <div
+                                    key={dept.department}
+                                    className="flex items-center gap-1 text-[9px] text-gray-500"
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full ${
+                                        dept.status === 'approved'
+                                          ? 'bg-green-500'
+                                          : dept.status === 'rejected'
+                                            ? 'bg-red-500'
+                                            : 'bg-gray-300'
+                                      }`}
+                                    />
+                                    <span>{DEPT_LABELS[dept.department] || dept.department}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         );
                       })()}
                     </td>
@@ -1034,6 +1116,7 @@ const MealPlanHistory: React.FC = () => {
                             </td>
                           );
                         const items = getItems(plan.date, col.target, target.items);
+                        const planKey = makeReviewKey(plan.date, plan.cycleType);
                         return (
                           <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
                             <TableCell
@@ -1042,6 +1125,7 @@ const MealPlanHistory: React.FC = () => {
                               targetType={col.target}
                               editedKeys={editedKeys}
                               commentCounts={commentCounts}
+                              allComments={commentCache[planKey] || []}
                               onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
                             />
                           </td>
@@ -1060,6 +1144,7 @@ const MealPlanHistory: React.FC = () => {
                         );
                       const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
                       const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
+                      const mergedPlanKey = makeReviewKey(plan.date, plan.cycleType);
                       return (
                         <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
                           <MergedTableCell
@@ -1071,6 +1156,7 @@ const MealPlanHistory: React.FC = () => {
                             plusTarget={col.group.plusTarget}
                             editedKeys={editedKeys}
                             commentCounts={commentCounts}
+                            allComments={commentCache[mergedPlanKey] || []}
                             onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
                           />
                         </td>

@@ -37,6 +37,51 @@ import { pushMealPlan } from '../services/syncManager';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { addSyncRecord } from '../services/syncTracker';
 
+// ── 식재료별 컬러 맵 ──
+const PLANNER_INGREDIENT_COLORS: Record<
+  string,
+  { bg: string; borderL: string; text: string; dot: string; label: string }
+> = {
+  beef: { bg: 'bg-red-50', borderL: 'border-l-red-400', text: 'text-red-700', dot: 'bg-red-400', label: '소고기' },
+  pork: { bg: 'bg-pink-50', borderL: 'border-l-pink-400', text: 'text-pink-700', dot: 'bg-pink-400', label: '한돈' },
+  chicken: {
+    bg: 'bg-amber-50',
+    borderL: 'border-l-amber-400',
+    text: 'text-amber-700',
+    dot: 'bg-amber-400',
+    label: '닭',
+  },
+  fish: { bg: 'bg-blue-50', borderL: 'border-l-blue-400', text: 'text-blue-700', dot: 'bg-blue-400', label: '생선' },
+  tofu: {
+    bg: 'bg-yellow-50',
+    borderL: 'border-l-yellow-400',
+    text: 'text-yellow-700',
+    dot: 'bg-yellow-400',
+    label: '두부',
+  },
+  egg: {
+    bg: 'bg-orange-50',
+    borderL: 'border-l-orange-400',
+    text: 'text-orange-700',
+    dot: 'bg-orange-400',
+    label: '달걀',
+  },
+  vegetable: {
+    bg: 'bg-green-50',
+    borderL: 'border-l-green-400',
+    text: 'text-green-700',
+    dot: 'bg-green-400',
+    label: '채소',
+  },
+};
+const DEFAULT_INGREDIENT_COLOR = {
+  bg: 'bg-gray-50',
+  borderL: 'border-l-gray-300',
+  text: 'text-gray-600',
+  dot: 'bg-gray-300',
+  label: '기타',
+};
+
 const MealPlanner: React.FC = () => {
   const { menuItems } = useMenu();
   const { addToast, confirm } = useToast();
@@ -402,6 +447,17 @@ const MealPlanner: React.FC = () => {
         </button>
       </div>
 
+      {/* 식재료 범례 */}
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-gray-100 bg-white">
+        <span className="text-[11px] font-medium text-gray-400">주재료:</span>
+        {Object.entries(PLANNER_INGREDIENT_COLORS).map(([key, val]) => (
+          <div key={key} className="flex items-center gap-1">
+            <span className={`w-2 h-2 rounded-full ${val.dot}`} />
+            <span className="text-[10px] text-gray-500">{val.label}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-100">
         {plan.weeks.map(week => {
           const costRatio = ((week.totalCost / targetPrice) * 100).toFixed(1);
@@ -453,15 +509,14 @@ const MealPlanner: React.FC = () => {
               <div className="space-y-1 flex-1">
                 {week.items.map((item, itemIdx) => {
                   const isExtra = parentItemCount !== null && itemIdx >= parentItemCount;
+                  const ingColor = PLANNER_INGREDIENT_COLORS[item.mainIngredient] || DEFAULT_INGREDIENT_COLOR;
 
                   return (
                     <div key={item.id}>
                       <div
                         onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
-                        className={`flex items-center gap-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer transition-all ${
-                          isExtra
-                            ? 'border border-amber-300 bg-amber-50/50'
-                            : 'border border-transparent hover:border-gray-200'
+                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${ingColor.bg} hover:ring-1 hover:ring-gray-300 ${
+                          isExtra ? 'border border-amber-300 border-l-2' : ''
                         }`}
                       >
                         <span
@@ -473,7 +528,7 @@ const MealPlanner: React.FC = () => {
                                 : 'bg-green-500'
                           }`}
                         ></span>
-                        <span className="font-medium text-gray-700 truncate flex-1">{item.name}</span>
+                        <span className={`font-medium truncate flex-1 ${ingColor.text}`}>{item.name}</span>
                         {isExtra && (
                           <span className="px-1.5 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 rounded border border-amber-200 flex-shrink-0">
                             추가

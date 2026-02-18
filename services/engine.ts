@@ -95,6 +95,7 @@ const generateWeeklyCycle = (
   const config = TARGET_CONFIGS[target];
   const warnings: string[] = [];
   let selectedItems: MenuItem[] = [];
+  const ingredientCount: Record<string, number> = {};
 
   // Filter valid items
   const availableMenu = menuDB.filter(item => {
@@ -143,12 +144,18 @@ const generateWeeklyCycle = (
     const fallbackPool = nonSimilarCandidates.length >= (count as number) ? nonSimilarCandidates : prioritized;
     const finalPool = nonRepeatingCandidates.length >= (count as number) ? nonRepeatingCandidates : fallbackPool;
 
-    const selected = shuffle(finalPool).slice(0, count as number);
+    // 동일 식재료 3개 초과 방지 (채소 제외)
+    const ingredientCapped = finalPool.filter(
+      item => item.mainIngredient === 'vegetable' || (ingredientCount[item.mainIngredient] || 0) < 3
+    );
+    const pickPool = ingredientCapped.length >= (count as number) ? ingredientCapped : finalPool;
 
-    // Check if we were forced to pick a repeating ingredient
+    const selected = shuffle(pickPool).slice(0, count as number);
+
+    // 선택 후 ingredientCount 업데이트
     selected.forEach(item => {
-      if (prevWeekIngredients.has(item.mainIngredient)) {
-        // warnings.push(`재료 중복 주의: ${item.name} (${item.mainIngredient})`);
+      if (item.mainIngredient !== 'vegetable') {
+        ingredientCount[item.mainIngredient] = (ingredientCount[item.mainIngredient] || 0) + 1;
       }
     });
 
@@ -161,6 +168,11 @@ const generateWeeklyCycle = (
   // Validations
   if (currentCost > config.budgetCap) {
     warnings.push(`원가 초과: ${currentCost.toLocaleString()}원`);
+  }
+  if (totalPrice < config.targetPrice) {
+    warnings.push(
+      `가격 미달: 단품합산 ${totalPrice.toLocaleString()}원 < 정책가 ${config.targetPrice.toLocaleString()}원`
+    );
   }
 
   return {
@@ -247,7 +259,7 @@ export const generateMonthlyMealPlan = (
   let prevWeekMenuNames: string[] = [];
 
   for (let i = 1; i <= 4; i++) {
-    const weekPlan = generateWeeklyCycle(
+    let weekPlan = generateWeeklyCycle(
       i,
       target,
       menuDB,
@@ -256,6 +268,21 @@ export const generateMonthlyMealPlan = (
       enableDuplicationCheck,
       prevWeekMenuNames
     );
+
+    // 가격 미달 시 최대 3회 재시도
+    let retries = 0;
+    while (weekPlan.totalPrice < config.targetPrice && retries < 3) {
+      weekPlan = generateWeeklyCycle(
+        i,
+        target,
+        menuDB,
+        usedItemIds,
+        prevWeekIngredients,
+        enableDuplicationCheck,
+        prevWeekMenuNames
+      );
+      retries++;
+    }
 
     weekPlan.items.forEach(item => usedItemIds.add(item.id));
     prevWeekIngredients = new Set(weekPlan.items.map(item => item.mainIngredient).filter(ing => ing !== 'vegetable'));
