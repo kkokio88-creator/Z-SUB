@@ -1,15 +1,22 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { MenuItem } from '../types';
 import { pullMenuDB } from '../services/syncManager';
+import { detectMainIngredient } from '../services/sheetsSerializer';
 
 const STORAGE_KEY = 'zsub_menu_db';
+
+// 캐시된 아이템의 mainIngredient가 'vegetable'(기본값)이면 메뉴명에서 재감지
+const redetectIngredients = (items: MenuItem[]): MenuItem[] =>
+  items.map(item =>
+    item.mainIngredient === 'vegetable' ? { ...item, mainIngredient: detectMainIngredient(item.name) } : item
+  );
 
 const loadMenuFromStorage = (): MenuItem[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const items: MenuItem[] = JSON.parse(stored);
-      return items.filter(item => item.name && item.name.trim());
+      return redetectIngredients(items.filter(item => item.name && item.name.trim()));
     }
   } catch {
     // ignore parse errors

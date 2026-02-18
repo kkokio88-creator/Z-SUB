@@ -35,14 +35,17 @@ import PlanDiffView from './PlanDiffView';
 import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportService';
 import { pushMealPlan } from '../services/syncManager';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
+import { addSyncRecord } from '../services/syncTracker';
 
 const MealPlanner: React.FC = () => {
   const { menuItems } = useMenu();
   const { addToast, confirm } = useToast();
   const { user } = useAuth();
-  const { refresh: refreshHistory } = useHistoricalPlans();
+  const { registerPlans } = useHistoricalPlans();
   const [target, setTarget] = useState<TargetType>(TargetType.KIDS);
-  const [monthLabel, setMonthLabel] = useState<string>('3월');
+  const [selectedYear, setSelectedYear] = useState<number>(2024);
+  const [selectedMonth, setSelectedMonth] = useState<number>(3);
+  const monthLabel = `${selectedYear}년 ${selectedMonth}월`;
   const [checkDupes, setCheckDupes] = useState<boolean>(true);
 
   // Dual Plans for Cycle A (Tue-Thu) and Cycle B (Fri-Mon)
@@ -158,17 +161,28 @@ const MealPlanner: React.FC = () => {
     });
     if (!confirmed) return;
 
+    // 로컬 저장 (즉시 반영)
+    const count = registerPlans(plans.A, plans.B);
+    addToast({
+      type: 'success',
+      title: '히스토리 등록 완료',
+      message: `${count}건의 식단이 등록되었습니다. 식단 히스토리 탭에서 확인하세요.`,
+    });
+
+    // 시트 동기화 (백그라운드, 실패해도 로컬에는 이미 저장됨)
     try {
-      await pushMealPlan(plans.A);
-      await pushMealPlan(plans.B);
-      await refreshHistory();
-      addToast({
-        type: 'success',
-        title: '히스토리 등록 완료',
-        message: '식단이 히스토리에 등록되었습니다. 히스토리 탭에서 검토를 진행하세요.',
-      });
+      const resultA = await pushMealPlan(plans.A);
+      const resultB = await pushMealPlan(plans.B);
+      if (!resultA.success || !resultB.success) {
+        addSyncRecord({
+          target: 'SHEETS',
+          result: 'error',
+          itemCount: 0,
+          errorMessage: resultA.error || resultB.error || '시트 동기화 실패',
+        });
+      }
     } catch {
-      addToast({ type: 'error', title: '등록 실패', message: '히스토리 등록 중 오류가 발생했습니다.' });
+      // 시트 동기화 실패해도 로컬 등록은 완료된 상태
     }
   };
 
@@ -484,14 +498,29 @@ const MealPlanner: React.FC = () => {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-bold text-gray-500 mb-1">월 설정</label>
+              <label className="text-xs font-bold text-gray-500 mb-1">연도</label>
               <select
-                value={monthLabel}
-                onChange={e => setMonthLabel(e.target.value)}
+                value={selectedYear}
+                onChange={e => setSelectedYear(Number(e.target.value))}
                 className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-24 p-2.5"
               >
-                {[3, 4, 5, 6].map(m => (
-                  <option key={m} value={`${m}월`}>
+                {[2024, 2025, 2026].map(y => (
+                  <option key={y} value={y}>
+                    {y}년
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-xs font-bold text-gray-500 mb-1">월</label>
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(Number(e.target.value))}
+                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-20 p-2.5"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                  <option key={m} value={m}>
                     {m}월
                   </option>
                 ))}

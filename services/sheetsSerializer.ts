@@ -46,6 +46,26 @@ export const menuItemToRow = (item: MenuItem): string[] => [
 // [0]구분 [1]메뉴명 [2]공정 [3]품목코드 [4]용량(g) [5]가격 [6]원가
 // [7]시즌 [8]미사용 [9]매운맛 [10]대용량갯수 [11]비고
 
+// 메뉴명 기반 주재료 감지
+const INGREDIENT_KEYWORDS: Record<string, string[]> = {
+  beef: ['소고기', '한우', '불고기', '갈비', '사골', '차돌', '설렁탕'],
+  pork: ['한돈', '돼지', '제육', '삼겹', '탕수', '수육', '족발', '보쌈'],
+  chicken: ['닭', '치킨', '닭볶음', '닭갈비'],
+  fish: ['동태', '오징어', '새우', '어묵', '참치', '멸치', '황태', '맛살', '고등어', '갈치', '조기', '꽁치', '연어'],
+  tofu: ['두부', '순두부'],
+  egg: ['계란', '달걀', '메추리알', '에그'],
+  potato: ['감자', '고구마'],
+  seaweed: ['미역', '파래', '김무침', '다시마', '해초'],
+  mushroom: ['버섯', '표고', '느타리', '팽이', '새송이'],
+};
+
+export function detectMainIngredient(name: string): string {
+  for (const [ingredient, keywords] of Object.entries(INGREDIENT_KEYWORDS)) {
+    if (keywords.some(kw => name.includes(kw))) return ingredient;
+  }
+  return 'vegetable';
+}
+
 const GUBUN_TO_CATEGORY: Record<string, MenuCategory> = {
   국: MenuCategory.SOUP,
   시즌국: MenuCategory.SOUP,
@@ -81,7 +101,7 @@ export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => {
     season: Season.ALL,
     tags,
     isSpicy: row[9] === 'TRUE',
-    mainIngredient: 'vegetable',
+    mainIngredient: detectMainIngredient((row[1] || '').trim()),
     process: Number(row[2]) || 0,
     weight: parseNumber(row[4]),
     isUnused: row[8] === 'TRUE',
