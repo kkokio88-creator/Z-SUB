@@ -55,21 +55,21 @@ const TARGET_LABELS: Record<string, string> = {
 };
 
 const TARGET_COLORS: Record<string, string> = {
-  [TargetType.VALUE]: 'bg-blue-100 text-blue-700 border-blue-200',
-  [TargetType.SENIOR_HEALTH]: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  [TargetType.SENIOR]: 'bg-teal-100 text-teal-700 border-teal-200',
-  [TargetType.YOUTH]: 'bg-violet-100 text-violet-700 border-violet-200',
-  [TargetType.YOUTH_MAIN]: 'bg-purple-100 text-purple-700 border-purple-200',
-  [TargetType.FAMILY_PLUS]: 'bg-amber-100 text-amber-700 border-amber-200',
-  [TargetType.FAMILY]: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  [TargetType.KIDS_PLUS]: 'bg-pink-100 text-pink-700 border-pink-200',
-  [TargetType.KIDS]: 'bg-rose-100 text-rose-700 border-rose-200',
-  [TargetType.SIDE_ONLY]: 'bg-lime-100 text-lime-700 border-lime-200',
-  [TargetType.FIRST_MEET]: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  [TargetType.TODDLER_PLUS]: 'bg-orange-100 text-orange-700 border-orange-200',
-  [TargetType.TODDLER]: 'bg-red-100 text-red-700 border-red-200',
-  [TargetType.CHILD_PLUS]: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  [TargetType.CHILD]: 'bg-sky-100 text-sky-700 border-sky-200',
+  [TargetType.VALUE]: 'bg-slate-100 text-slate-600',
+  [TargetType.SENIOR_HEALTH]: 'bg-slate-100 text-slate-600',
+  [TargetType.SENIOR]: 'bg-slate-100 text-slate-600',
+  [TargetType.YOUTH]: 'bg-slate-100 text-slate-600',
+  [TargetType.YOUTH_MAIN]: 'bg-slate-100 text-slate-600',
+  [TargetType.FAMILY_PLUS]: 'bg-slate-100 text-slate-600',
+  [TargetType.FAMILY]: 'bg-slate-100 text-slate-600',
+  [TargetType.KIDS_PLUS]: 'bg-slate-100 text-slate-600',
+  [TargetType.KIDS]: 'bg-slate-100 text-slate-600',
+  [TargetType.SIDE_ONLY]: 'bg-slate-100 text-slate-600',
+  [TargetType.FIRST_MEET]: 'bg-slate-100 text-slate-600',
+  [TargetType.TODDLER_PLUS]: 'bg-slate-100 text-slate-600',
+  [TargetType.TODDLER]: 'bg-slate-100 text-slate-600',
+  [TargetType.CHILD_PLUS]: 'bg-slate-100 text-slate-600',
+  [TargetType.CHILD]: 'bg-slate-100 text-slate-600',
 };
 
 // ── 부모-자식 병합 매핑 ──
@@ -88,42 +88,42 @@ const TARGET_MERGE_MAP: MergeGroup[] = [
     baseTarget: TargetType.SENIOR,
     plusTarget: TargetType.SENIOR_HEALTH,
     plusBadge: '건강',
-    color: 'bg-teal-100 text-teal-700 border-teal-200',
+    color: 'bg-slate-100 text-slate-600',
   },
   {
     groupLabel: '가족',
     baseTarget: TargetType.FAMILY,
     plusTarget: TargetType.FAMILY_PLUS,
     plusBadge: '든든',
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    color: 'bg-slate-100 text-slate-600',
   },
   {
     groupLabel: '아이',
     baseTarget: TargetType.KIDS,
     plusTarget: TargetType.KIDS_PLUS,
     plusBadge: '든든',
-    color: 'bg-rose-100 text-rose-700 border-rose-200',
+    color: 'bg-slate-100 text-slate-600',
   },
   {
     groupLabel: '유아',
     baseTarget: TargetType.TODDLER,
     plusTarget: TargetType.TODDLER_PLUS,
     plusBadge: '든든',
-    color: 'bg-red-100 text-red-700 border-red-200',
+    color: 'bg-slate-100 text-slate-600',
   },
   {
     groupLabel: '어린이',
     baseTarget: TargetType.CHILD,
     plusTarget: TargetType.CHILD_PLUS,
     plusBadge: '든든',
-    color: 'bg-sky-100 text-sky-700 border-sky-200',
+    color: 'bg-slate-100 text-slate-600',
   },
   {
     groupLabel: '청소연구소',
     baseTarget: TargetType.YOUTH,
     plusTarget: TargetType.YOUTH_MAIN,
     plusBadge: '메인',
-    color: 'bg-violet-100 text-violet-700 border-violet-200',
+    color: 'bg-slate-100 text-slate-600',
   },
 ];
 
@@ -149,59 +149,29 @@ const INGREDIENT_KEYWORDS: Record<string, string[]> = {
 };
 
 const INGREDIENT_COLORS: Record<string, { bg: string; borderL: string; text: string; dot: string; label: string }> = {
-  beef: { bg: 'bg-red-50', borderL: 'border-l-red-400', text: 'text-red-700', dot: 'bg-red-400', label: '소고기' },
-  pork: { bg: 'bg-pink-50', borderL: 'border-l-pink-400', text: 'text-pink-700', dot: 'bg-pink-400', label: '한돈' },
-  chicken: {
-    bg: 'bg-amber-50',
-    borderL: 'border-l-amber-400',
-    text: 'text-amber-700',
-    dot: 'bg-amber-400',
-    label: '닭',
-  },
-  fish: { bg: 'bg-blue-50', borderL: 'border-l-blue-400', text: 'text-blue-700', dot: 'bg-blue-400', label: '생선' },
-  tofu: {
-    bg: 'bg-yellow-50',
-    borderL: 'border-l-yellow-400',
-    text: 'text-yellow-700',
-    dot: 'bg-yellow-400',
-    label: '두부',
-  },
-  egg: {
-    bg: 'bg-orange-50',
-    borderL: 'border-l-orange-400',
-    text: 'text-orange-700',
-    dot: 'bg-orange-400',
-    label: '달걀',
-  },
-  potato: {
-    bg: 'bg-stone-100',
-    borderL: 'border-l-stone-400',
-    text: 'text-stone-700',
-    dot: 'bg-stone-400',
-    label: '감자',
-  },
-  seaweed: {
-    bg: 'bg-emerald-50',
-    borderL: 'border-l-emerald-400',
-    text: 'text-emerald-700',
-    dot: 'bg-emerald-400',
-    label: '해조류',
-  },
+  beef: { bg: 'bg-white', borderL: 'border-l-red-400', text: 'text-gray-700', dot: 'bg-red-400', label: '소고기' },
+  pork: { bg: 'bg-white', borderL: 'border-l-rose-400', text: 'text-gray-700', dot: 'bg-rose-400', label: '한돈' },
+  chicken: { bg: 'bg-white', borderL: 'border-l-amber-400', text: 'text-gray-700', dot: 'bg-amber-400', label: '닭' },
+  fish: { bg: 'bg-white', borderL: 'border-l-sky-400', text: 'text-gray-700', dot: 'bg-sky-400', label: '생선' },
+  tofu: { bg: 'bg-white', borderL: 'border-l-yellow-300', text: 'text-gray-700', dot: 'bg-yellow-300', label: '두부' },
+  egg: { bg: 'bg-white', borderL: 'border-l-orange-300', text: 'text-gray-700', dot: 'bg-orange-300', label: '달걀' },
+  potato: { bg: 'bg-white', borderL: 'border-l-stone-400', text: 'text-gray-700', dot: 'bg-stone-400', label: '감자' },
+  seaweed: { bg: 'bg-white', borderL: 'border-l-teal-400', text: 'text-gray-700', dot: 'bg-teal-400', label: '해조류' },
   mushroom: {
-    bg: 'bg-purple-50',
-    borderL: 'border-l-purple-400',
-    text: 'text-purple-700',
-    dot: 'bg-purple-400',
+    bg: 'bg-white',
+    borderL: 'border-l-violet-300',
+    text: 'text-gray-700',
+    dot: 'bg-violet-300',
     label: '버섯',
   },
   vegetable: {
-    bg: 'bg-green-50',
+    bg: 'bg-white',
     borderL: 'border-l-green-400',
-    text: 'text-green-700',
+    text: 'text-gray-700',
     dot: 'bg-green-400',
     label: '채소',
   },
-  other: { bg: 'bg-gray-50', borderL: 'border-l-gray-300', text: 'text-gray-500', dot: 'bg-gray-300', label: '기타' },
+  other: { bg: 'bg-white', borderL: 'border-l-gray-300', text: 'text-gray-500', dot: 'bg-gray-300', label: '기타' },
 };
 
 function detectIngredient(name: string): string {
@@ -252,12 +222,25 @@ const MenuItemRow: React.FC<{
   date: string;
   targetType: string;
   isEdited: boolean;
+  originalName?: string;
   isPlusOnly?: boolean;
   plusBadge?: string;
   commentCount: number;
   recentComments?: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
-}> = ({ item, idx, date, targetType, isEdited, isPlusOnly, plusBadge, commentCount, recentComments, onAction }) => {
+}> = ({
+  item,
+  idx,
+  date,
+  targetType,
+  isEdited,
+  originalName,
+  isPlusOnly,
+  plusBadge,
+  commentCount,
+  recentComments,
+  onAction,
+}) => {
   const ingredient = detectIngredient(item.name);
   const colors = INGREDIENT_COLORS[ingredient];
   const { cleanName, quantity } = parseMenuItem(item.name);
@@ -265,46 +248,55 @@ const MenuItemRow: React.FC<{
   return (
     <div
       onClick={() => onAction(targetType, idx, item.name)}
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all ${isEdited ? 'ring-1 ring-amber-300' : ''}`}
-      title={item.name}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : ''}`}
+      title={isEdited && originalName ? `변경: ${originalName} → ${cleanName}` : item.name}
     >
       <span className={`${colors.text} truncate flex-1`}>{cleanName}</span>
       {quantity !== null && (
-        <span className="px-1 py-0 text-[9px] font-bold text-gray-500 bg-white/70 rounded shrink-0">{quantity}</span>
+        <span className="px-1 py-0 text-[9px] font-bold text-gray-400 bg-gray-50 rounded shrink-0">{quantity}</span>
       )}
       {isPlusOnly && plusBadge && (
-        <span className="px-1 py-0 text-[9px] font-medium text-amber-700 bg-amber-100 rounded shrink-0">
+        <span className="px-1 py-0 text-[9px] font-medium text-slate-500 bg-slate-100 rounded shrink-0">
           {plusBadge}
         </span>
       )}
-      {isEdited && <span className="text-[9px] text-amber-600 font-medium shrink-0">수정</span>}
+      {isEdited && originalName && (
+        <span className="text-[9px] text-green-600 font-medium shrink-0" title={`${originalName} → ${cleanName}`}>
+          {'\u2713'}
+        </span>
+      )}
       {commentCount > 0 &&
         (() => {
           const hasIssue = recentComments?.some(c => c.status === 'issue');
           const allResolved =
             recentComments && recentComments.length > 0 && recentComments.every(c => c.status === 'resolved');
-          const iconColor = allResolved ? 'text-green-600' : hasIssue ? 'text-amber-600' : 'text-blue-600';
+          const iconColor = allResolved ? 'text-green-600' : hasIssue ? 'text-red-500' : 'text-slate-400';
           return (
             <span className={`relative group/comment flex items-center gap-0.5 text-[9px] ${iconColor} shrink-0`}>
               <MessageSquare className="w-2.5 h-2.5" />
               {commentCount}
               {recentComments && recentComments.length > 0 && (
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-48 p-2 bg-gray-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
-                  {recentComments.slice(-2).map((c, i) => {
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-52 p-2 bg-gray-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
+                  {isEdited && originalName && (
+                    <span className="block mb-1.5 pb-1 border-b border-gray-600 text-green-400 text-[9px]">
+                      {'\u2713'} {originalName} → {cleanName}
+                    </span>
+                  )}
+                  {recentComments.slice(-3).map((c, i) => {
                     const statusColor =
                       c.status === 'resolved'
                         ? 'text-green-400'
                         : c.status === 'issue'
-                          ? 'text-amber-400'
-                          : 'text-white';
-                    const statusPrefix = c.status === 'resolved' ? '\u2713 ' : c.status === 'issue' ? '! ' : '';
+                          ? 'text-red-400'
+                          : 'text-gray-300';
+                    const statusPrefix = c.status === 'resolved' ? '\u2713 ' : c.status === 'issue' ? '\u2717 ' : '';
                     return (
                       <span key={i} className={`block mb-1 last:mb-0 ${statusColor}`}>
                         <span className="font-bold">
                           {statusPrefix}
                           {c.reviewer}:
                         </span>{' '}
-                        {c.comment.length > 30 ? c.comment.slice(0, 30) + '...' : c.comment}
+                        {c.comment.length > 40 ? c.comment.slice(0, 40) + '...' : c.comment}
                       </span>
                     );
                   })}
@@ -327,6 +319,7 @@ const MergedTableCell: React.FC<{
   baseTarget: string;
   plusTarget: string;
   editedKeys: Set<string>;
+  originalNames: Map<string, string>;
   commentCounts: Map<string, number>;
   allComments: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
@@ -338,6 +331,7 @@ const MergedTableCell: React.FC<{
   baseTarget,
   plusTarget,
   editedKeys,
+  originalNames,
   commentCounts,
   allComments,
   onAction,
@@ -367,7 +361,12 @@ const MergedTableCell: React.FC<{
   return (
     <div className="space-y-0.5">
       {displayItems.map((entry, displayIdx) => {
-        const cKey = `${entry.targetType}-${entry.idx}-${parseMenuItem(entry.item.name).cleanName}`;
+        const editKey = `${date}|${entry.targetType}|${entry.idx}`;
+        const isEdited = editedKeys.has(editKey);
+        const origCleanName = originalNames.get(editKey);
+        const cKey = origCleanName
+          ? `${entry.targetType}-${entry.idx}-${origCleanName}`
+          : `${entry.targetType}-${entry.idx}-${parseMenuItem(entry.item.name).cleanName}`;
         const scopeComments = allComments.filter(c => c.scopeKey === cKey);
         return (
           <MenuItemRow
@@ -376,7 +375,8 @@ const MergedTableCell: React.FC<{
             idx={entry.idx}
             date={date}
             targetType={entry.targetType}
-            isEdited={editedKeys.has(`${date}|${entry.targetType}|${entry.idx}`)}
+            isEdited={isEdited}
+            originalName={origCleanName}
             isPlusOnly={entry.isPlusOnly}
             plusBadge={plusBadge}
             commentCount={commentCounts.get(cKey) || 0}
@@ -418,10 +418,11 @@ const TableCell: React.FC<{
   date: string;
   targetType: string;
   editedKeys: Set<string>;
+  originalNames: Map<string, string>;
   commentCounts: Map<string, number>;
   allComments: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
-}> = ({ items, date, targetType, editedKeys, commentCounts, allComments, onAction }) => {
+}> = ({ items, date, targetType, editedKeys, originalNames, commentCounts, allComments, onAction }) => {
   const [expanded, setExpanded] = useState(false);
 
   const validItems = useMemo(
@@ -435,7 +436,12 @@ const TableCell: React.FC<{
   return (
     <div className="space-y-0.5">
       {displayItems.map(({ item, originalIdx }) => {
-        const cKey = `${targetType}-${originalIdx}-${parseMenuItem(item.name).cleanName}`;
+        const editKey = `${date}|${targetType}|${originalIdx}`;
+        const isEdited = editedKeys.has(editKey);
+        const origCleanName = originalNames.get(editKey);
+        const cKey = origCleanName
+          ? `${targetType}-${originalIdx}-${origCleanName}`
+          : `${targetType}-${originalIdx}-${parseMenuItem(item.name).cleanName}`;
         const scopeComments = allComments.filter(c => c.scopeKey === cKey);
         return (
           <MenuItemRow
@@ -444,7 +450,8 @@ const TableCell: React.FC<{
             idx={originalIdx}
             date={date}
             targetType={targetType}
-            isEdited={editedKeys.has(`${date}|${targetType}|${originalIdx}`)}
+            isEdited={isEdited}
+            originalName={origCleanName}
             commentCount={commentCounts.get(cKey) || 0}
             recentComments={scopeComments}
             onAction={(tt, ii, name) => onAction(tt, ii, name)}
@@ -724,8 +731,17 @@ const MealPlanHistory: React.FC = () => {
   }, []);
 
   // 편집 상태
-  const [editedPlans, setEditedPlans] = useState<Map<string, string>>(new Map());
+  const [editedPlans, setEditedPlans] = useState<Map<string, { newName: string; originalName: string }>>(new Map());
   const editedKeys = useMemo(() => new Set(editedPlans.keys()), [editedPlans]);
+
+  // editKey → original cleanName (for scopeKey lookup)
+  const originalNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    editedPlans.forEach((val, key) => {
+      map.set(key, parseMenuItem(val.originalName).cleanName);
+    });
+    return map;
+  }, [editedPlans]);
 
   // 액션/교체/코멘트 상태
   const [actionTarget, setActionTarget] = useState<{
@@ -855,8 +871,8 @@ const MealPlanHistory: React.FC = () => {
     (date: string, targetType: string, items: HistoricalMenuItem[]): HistoricalMenuItem[] => {
       return items.map((item, idx) => {
         const key = `${date}|${targetType}|${idx}`;
-        const editedName = editedPlans.get(key);
-        return editedName ? { ...item, name: editedName } : item;
+        const edited = editedPlans.get(key);
+        return edited ? { ...item, name: edited.newName } : item;
       });
     },
     [editedPlans]
@@ -870,9 +886,12 @@ const MealPlanHistory: React.FC = () => {
       const oldCleanName = parseMenuItem(swapTarget.currentName).cleanName;
       const newCleanName = parseMenuItem(newName).cleanName;
 
+      const existingEdit = editedPlans.get(key);
+      const originalName = existingEdit ? existingEdit.originalName : swapTarget.currentName;
+
       setEditedPlans(prev => {
         const next = new Map(prev);
-        next.set(key, newName);
+        next.set(key, { newName, originalName });
         return next;
       });
 
@@ -917,11 +936,15 @@ const MealPlanHistory: React.FC = () => {
   const handleChooseComment = useCallback(() => {
     if (!actionTarget) return;
     const planKey = makeReviewKey(actionTarget.date, actionTarget.cycleType);
+    const editKey = `${actionTarget.date}|${actionTarget.targetType}|${actionTarget.itemIndex}`;
+    const origCleanName = originalNameMap.get(editKey);
     const { cleanName } = parseMenuItem(actionTarget.menuName);
-    const scopeKey = `${actionTarget.targetType}-${actionTarget.itemIndex}-${cleanName}`;
+    const scopeKey = origCleanName
+      ? `${actionTarget.targetType}-${actionTarget.itemIndex}-${origCleanName}`
+      : `${actionTarget.targetType}-${actionTarget.itemIndex}-${cleanName}`;
     setCommentTarget({ planKey, scopeKey, menuName: actionTarget.menuName });
     setActionTarget(null);
-  }, [actionTarget]);
+  }, [actionTarget, originalNameMap]);
 
   const handleChooseSwap = useCallback(() => {
     if (!actionTarget) return;
@@ -1008,9 +1031,9 @@ const MealPlanHistory: React.FC = () => {
         {(
           [
             { key: 'all' as const, label: '전체', color: 'bg-gray-100 text-gray-700 border-gray-300' },
-            { key: 'pending' as const, label: '검토 대기', color: 'bg-yellow-50 text-yellow-700 border-yellow-300' },
-            { key: 'in_progress' as const, label: '검토중', color: 'bg-blue-50 text-blue-700 border-blue-300' },
-            { key: 'completed' as const, label: '검토 완료', color: 'bg-green-50 text-green-700 border-green-300' },
+            { key: 'pending' as const, label: '대기', color: 'bg-gray-50 text-gray-600 border-gray-300' },
+            { key: 'in_progress' as const, label: '검토중', color: 'bg-blue-50 text-blue-600 border-blue-300' },
+            { key: 'completed' as const, label: '완료', color: 'bg-green-50 text-green-600 border-green-300' },
           ] as const
         ).map(f => (
           <button
@@ -1037,13 +1060,13 @@ const MealPlanHistory: React.FC = () => {
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-20">
               <tr className="bg-gray-50">
-                <th className="sticky left-0 z-30 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
+                <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[72px]">
                   날짜
                 </th>
-                <th className="sticky left-[80px] z-30 bg-gray-50 px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
+                <th className="sticky left-[72px] z-30 bg-gray-50 px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[40px]">
                   주기
                 </th>
-                <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[90px]">
+                <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[68px]">
                   검토상태
                 </th>
                 {columns.map((col, idx) => (
@@ -1072,35 +1095,33 @@ const MealPlanHistory: React.FC = () => {
                     key={`${plan.date}-${plan.cycleType}`}
                     className={`border-b border-gray-100 hover:bg-gray-50/30 ${isCompleted ? 'opacity-60 bg-gray-50/50' : ''}`}
                   >
-                    <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
+                    <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
                       {formatDate(plan.date)}
                     </td>
-                    <td className="sticky left-[80px] z-10 bg-white px-2 py-2 border-r border-gray-200 text-center align-top">
-                      <span
-                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${plan.cycleType === '화수목' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}
-                      >
+                    <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-gray-200 text-center align-top">
+                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600">
                         {plan.cycleType}
                       </span>
                     </td>
-                    <td className="px-2 py-2 border-r border-gray-200 text-center align-top">
+                    <td className="px-1.5 py-2 border-r border-gray-200 text-center align-top">
                       {(() => {
                         const rKey = makeReviewKey(plan.date, plan.cycleType);
                         const record = reviewStatusMap.get(rKey);
                         const cat = record ? getFilterStatus(record.status) : 'pending';
                         const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
                           pending: {
-                            cls: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200',
-                            label: '검토 대기',
+                            cls: 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
+                            label: '대기',
                             icon: Clock,
                           },
                           in_progress: {
-                            cls: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
+                            cls: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',
                             label: '검토중',
                             icon: Shield,
                           },
                           completed: {
-                            cls: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200',
-                            label: '검토 완료',
+                            cls: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100',
+                            label: '완료',
                             icon: CheckCircle,
                           },
                         };
@@ -1166,6 +1187,7 @@ const MealPlanHistory: React.FC = () => {
                               date={plan.date}
                               targetType={col.target}
                               editedKeys={editedKeys}
+                              originalNames={originalNameMap}
                               commentCounts={commentCounts}
                               allComments={commentCache[planKey] || []}
                               onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
@@ -1197,6 +1219,7 @@ const MealPlanHistory: React.FC = () => {
                             baseTarget={col.group.baseTarget}
                             plusTarget={col.group.plusTarget}
                             editedKeys={editedKeys}
+                            originalNames={originalNameMap}
                             commentCounts={commentCounts}
                             allComments={commentCache[mergedPlanKey] || []}
                             onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
