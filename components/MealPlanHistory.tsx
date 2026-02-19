@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,6 +12,8 @@ import {
   MessageSquare,
   Replace,
   Send,
+  Download,
+  FileText,
 } from 'lucide-react';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { useMenu } from '../context/MenuContext';
@@ -38,6 +40,8 @@ import {
   resetDepartmentsForReReview,
 } from '../services/reviewService';
 import HistoryReviewModal from './HistoryReviewModal';
+import HistoryIngredientView from './HistoryIngredientView';
+import HistoryDistributionView from './HistoryDistributionView';
 
 // ── 상수 ──
 
@@ -203,6 +207,50 @@ function parseMenuItem(name: string): { cleanName: string; quantity: number | nu
   return { cleanName: stripped, quantity: null };
 }
 
+// ── 공정 분류 ──
+
+const PROCESS_ORDER = [
+  '국/탕',
+  '냉장국',
+  '냉동국',
+  '밥류',
+  '무침/나물',
+  '볶음',
+  '조림',
+  '전류',
+  '김치/절임',
+  '샐러드',
+  '기타',
+];
+
+const PROCESS_COLORS: Record<string, { bg: string; text: string; badge: string }> = {
+  '국/탕': { bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' },
+  냉장국: { bg: 'bg-cyan-50', text: 'text-cyan-700', badge: 'bg-cyan-100 text-cyan-700' },
+  냉동국: { bg: 'bg-indigo-50', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-700' },
+  밥류: { bg: 'bg-purple-50', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
+  '무침/나물': { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-100 text-green-700' },
+  볶음: { bg: 'bg-orange-50', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
+  조림: { bg: 'bg-amber-50', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700' },
+  전류: { bg: 'bg-yellow-50', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700' },
+  '김치/절임': { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-100 text-red-700' },
+  샐러드: { bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
+  기타: { bg: 'bg-gray-50', text: 'text-gray-600', badge: 'bg-gray-100 text-gray-600' },
+};
+
+function detectProcess(name: string): string {
+  if (name.includes('_냉장') || name.startsWith('냉장')) return '냉장국';
+  if (name.includes('_냉동') || name.startsWith('냉동')) return '냉동국';
+  if (/국$|탕$|찌개$|찌게$|국물|수프/.test(name)) return '국/탕';
+  if (/밥$|죽$|리조또|볶음밥|비빔밥/.test(name)) return '밥류';
+  if (/나물|무침|겉절이|숙채|생채/.test(name)) return '무침/나물';
+  if (/볶음|볶이|잡채/.test(name)) return '볶음';
+  if (/조림|장조림|졸임/.test(name)) return '조림';
+  if (/전$|부침|동그랑땡|까스|커틀릿|튀김/.test(name)) return '전류';
+  if (/김치|깍두기|장아찌|절임|피클/.test(name)) return '김치/절임';
+  if (/샐러드|셀러드/.test(name)) return '샐러드';
+  return '기타';
+}
+
 // ── 주재료 범례 ──
 
 const IngredientLegend: React.FC = () => (
@@ -249,11 +297,12 @@ const MenuItemRow: React.FC<{
   const ingredient = detectIngredient(item.name);
   const colors = INGREDIENT_COLORS[ingredient];
   const { cleanName, quantity } = parseMenuItem(item.name);
+  const hasUnresolvedComment = !isEdited && recentComments?.some(c => c.status === 'comment' || c.status === 'issue');
 
   return (
     <div
       onClick={() => onAction(targetType, idx, item.name)}
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : ''}`}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
       title={isEdited && originalName ? `변경: ${originalName} → ${cleanName}` : item.name}
     >
       <span className={`${colors.text} truncate flex-1`}>{cleanName}</span>
@@ -804,28 +853,37 @@ const MealPlanHistory: React.FC = () => {
     return result;
   }, [monthPlans]);
 
-  // ── 날짜별 생산수량 계산 ──
+  // ── 날짜별 생산수량 계산 (공정별 그룹) ──
   const productionSummary = useMemo(() => {
-    const result = new Map<string, { name: string; qty: number }[]>();
+    const result = new Map<string, { process: string; items: { name: string; qty: number }[]; totalQty: number }[]>();
     for (const plan of monthPlans) {
       const key = `${plan.date}-${plan.cycleType}`;
       const menuQty = new Map<string, number>();
+      const menuProcess = new Map<string, string>();
 
       for (const target of plan.targets) {
         const volume = shipmentConfig[target.targetType]?.[plan.cycleType] || 0;
         if (volume === 0) continue;
-
         for (const item of target.items) {
           if (!isValidMenuItem(item.name)) continue;
           const { cleanName } = parseMenuItem(item.name);
           menuQty.set(cleanName, (menuQty.get(cleanName) || 0) + volume);
+          if (!menuProcess.has(cleanName)) menuProcess.set(cleanName, detectProcess(item.name));
         }
       }
 
-      const sorted = Array.from(menuQty.entries())
-        .map(([name, qty]) => ({ name, qty }))
-        .sort((a, b) => b.qty - a.qty);
-      result.set(key, sorted);
+      const processGroups = new Map<string, { name: string; qty: number }[]>();
+      for (const [name, qty] of menuQty) {
+        const process = menuProcess.get(name) || '기타';
+        if (!processGroups.has(process)) processGroups.set(process, []);
+        processGroups.get(process)!.push({ name, qty });
+      }
+
+      const groups = PROCESS_ORDER.filter(p => processGroups.has(p)).map(p => {
+        const items = processGroups.get(p)!.sort((a, b) => b.qty - a.qty);
+        return { process: p, items, totalQty: items.reduce((s, i) => s + i.qty, 0) };
+      });
+      result.set(key, groups);
     }
     return result;
   }, [monthPlans, shipmentConfig]);
@@ -881,6 +939,45 @@ const MealPlanHistory: React.FC = () => {
     setViewYear(now.getFullYear());
     setViewMonth(now.getMonth());
   }, []);
+
+  const [viewMode, setViewMode] = useState<'plan' | 'ingredient' | 'distribution'>('plan');
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const exportToHistoryCSV = useCallback(() => {
+    if (monthPlans.length === 0) return;
+    const header = '날짜,주기,공정,메뉴명,수량';
+    const rows: string[] = [];
+    for (const plan of monthPlans) {
+      const key = `${plan.date}-${plan.cycleType}`;
+      const groups = productionSummary.get(key) || [];
+      for (const g of groups) {
+        for (const item of g.items) {
+          rows.push(`${plan.date},"${plan.cycleType}","${g.process}","${item.name}",${item.qty}`);
+        }
+      }
+    }
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `식단히스토리_${viewYear}년${viewMonth + 1}월.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [monthPlans, productionSummary, viewYear, viewMonth]);
+
+  const exportToHistoryPDF = useCallback(async () => {
+    if (!contentRef.current) return;
+    const html2pdf = (await import('html2pdf.js')).default;
+    const opt = {
+      margin: [10, 10, 10, 10] as [number, number, number, number],
+      filename: `식단히스토리_${viewYear}년${viewMonth + 1}월.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { orientation: 'landscape' as const, unit: 'mm' as const, format: 'a4' as const } as const,
+    };
+    html2pdf().set(opt).from(contentRef.current).save();
+  }, [viewYear, viewMonth]);
 
   const getItems = useCallback(
     (date: string, targetType: string, items: HistoricalMenuItem[]): HistoricalMenuItem[] => {
@@ -1070,156 +1167,242 @@ const MealPlanHistory: React.FC = () => {
         ))}
       </div>
 
-      <IngredientLegend />
-
-      {/* 테이블 */}
-      {monthPlans.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-          <UtensilsCrossed className="w-12 h-12 mb-3 opacity-50" />
-          <p className="font-medium">이 달의 식단 데이터가 없습니다</p>
+      {/* 뷰 모드 & 내보내기 */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
+          {[
+            { key: 'plan' as const, label: '식단표' },
+            { key: 'ingredient' as const, label: '재료검토' },
+            { key: 'distribution' as const, label: '현장배포' },
+          ].map(v => (
+            <button
+              key={v.key}
+              onClick={() => setViewMode(v.key)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === v.key ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              {v.label}
+            </button>
+          ))}
         </div>
-      ) : (
-        <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
-          <table className="w-full border-collapse">
-            <thead className="sticky top-0 z-20">
-              <tr className="bg-gray-50">
-                <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[72px]">
-                  날짜
-                </th>
-                <th className="sticky left-[72px] z-30 bg-gray-50 px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
-                  주기
-                </th>
-                <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
-                  검토상태
-                </th>
-                <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[120px]">
-                  생산수량
-                </th>
-                {columns.map((col, idx) => (
-                  <th
-                    key={idx}
-                    className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200"
-                    style={{ minWidth: columnWidths[idx] }}
-                  >
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${getColumnColor(col)}`}
-                    >
-                      {getColumnLabel(col)}
-                    </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={exportToHistoryCSV}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            title="CSV 다운로드"
+          >
+            <Download className="w-3.5 h-3.5" /> CSV
+          </button>
+          <button
+            onClick={exportToHistoryPDF}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            title="PDF 다운로드"
+          >
+            <FileText className="w-3.5 h-3.5" /> PDF
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'plan' && <IngredientLegend />}
+
+      {/* 콘텐츠 */}
+      <div ref={contentRef} className="flex-1 flex flex-col min-h-0">
+        {monthPlans.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+            <UtensilsCrossed className="w-12 h-12 mb-3 opacity-50" />
+            <p className="font-medium">이 달의 식단 데이터가 없습니다</p>
+          </div>
+        ) : viewMode === 'ingredient' ? (
+          <HistoryIngredientView
+            monthPlans={monthPlans}
+            productionSummary={productionSummary}
+            formatDate={formatDate}
+          />
+        ) : viewMode === 'distribution' ? (
+          <HistoryDistributionView
+            monthPlans={monthPlans}
+            productionSummary={productionSummary}
+            formatDate={formatDate}
+          />
+        ) : (
+          <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
+            <table className="w-full border-collapse">
+              <thead className="sticky top-0 z-20">
+                <tr className="bg-gray-50">
+                  <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[72px]">
+                    날짜
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {monthPlans.map(plan => {
-                const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
-                const rowRKey = makeReviewKey(plan.date, plan.cycleType);
-                const rowRecord = reviewStatusMap.get(rowRKey);
-                const rowCat = rowRecord ? getFilterStatus(rowRecord.status) : 'pending';
-                const isCompleted = rowCat === 'completed';
-                return (
-                  <tr
-                    key={`${plan.date}-${plan.cycleType}`}
-                    className={`border-b border-gray-100 hover:bg-gray-50/30 ${isCompleted ? 'opacity-60 bg-gray-50/50' : ''}`}
-                  >
-                    <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
-                      {formatDate(plan.date)}
-                    </td>
-                    <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-gray-200 text-center align-top">
-                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
-                        {plan.cycleType}
+                  <th className="sticky left-[72px] z-30 bg-gray-50 px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
+                    주기
+                  </th>
+                  <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
+                    검토상태
+                  </th>
+                  <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[120px]">
+                    생산수량
+                  </th>
+                  {columns.map((col, idx) => (
+                    <th
+                      key={idx}
+                      className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200"
+                      style={{ minWidth: columnWidths[idx] }}
+                    >
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${getColumnColor(col)}`}
+                      >
+                        {getColumnLabel(col)}
                       </span>
-                    </td>
-                    <td className="px-1.5 py-2 border-r border-gray-200 text-center align-top">
-                      {(() => {
-                        const rKey = makeReviewKey(plan.date, plan.cycleType);
-                        const record = reviewStatusMap.get(rKey);
-                        const cat = record ? getFilterStatus(record.status) : 'pending';
-                        const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
-                          pending: {
-                            cls: 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
-                            label: '대기',
-                            icon: Clock,
-                          },
-                          in_progress: {
-                            cls: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',
-                            label: '검토중',
-                            icon: Shield,
-                          },
-                          completed: {
-                            cls: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100',
-                            label: '완료',
-                            icon: CheckCircle,
-                          },
-                        };
-                        const s = styles[cat];
-                        const StatusIcon = s.icon;
-                        const DEPT_LABELS: Record<string, string> = {
-                          quality: '품질',
-                          development: '개발',
-                          process: '공정',
-                        };
-                        return (
-                          <div className="flex flex-col items-center gap-1">
-                            <button
-                              onClick={() => setSelectedReview(plan)}
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors whitespace-nowrap ${s.cls}`}
-                            >
-                              <StatusIcon className="w-3 h-3" />
-                              {s.label}
-                            </button>
-                            {record && record.departments && record.departments.length > 0 && (
-                              <div className="flex flex-col gap-0.5 mt-0.5">
-                                {record.departments.map(dept => (
-                                  <div
-                                    key={dept.department}
-                                    className="flex items-center gap-1 text-[9px] text-gray-500"
-                                  >
-                                    <span
-                                      className={`w-1.5 h-1.5 rounded-full ${
-                                        dept.status === 'approved'
-                                          ? 'bg-green-500'
-                                          : dept.status === 'rejected'
-                                            ? 'bg-red-500'
-                                            : 'bg-gray-300'
-                                      }`}
-                                    />
-                                    <span>{DEPT_LABELS[dept.department] || dept.department}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    {/* 생산수량 */}
-                    <td className="px-1.5 py-2 border-r border-gray-200 align-top">
-                      {(() => {
-                        const sumKey = `${plan.date}-${plan.cycleType}`;
-                        const items = productionSummary.get(sumKey) || [];
-                        if (items.length === 0) {
-                          return <span className="text-[10px] text-gray-300 whitespace-nowrap">설정 필요</span>;
-                        }
-                        return (
-                          <div className="space-y-px">
-                            {items.map(item => (
-                              <div
-                                key={item.name}
-                                className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap"
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {monthPlans.map(plan => {
+                  const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
+                  const rowRKey = makeReviewKey(plan.date, plan.cycleType);
+                  const rowRecord = reviewStatusMap.get(rowRKey);
+                  const rowCat = rowRecord ? getFilterStatus(rowRecord.status) : 'pending';
+                  const isCompleted = rowCat === 'completed';
+                  return (
+                    <tr
+                      key={`${plan.date}-${plan.cycleType}`}
+                      className={`border-b border-gray-100 hover:bg-gray-50/30 ${isCompleted ? 'opacity-60 bg-gray-50/50' : ''}`}
+                    >
+                      <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
+                        {formatDate(plan.date)}
+                      </td>
+                      <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-gray-200 text-center align-top">
+                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
+                          {plan.cycleType}
+                        </span>
+                      </td>
+                      <td className="px-1.5 py-2 border-r border-gray-200 text-center align-top">
+                        {(() => {
+                          const rKey = makeReviewKey(plan.date, plan.cycleType);
+                          const record = reviewStatusMap.get(rKey);
+                          const cat = record ? getFilterStatus(record.status) : 'pending';
+                          const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
+                            pending: {
+                              cls: 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
+                              label: '대기',
+                              icon: Clock,
+                            },
+                            in_progress: {
+                              cls: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',
+                              label: '검토중',
+                              icon: Shield,
+                            },
+                            completed: {
+                              cls: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100',
+                              label: '완료',
+                              icon: CheckCircle,
+                            },
+                          };
+                          const s = styles[cat];
+                          const StatusIcon = s.icon;
+                          const DEPT_LABELS: Record<string, string> = {
+                            quality: '품질',
+                            development: '개발',
+                            process: '공정',
+                          };
+                          return (
+                            <div className="flex flex-col items-center gap-1">
+                              <button
+                                onClick={() => setSelectedReview(plan)}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors whitespace-nowrap ${s.cls}`}
                               >
-                                <span className="text-gray-600 truncate">{item.name}</span>
-                                <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    {columns.map((col, colIdx) => {
-                      if (col.type === 'standalone') {
-                        const target = targetMap.get(col.target);
-                        if (!target)
+                                <StatusIcon className="w-3 h-3" />
+                                {s.label}
+                              </button>
+                              {record && record.departments && record.departments.length > 0 && (
+                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                  {record.departments.map(dept => (
+                                    <div
+                                      key={dept.department}
+                                      className="flex items-center gap-1 text-[9px] text-gray-500"
+                                    >
+                                      <span
+                                        className={`w-1.5 h-1.5 rounded-full ${
+                                          dept.status === 'approved'
+                                            ? 'bg-green-500'
+                                            : dept.status === 'rejected'
+                                              ? 'bg-red-500'
+                                              : 'bg-gray-300'
+                                        }`}
+                                      />
+                                      <span>{DEPT_LABELS[dept.department] || dept.department}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      {/* 생산수량 */}
+                      <td className="px-1.5 py-2 border-r border-gray-200 align-top">
+                        {(() => {
+                          const sumKey = `${plan.date}-${plan.cycleType}`;
+                          const groups = productionSummary.get(sumKey) || [];
+                          if (groups.length === 0) {
+                            return <span className="text-[10px] text-gray-300 whitespace-nowrap">설정 필요</span>;
+                          }
+                          return (
+                            <div className="space-y-1">
+                              {groups.map(group => {
+                                const pc = PROCESS_COLORS[group.process] || PROCESS_COLORS['기타'];
+                                return (
+                                  <div key={group.process}>
+                                    <div className={`text-[9px] font-bold px-1 py-0.5 rounded ${pc.badge} mb-0.5`}>
+                                      {group.process} ({group.totalQty})
+                                    </div>
+                                    {group.items.map(item => (
+                                      <div
+                                        key={item.name}
+                                        className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1"
+                                      >
+                                        <span className="text-gray-600 truncate">{item.name}</span>
+                                        <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      {columns.map((col, colIdx) => {
+                        if (col.type === 'standalone') {
+                          const target = targetMap.get(col.target);
+                          if (!target)
+                            return (
+                              <td
+                                key={colIdx}
+                                className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
+                              >
+                                —
+                              </td>
+                            );
+                          const items = getItems(plan.date, col.target, target.items);
+                          const planKey = makeReviewKey(plan.date, plan.cycleType);
+                          return (
+                            <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                              <TableCell
+                                items={items}
+                                date={plan.date}
+                                targetType={col.target}
+                                editedKeys={editedKeys}
+                                originalNames={originalNameMap}
+                                commentCounts={commentCounts}
+                                allComments={commentCache[planKey] || []}
+                                onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
+                              />
+                            </td>
+                          );
+                        }
+                        const baseData = targetMap.get(col.group.baseTarget);
+                        const plusData = targetMap.get(col.group.plusTarget);
+                        if (!baseData && !plusData)
                           return (
                             <td
                               key={colIdx}
@@ -1228,62 +1411,35 @@ const MealPlanHistory: React.FC = () => {
                               —
                             </td>
                           );
-                        const items = getItems(plan.date, col.target, target.items);
-                        const planKey = makeReviewKey(plan.date, plan.cycleType);
+                        const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
+                        const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
+                        const mergedPlanKey = makeReviewKey(plan.date, plan.cycleType);
                         return (
                           <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
-                            <TableCell
-                              items={items}
+                            <MergedTableCell
+                              baseItems={baseItems}
+                              plusItems={plusItems}
+                              plusBadge={col.group.plusBadge}
                               date={plan.date}
-                              targetType={col.target}
+                              baseTarget={col.group.baseTarget}
+                              plusTarget={col.group.plusTarget}
                               editedKeys={editedKeys}
                               originalNames={originalNameMap}
                               commentCounts={commentCounts}
-                              allComments={commentCache[planKey] || []}
+                              allComments={commentCache[mergedPlanKey] || []}
                               onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
                             />
                           </td>
                         );
-                      }
-                      const baseData = targetMap.get(col.group.baseTarget);
-                      const plusData = targetMap.get(col.group.plusTarget);
-                      if (!baseData && !plusData)
-                        return (
-                          <td
-                            key={colIdx}
-                            className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
-                          >
-                            —
-                          </td>
-                        );
-                      const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
-                      const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
-                      const mergedPlanKey = makeReviewKey(plan.date, plan.cycleType);
-                      return (
-                        <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
-                          <MergedTableCell
-                            baseItems={baseItems}
-                            plusItems={plusItems}
-                            plusBadge={col.group.plusBadge}
-                            date={plan.date}
-                            baseTarget={col.group.baseTarget}
-                            plusTarget={col.group.plusTarget}
-                            editedKeys={editedKeys}
-                            originalNames={originalNameMap}
-                            commentCounts={commentCounts}
-                            allComments={commentCache[mergedPlanKey] || []}
-                            onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* 액션 선택 모달 */}
       {actionTarget && (
