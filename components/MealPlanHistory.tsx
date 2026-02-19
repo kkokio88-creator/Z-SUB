@@ -632,10 +632,15 @@ const CommentModal: React.FC<{
 }> = ({ planKey, scopeKey, menuName, comments, onSubmit, onClose }) => {
   const [text, setText] = useState('');
 
-  const scopeComments = useMemo(
-    () => comments.filter(c => c.scopeKey === scopeKey).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [comments, scopeKey]
-  );
+  const scopeComments = useMemo(() => {
+    if (scopeKey.startsWith('PROD|')) {
+      const cleanName = scopeKey.split('|')[1];
+      return comments
+        .filter(c => c.scopeKey.endsWith(`-${cleanName}`))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    }
+    return comments.filter(c => c.scopeKey === scopeKey).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }, [comments, scopeKey]);
 
   const handleSubmit = () => {
     if (!text.trim()) return;
@@ -652,7 +657,9 @@ const CommentModal: React.FC<{
         <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
           <div>
             <p className="text-sm font-bold text-gray-800">{parseMenuItem(menuName).cleanName}</p>
-            <p className="text-[11px] text-gray-400">코멘트 ({scopeComments.length})</p>
+            <p className="text-[11px] text-gray-400">
+              {scopeKey.startsWith('PROD|') ? '전체 식단 공통 코멘트' : '코멘트'} ({scopeComments.length})
+            </p>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
             <X className="w-4 h-4 text-gray-400" />
@@ -891,7 +898,10 @@ const MealPlanHistory: React.FC = () => {
 
   // ── 타겟별 할인 정보 계산 ──
   const discountSummary = useMemo(() => {
-    const result = new Map<string, { sumRecPrice: number; targetPrice: number; totalCost: number }>();
+    const result = new Map<
+      string,
+      { sumRecPrice: number; targetPrice: number; totalCost: number; targetCostRatio: number }
+    >();
     for (const plan of monthPlans) {
       for (const target of plan.targets) {
         const key = `${plan.date}-${plan.cycleType}-${target.targetType}`;
@@ -912,7 +922,12 @@ const MealPlanHistory: React.FC = () => {
             totalCost += item.cost;
           }
         });
-        result.set(key, { sumRecPrice, targetPrice: config.targetPrice, totalCost });
+        result.set(key, {
+          sumRecPrice,
+          targetPrice: config.targetPrice,
+          totalCost,
+          targetCostRatio: config.targetCostRatio,
+        });
       }
     }
     return result;
@@ -1129,18 +1144,45 @@ const MealPlanHistory: React.FC = () => {
   const handleSubmitComment = useCallback(
     (text: string) => {
       if (!commentTarget) return;
-      addReviewComment(commentTarget.planKey, {
-        department: 'quality',
-        reviewer: user?.displayName || '익명',
-        scope: 'item',
-        scopeKey: commentTarget.scopeKey,
-        comment: text,
-        status: 'comment',
-      });
+
+      if (commentTarget.scopeKey.startsWith('PROD|')) {
+        // Production comment → propagate to all targets containing this menu
+        const cleanName = commentTarget.scopeKey.split('|')[1];
+        const plan = monthPlans.find(p => makeReviewKey(p.date, p.cycleType) === commentTarget.planKey);
+        if (plan) {
+          for (const target of plan.targets) {
+            target.items.forEach((item, idx) => {
+              if (!isValidMenuItem(item.name)) return;
+              const { cleanName: itemClean } = parseMenuItem(item.name);
+              if (itemClean === cleanName) {
+                addReviewComment(commentTarget.planKey, {
+                  department: 'quality',
+                  reviewer: user?.displayName || '익명',
+                  scope: 'item',
+                  scopeKey: `${target.targetType}-${idx}-${cleanName}`,
+                  comment: text,
+                  status: 'comment',
+                });
+              }
+            });
+          }
+          addToast({ type: 'success', title: '코멘트 등록', message: '모든 해당 식단에 의견이 반영되었습니다.' });
+        }
+      } else {
+        addReviewComment(commentTarget.planKey, {
+          department: 'quality',
+          reviewer: user?.displayName || '익명',
+          scope: 'item',
+          scopeKey: commentTarget.scopeKey,
+          comment: text,
+          status: 'comment',
+        });
+        addToast({ type: 'success', title: '코멘트 등록', message: '의견이 등록되었습니다.' });
+      }
+
       loadCommentsForPlan(commentTarget.planKey);
-      addToast({ type: 'success', title: '코멘트 등록', message: '의견이 등록되었습니다.' });
     },
-    [commentTarget, user, loadCommentsForPlan, addToast]
+    [commentTarget, user, loadCommentsForPlan, addToast, monthPlans]
   );
 
   const formatDate = (dateStr: string) => {
@@ -1407,15 +1449,35 @@ const MealPlanHistory: React.FC = () => {
                                 <div className={`text-[9px] font-bold px-1 py-0.5 rounded ${pc.badge} mb-0.5`}>
                                   {group.process} ({group.totalQty})
                                 </div>
-                                {group.items.map(item => (
-                                  <div
-                                    key={item.name}
-                                    className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1"
-                                  >
-                                    <span className="text-gray-600 truncate">{item.name}</span>
-                                    <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
-                                  </div>
-                                ))}
+                                {group.items.map(item => {
+                                  const prodScopePrefix = `PROD|${item.name}`;
+                                  const prodCommentCount = Array.from(commentCounts.entries())
+                                    .filter(([k]) => k.endsWith(`-${item.name}`))
+                                    .reduce((s, [, v]) => s + v, 0);
+                                  return (
+                                    <div
+                                      key={item.name}
+                                      onClick={() => {
+                                        const pk = makeReviewKey(plan.date, plan.cycleType);
+                                        setCommentTarget({
+                                          planKey: pk,
+                                          scopeKey: `PROD|${item.name}`,
+                                          menuName: item.name,
+                                        });
+                                      }}
+                                      className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1 cursor-pointer hover:bg-gray-100 rounded px-0.5 -mx-0.5"
+                                    >
+                                      <span className="text-gray-600 truncate">{item.name}</span>
+                                      <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
+                                      {prodCommentCount > 0 && (
+                                        <span className="text-[8px] text-blue-500 shrink-0">
+                                          <MessageSquare className="w-2.5 h-2.5 inline" />
+                                          {prodCommentCount}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           };
@@ -1445,17 +1507,46 @@ const MealPlanHistory: React.FC = () => {
                           const dInfo = discountSummary.get(discKey);
                           return (
                             <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
-                              {dInfo && dInfo.sumRecPrice > dInfo.targetPrice && (
-                                <div className="mb-1 flex items-center justify-between px-0.5 py-0.5 bg-red-50 rounded text-[9px]">
-                                  <span className="text-gray-500 tabular-nums">
-                                    권장 {dInfo.sumRecPrice.toLocaleString()}
-                                  </span>
-                                  <span className="text-red-500 font-bold tabular-nums">
-                                    -{(dInfo.sumRecPrice - dInfo.targetPrice).toLocaleString()} (
-                                    {(((dInfo.sumRecPrice - dInfo.targetPrice) / dInfo.sumRecPrice) * 100).toFixed(0)}%)
-                                  </span>
-                                </div>
-                              )}
+                              {dInfo &&
+                                (() => {
+                                  const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
+                                  const priceRate =
+                                    dInfo.sumRecPrice > 0 ? (Math.abs(priceDiff) / dInfo.sumRecPrice) * 100 : 0;
+                                  const actualCostRatio =
+                                    dInfo.targetPrice > 0 ? (dInfo.totalCost / dInfo.targetPrice) * 100 : 0;
+                                  const costDiff = actualCostRatio - dInfo.targetCostRatio;
+                                  if (priceDiff === 0 && Math.abs(costDiff) < 0.5) return null;
+                                  return (
+                                    <div className="mb-1 px-1 py-0.5 rounded text-[9px] space-y-0.5">
+                                      {priceDiff !== 0 && (
+                                        <div
+                                          className={`flex items-center justify-between ${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
+                                        >
+                                          <span className="text-gray-500">
+                                            판매 {dInfo.targetPrice.toLocaleString()}
+                                          </span>
+                                          <span className="font-bold tabular-nums">
+                                            {priceDiff > 0 ? '초과' : '할인'} {priceDiff > 0 ? '+' : ''}
+                                            {priceDiff.toLocaleString()}원 ({priceRate.toFixed(0)}%)
+                                          </span>
+                                        </div>
+                                      )}
+                                      <div
+                                        className={`flex items-center justify-between ${costDiff > 0.5 ? 'text-red-400' : costDiff < -0.5 ? 'text-emerald-500' : 'text-gray-400'}`}
+                                      >
+                                        <span className="text-gray-400">원가 {actualCostRatio.toFixed(1)}%</span>
+                                        <span className="font-medium tabular-nums">
+                                          가이드 {dInfo.targetCostRatio}%{' '}
+                                          {costDiff > 0.5
+                                            ? `+${costDiff.toFixed(1)}%p`
+                                            : costDiff < -0.5
+                                              ? `${costDiff.toFixed(1)}%p`
+                                              : '적정'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               <TableCell
                                 items={items}
                                 date={plan.date}
@@ -1489,40 +1580,54 @@ const MealPlanHistory: React.FC = () => {
                         const plusDInfo = discountSummary.get(plusDiscKey);
                         return (
                           <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
-                            {(baseDInfo || plusDInfo) && (
-                              <div className="mb-1 space-y-0.5">
-                                {baseDInfo && baseDInfo.sumRecPrice > baseDInfo.targetPrice && (
-                                  <div className="flex items-center justify-between px-0.5 py-0.5 bg-red-50 rounded text-[9px]">
-                                    <span className="text-gray-500 tabular-nums">
-                                      권장 {baseDInfo.sumRecPrice.toLocaleString()}
-                                    </span>
-                                    <span className="text-red-500 font-bold tabular-nums">
-                                      -{(baseDInfo.sumRecPrice - baseDInfo.targetPrice).toLocaleString()} (
-                                      {(
-                                        ((baseDInfo.sumRecPrice - baseDInfo.targetPrice) / baseDInfo.sumRecPrice) *
-                                        100
-                                      ).toFixed(0)}
-                                      %)
-                                    </span>
+                            {(() => {
+                              const renderDiscBadge = (dI: typeof baseDInfo, label?: string) => {
+                                if (!dI) return null;
+                                const pDiff = dI.sumRecPrice - dI.targetPrice;
+                                const pRate = dI.sumRecPrice > 0 ? (Math.abs(pDiff) / dI.sumRecPrice) * 100 : 0;
+                                const aCR = dI.targetPrice > 0 ? (dI.totalCost / dI.targetPrice) * 100 : 0;
+                                const cDiff = aCR - dI.targetCostRatio;
+                                if (pDiff === 0 && Math.abs(cDiff) < 0.5) return null;
+                                return (
+                                  <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
+                                    {label && <span className="text-gray-400 text-[8px]">{label}</span>}
+                                    {pDiff !== 0 && (
+                                      <div
+                                        className={`flex items-center justify-between ${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
+                                      >
+                                        <span className="text-gray-500">판매 {dI.targetPrice.toLocaleString()}</span>
+                                        <span className="font-bold tabular-nums">
+                                          {pDiff > 0 ? '초과' : '할인'} {pDiff > 0 ? '+' : ''}
+                                          {pDiff.toLocaleString()}원 ({pRate.toFixed(0)}%)
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div
+                                      className={`flex items-center justify-between ${cDiff > 0.5 ? 'text-red-400' : cDiff < -0.5 ? 'text-emerald-500' : 'text-gray-400'}`}
+                                    >
+                                      <span className="text-gray-400">원가 {aCR.toFixed(1)}%</span>
+                                      <span className="font-medium tabular-nums">
+                                        가이드 {dI.targetCostRatio}%{' '}
+                                        {cDiff > 0.5
+                                          ? `+${cDiff.toFixed(1)}%p`
+                                          : cDiff < -0.5
+                                            ? `${cDiff.toFixed(1)}%p`
+                                            : '적정'}
+                                      </span>
+                                    </div>
                                   </div>
-                                )}
-                                {plusDInfo && plusDInfo.sumRecPrice > plusDInfo.targetPrice && (
-                                  <div className="flex items-center justify-between px-0.5 py-0.5 bg-orange-50 rounded text-[9px]">
-                                    <span className="text-gray-400 tabular-nums">
-                                      {col.group.plusBadge} {plusDInfo.sumRecPrice.toLocaleString()}
-                                    </span>
-                                    <span className="text-orange-500 font-bold tabular-nums">
-                                      -{(plusDInfo.sumRecPrice - plusDInfo.targetPrice).toLocaleString()} (
-                                      {(
-                                        ((plusDInfo.sumRecPrice - plusDInfo.targetPrice) / plusDInfo.sumRecPrice) *
-                                        100
-                                      ).toFixed(0)}
-                                      %)
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                );
+                              };
+                              const baseEl = renderDiscBadge(baseDInfo);
+                              const plusEl = renderDiscBadge(plusDInfo, col.group.plusBadge);
+                              if (!baseEl && !plusEl) return null;
+                              return (
+                                <div className="mb-1 space-y-0.5">
+                                  {baseEl}
+                                  {plusEl}
+                                </div>
+                              );
+                            })()}
                             <MergedTableCell
                               baseItems={baseItems}
                               plusItems={plusItems}

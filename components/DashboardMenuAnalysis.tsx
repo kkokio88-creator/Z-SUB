@@ -1,322 +1,203 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import { Layers, Search, BookOpen, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { BarChart3 } from 'lucide-react';
 import { useMenu } from '../context/MenuContext';
-import { useHistoricalPlans } from '../context/HistoricalPlansContext';
-import {
-  buildSimilarMenuClusters,
-  analyzeKoreanBanchanGap,
-  analyzeTagGapByCategory,
-  analyzeHistoryForTags,
-  TagSuggestion,
-} from '../services/tagAnalysisService';
+import { MAJOR_INGREDIENTS } from '../constants';
+import { MenuCategory, TasteProfile } from '../types';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart, Cell } from 'recharts';
 
-const TRAFFIC_LIGHT = {
-  ok: 'bg-green-100 text-green-700',
-  warn: 'bg-yellow-100 text-yellow-700',
-  danger: 'bg-red-100 text-red-700',
+const TASTE_LABELS: Record<string, string> = {
+  [TasteProfile.SPICY]: '매운맛',
+  [TasteProfile.OILY]: '느끼함',
+  [TasteProfile.SALTY]: '짭짤함',
+  [TasteProfile.SWEET]: '달콤함',
+  [TasteProfile.BLAND]: '담백함',
 };
 
-type TabId = 'clusters' | 'gaps' | 'history';
-
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: 'clusters', label: '유사 메뉴 클러스터', icon: <Layers className="w-4 h-4" /> },
-  { id: 'gaps', label: '반찬 갭 + 태깅률', icon: <Search className="w-4 h-4" /> },
-  { id: 'history', label: '히스토리 태그 학습', icon: <BookOpen className="w-4 h-4" /> },
-];
-
 const DashboardMenuAnalysis: React.FC = () => {
-  const { menuItems, updateItem, saveToStorage } = useMenu();
-  const { plans } = useHistoricalPlans();
-  const [activeTab, setActiveTab] = useState<TabId>('clusters');
-  const [showAllClusters, setShowAllClusters] = useState(false);
-  const [tagFilter, setTagFilter] = useState<'all' | '아이선호' | '시니어'>('all');
-  const [appliedTags, setAppliedTags] = useState<Set<string>>(new Set());
+  const { menuItems } = useMenu();
 
-  // ── 데이터 계산 ──
-  const clusters = useMemo(() => buildSimilarMenuClusters(menuItems), [menuItems]);
-  const banchanGaps = useMemo(() => analyzeKoreanBanchanGap(menuItems), [menuItems]);
-  const tagGaps = useMemo(() => analyzeTagGapByCategory(menuItems), [menuItems]);
-  const historySuggestions = useMemo(() => analyzeHistoryForTags(plans, menuItems), [plans, menuItems]);
+  const activeMenus = useMemo(() => menuItems.filter(m => !m.isUnused), [menuItems]);
 
-  const filteredSuggestions = useMemo(() => {
-    if (tagFilter === 'all') return historySuggestions;
-    return historySuggestions.filter(s => s.suggestedTag === tagFilter);
-  }, [historySuggestions, tagFilter]);
-
-  const missingBanchan = useMemo(() => banchanGaps.filter(g => !g.hasMatch).length, [banchanGaps]);
-  const dangerCategories = useMemo(
-    () => tagGaps.filter(g => g.kidStatus === 'danger' || g.seniorStatus === 'danger').length,
-    [tagGaps]
-  );
-
-  // ── 태그 추가 핸들러 ──
-  const handleAddTag = useCallback(
-    (suggestion: TagSuggestion) => {
-      const item = menuItems.find(m => m.id === suggestion.menuId);
-      if (!item || item.tags.includes(suggestion.suggestedTag)) return;
-      const updated = { ...item, tags: [...item.tags, suggestion.suggestedTag] };
-      updateItem(item.id, updated);
-      setAppliedTags(prev => new Set(prev).add(`${item.id}-${suggestion.suggestedTag}`));
-    },
-    [menuItems, updateItem]
-  );
-
-  const handleAddAll = useCallback(() => {
-    for (const s of filteredSuggestions) {
-      const key = `${s.menuId}-${s.suggestedTag}`;
-      if (appliedTags.has(key)) continue;
-      const item = menuItems.find(m => m.id === s.menuId);
-      if (!item || item.tags.includes(s.suggestedTag)) continue;
-      const updated = { ...item, tags: [...item.tags, s.suggestedTag] };
-      updateItem(item.id, updated);
-      setAppliedTags(prev => new Set(prev).add(key));
+  // ── Section A: 주재료 분포 ──
+  const ingredientData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of activeMenus) {
+      if (m.mainIngredient) {
+        counts[m.mainIngredient] = (counts[m.mainIngredient] || 0) + 1;
+      }
     }
-    saveToStorage();
-  }, [filteredSuggestions, appliedTags, menuItems, updateItem, saveToStorage]);
+    const labelMap = new Map(MAJOR_INGREDIENTS.map(i => [i.key, i.label]));
+    return Object.entries(counts)
+      .map(([key, count]) => ({
+        key,
+        label: labelMap.get(key) || key,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [activeMenus]);
+
+  const maxIngredientCount = useMemo(() => Math.max(...ingredientData.map(d => d.count), 1), [ingredientData]);
+
+  // ── Section B: 태그 분석 ──
+  const tagData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of activeMenus) {
+      for (const tag of m.tags) {
+        counts[tag] = (counts[tag] || 0) + 1;
+      }
+    }
+    return Object.entries(counts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [activeMenus]);
+
+  const maxTagCount = useMemo(() => Math.max(...tagData.map(d => d.count), 1), [tagData]);
+
+  // ── Section C: 맛 프로필 × 카테고리 매트릭스 ──
+  const tasteCategories = Object.values(MenuCategory);
+  const tasteProfiles = Object.values(TasteProfile);
+
+  const tasteMatrix = useMemo(() => {
+    const matrix: Record<string, Record<string, number>> = {};
+    for (const taste of tasteProfiles) {
+      matrix[taste] = {};
+      for (const cat of tasteCategories) {
+        matrix[taste][cat] = 0;
+      }
+    }
+    for (const m of activeMenus) {
+      for (const taste of m.tastes) {
+        if (matrix[taste]?.[m.category] !== undefined) {
+          matrix[taste][m.category]++;
+        }
+      }
+    }
+    return matrix;
+  }, [activeMenus, tasteProfiles, tasteCategories]);
+
+  const maxMatrixValue = useMemo(() => {
+    let max = 1;
+    for (const taste of tasteProfiles) {
+      for (const cat of tasteCategories) {
+        if (tasteMatrix[taste][cat] > max) max = tasteMatrix[taste][cat];
+      }
+    }
+    return max;
+  }, [tasteMatrix, tasteProfiles, tasteCategories]);
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-      <h3 className="text-lg font-bold text-gray-800 mb-4">메뉴 분석</h3>
-
-      {/* 탭 네비게이션 */}
-      <div className="flex gap-1 border-b border-gray-200 mb-5">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-8">
+      <div className="flex items-center gap-2">
+        <BarChart3 className="w-5 h-5 text-gray-500" />
+        <h3 className="text-lg font-bold text-gray-800">메뉴 분석</h3>
+        <span className="text-xs text-gray-400 ml-2">활성 메뉴 {activeMenus.length}개 기준</span>
       </div>
 
-      {/* ── 탭 1: 유사 메뉴 클러스터 ── */}
-      {activeTab === 'clusters' && (
-        <div>
-          <p className="text-xs text-gray-500 mb-3">유사한 이름의 메뉴를 그룹핑 ({clusters.length}개 클러스터)</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(showAllClusters ? clusters : clusters.slice(0, 10)).map((cluster, idx) => (
-              <div key={idx} className="border border-gray-100 rounded-lg p-3 hover:bg-gray-50/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-gray-800">{cluster.representative}</span>
-                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                    {cluster.members.length}개
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {cluster.members.map(m => (
-                    <span key={m.id} className="text-[11px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                      {m.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+      {/* Section A: 주재료 분포 */}
+      <div>
+        <h4 className="text-sm font-bold text-gray-700 mb-3">주재료 분포</h4>
+        {ingredientData.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">주재료 데이터가 없습니다</div>
+        ) : (
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ingredientData} layout="vertical" margin={{ top: 5, right: 30, left: 70, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="label" tick={{ fontSize: 12 }} width={65} />
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: any) => [`${value}개`, '메뉴 수']}
+                />
+                <Bar dataKey="count" name="메뉴 수" radius={[0, 4, 4, 0]}>
+                  {ingredientData.map((entry, index) => {
+                    const ratio = entry.count / maxIngredientCount;
+                    const r = Math.round(59 + (1 - ratio) * 170);
+                    const g = Math.round(130 + (1 - ratio) * 100);
+                    const b = Math.round(246 - ratio * 100);
+                    return <Cell key={index} fill={`rgb(${r}, ${g}, ${b})`} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-          {clusters.length > 10 && (
-            <button
-              onClick={() => setShowAllClusters(v => !v)}
-              className="flex items-center gap-1 mt-3 text-sm text-blue-600 hover:text-blue-800"
-            >
-              {showAllClusters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              {showAllClusters ? '접기' : `전체 보기 (${clusters.length}개)`}
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* ── 탭 2: 반찬 갭 + 태깅률 ── */}
-      {activeTab === 'gaps' && (
-        <div className="space-y-6">
-          {/* 요약 */}
-          <div className="flex gap-4 text-sm">
-            <span
-              className={`px-3 py-1 rounded ${missingBanchan > 5 ? TRAFFIC_LIGHT.danger : missingBanchan > 0 ? TRAFFIC_LIGHT.warn : TRAFFIC_LIGHT.ok}`}
-            >
-              없는 반찬: {missingBanchan}개
-            </span>
-            <span className={`px-3 py-1 rounded ${dangerCategories > 0 ? TRAFFIC_LIGHT.danger : TRAFFIC_LIGHT.ok}`}>
-              부족 카테고리: {dangerCategories}개
-            </span>
-          </div>
-
-          {/* 한식 반찬 매칭 테이블 */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">한식 반찬 레퍼런스 매칭</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">반찬명</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">분류</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">상태</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">매칭 메뉴</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {banchanGaps.map((gap, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{gap.reference.name}</td>
-                      <td className="px-3 py-1.5 text-xs text-gray-500">{gap.reference.category}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${gap.hasMatch ? TRAFFIC_LIGHT.ok : TRAFFIC_LIGHT.danger}`}
-                        >
-                          {gap.hasMatch ? '있음' : '없음'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-gray-500 max-w-[200px] truncate">
-                        {gap.matchedMenus.length > 0 ? gap.matchedMenus.slice(0, 3).join(', ') : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* 카테고리별 태깅률 */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">카테고리별 태깅률</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">카테고리</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">활성 메뉴</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">아이선호</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">시니어</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {tagGaps.map(gap => (
-                    <tr key={gap.category} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-1.5 text-xs font-medium text-gray-700">{gap.category}</td>
-                      <td className="px-3 py-1.5 text-center text-xs text-gray-600">{gap.totalActive}개</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${TRAFFIC_LIGHT[gap.kidStatus]}`}
-                        >
-                          {gap.kidTagged}개 ({gap.kidRate}%)
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${TRAFFIC_LIGHT[gap.seniorStatus]}`}
-                        >
-                          {gap.seniorTagged}개 ({gap.seniorRate}%)
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 탭 3: 히스토리 태그 학습 ── */}
-      {activeTab === 'history' && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-gray-500">
-              히스토리에서 2회+ 사용되었지만 태그 없는 메뉴 ({filteredSuggestions.length}건)
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1">
-                {(['all', '아이선호', '시니어'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setTagFilter(f)}
-                    className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                      tagFilter === f ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {f === 'all' ? '전체' : f}
-                  </button>
-                ))}
-              </div>
-              {filteredSuggestions.length > 0 && (
-                <button
-                  onClick={handleAddAll}
-                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+      {/* Section B: 태그 분석 */}
+      <div>
+        <h4 className="text-sm font-bold text-gray-700 mb-3">태그 분석</h4>
+        {tagData.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">태그 데이터가 없습니다</div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {tagData.map(({ tag, count }) => {
+              const ratio = count / maxTagCount;
+              const bg =
+                ratio > 0.7
+                  ? 'bg-blue-600 text-white'
+                  : ratio > 0.4
+                    ? 'bg-blue-400 text-white'
+                    : ratio > 0.2
+                      ? 'bg-blue-200 text-blue-800'
+                      : 'bg-blue-50 text-blue-600';
+              return (
+                <span
+                  key={tag}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${bg}`}
                 >
-                  전체 추가
-                </button>
-              )}
-            </div>
+                  {tag}
+                  <span className="opacity-75 text-[10px]">{count}</span>
+                </span>
+              );
+            })}
           </div>
+        )}
+      </div>
 
-          {filteredSuggestions.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              {plans.length === 0 ? '히스토리 데이터가 없습니다' : '추천할 태그가 없습니다'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">메뉴명</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">카테고리</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">추천 태그</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">사용 횟수</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">식단 유형</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">액션</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredSuggestions.map(s => {
-                    const key = `${s.menuId}-${s.suggestedTag}`;
-                    const isApplied = appliedTags.has(key);
+      {/* Section C: 맛 프로필 x 카테고리 매트릭스 */}
+      <div>
+        <h4 className="text-sm font-bold text-gray-700 mb-3">맛 프로필 x 카테고리 매트릭스</h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-3 py-2 text-left text-[11px] font-semibold text-gray-500">맛</th>
+                {tasteCategories.map(cat => (
+                  <th key={cat} className="px-3 py-2 text-center text-[11px] font-semibold text-gray-500">
+                    {cat}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {tasteProfiles.map(taste => (
+                <tr key={taste} className="hover:bg-gray-50/30">
+                  <td className="px-3 py-2 text-xs font-medium text-gray-700 whitespace-nowrap">
+                    {TASTE_LABELS[taste] || taste}
+                  </td>
+                  {tasteCategories.map(cat => {
+                    const value = tasteMatrix[taste][cat];
+                    const ratio = value / maxMatrixValue;
+                    let cellClass = 'bg-gray-50 text-gray-400';
+                    if (value > 0) {
+                      if (ratio > 0.7) cellClass = 'bg-blue-500 text-white font-bold';
+                      else if (ratio > 0.4) cellClass = 'bg-blue-300 text-blue-900 font-semibold';
+                      else if (ratio > 0.15) cellClass = 'bg-blue-100 text-blue-700';
+                      else cellClass = 'bg-blue-50 text-blue-600';
+                    }
                     return (
-                      <tr key={key} className="hover:bg-gray-50/50">
-                        <td className="px-3 py-1.5 text-xs font-medium text-gray-700">{s.menuName}</td>
-                        <td className="px-3 py-1.5 text-xs text-gray-500">{s.category}</td>
-                        <td className="px-3 py-1.5 text-center">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${
-                              s.suggestedTag === '아이선호'
-                                ? 'bg-pink-100 text-pink-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                            }`}
-                          >
-                            {s.suggestedTag}
-                          </span>
-                        </td>
-                        <td className="px-3 py-1.5 text-center text-xs text-gray-600">{s.usageCount}회</td>
-                        <td className="px-3 py-1.5 text-xs text-gray-500 max-w-[150px] truncate">
-                          {s.usedInTargets.map(t => t.replace(/ 식단$/, '')).join(', ')}
-                        </td>
-                        <td className="px-3 py-1.5 text-center">
-                          {isApplied ? (
-                            <span className="inline-flex items-center gap-0.5 text-green-600 text-xs">
-                              <Check className="w-3.5 h-3.5" /> 추가됨
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleAddTag(s)}
-                              className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                            >
-                              태그 추가
-                            </button>
-                          )}
-                        </td>
-                      </tr>
+                      <td key={cat} className="px-1 py-1">
+                        <div className={`rounded px-2 py-1.5 text-center text-xs ${cellClass}`}>{value}</div>
+                      </td>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 };
