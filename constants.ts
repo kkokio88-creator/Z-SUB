@@ -13,6 +13,55 @@ export const MAJOR_INGREDIENTS = [
   { key: 'vegetable', label: '채소' },
 ];
 
+export interface BanchanReference {
+  name: string;
+  category: string;
+  keywords: string[];
+}
+
+export const KOREAN_BANCHAN_REFERENCE: BanchanReference[] = [
+  // 나물류
+  { name: '시금치나물', category: '나물', keywords: ['시금치'] },
+  { name: '콩나물무침', category: '나물', keywords: ['콩나물'] },
+  { name: '숙주나물', category: '나물', keywords: ['숙주'] },
+  { name: '고사리나물', category: '나물', keywords: ['고사리'] },
+  { name: '도라지무침', category: '나물', keywords: ['도라지'] },
+  { name: '미나리무침', category: '나물', keywords: ['미나리'] },
+  { name: '무나물', category: '나물', keywords: ['무나물'] },
+  { name: '브로콜리무침', category: '나물', keywords: ['브로콜리'] },
+  // 조림류
+  { name: '감자조림', category: '조림', keywords: ['감자조림'] },
+  { name: '우엉조림', category: '조림', keywords: ['우엉'] },
+  { name: '연근조림', category: '조림', keywords: ['연근'] },
+  { name: '장조림', category: '조림', keywords: ['장조림'] },
+  { name: '두부조림', category: '조림', keywords: ['두부조림'] },
+  { name: '메추리알조림', category: '조림', keywords: ['메추리알'] },
+  // 볶음류
+  { name: '멸치볶음', category: '볶음', keywords: ['멸치볶음', '멸치'] },
+  { name: '어묵볶음', category: '볶음', keywords: ['어묵볶음', '어묵'] },
+  { name: '버섯볶음', category: '볶음', keywords: ['버섯볶음'] },
+  { name: '호박볶음', category: '볶음', keywords: ['호박볶음', '애호박'] },
+  { name: '감자채볶음', category: '볶음', keywords: ['감자채'] },
+  { name: '김치볶음', category: '볶음', keywords: ['김치볶음'] },
+  // 전류
+  { name: '동그랑땡', category: '전', keywords: ['동그랑땡'] },
+  { name: '호박전', category: '전', keywords: ['호박전'] },
+  { name: '김치전', category: '전', keywords: ['김치전'] },
+  { name: '부추전', category: '전', keywords: ['부추전'] },
+  // 김치류
+  { name: '배추김치', category: '김치', keywords: ['배추김치', '배추'] },
+  { name: '깍두기', category: '김치', keywords: ['깍두기'] },
+  { name: '총각김치', category: '김치', keywords: ['총각'] },
+  { name: '백김치', category: '김치', keywords: ['백김치'] },
+  // 국/찌개류
+  { name: '된장찌개', category: '국/찌개', keywords: ['된장찌개', '된장'] },
+  { name: '미역국', category: '국/찌개', keywords: ['미역국'] },
+  { name: '시래기국', category: '국/찌개', keywords: ['시래기'] },
+  { name: '소고기무국', category: '국/찌개', keywords: ['소고기무국', '소고기무'] },
+  { name: '콩나물국', category: '국/찌개', keywords: ['콩나물국'] },
+  { name: '배추국', category: '국/찌개', keywords: ['배추국'] },
+];
+
 export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
   [TargetType.KIDS]: {
     target: TargetType.KIDS,

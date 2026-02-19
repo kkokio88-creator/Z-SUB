@@ -31,7 +31,12 @@ import {
   getFilterStatus,
   type ReviewFilterCategory,
 } from '../services/historyReviewService';
-import { addReviewComment, getReviewComments, resolveComment } from '../services/reviewService';
+import {
+  addReviewComment,
+  getReviewComments,
+  resolveComment,
+  resetDepartmentsForReReview,
+} from '../services/reviewService';
 import HistoryReviewModal from './HistoryReviewModal';
 
 // ── 상수 ──
@@ -336,8 +341,6 @@ const MergedTableCell: React.FC<{
   allComments,
   onAction,
 }) => {
-  const [expanded, setExpanded] = useState(false);
-
   const baseNameSet = new Set(baseItems.filter(i => isValidMenuItem(i.name)).map(i => parseMenuItem(i.name).cleanName));
   const allItems: { item: HistoricalMenuItem; isPlusOnly: boolean; targetType: string; idx: number }[] = [];
 
@@ -355,12 +358,9 @@ const MergedTableCell: React.FC<{
     }
   });
 
-  const displayItems = expanded ? allItems : allItems.slice(0, 8);
-  const hasMore = allItems.length > 8;
-
   return (
     <div className="space-y-0.5">
-      {displayItems.map((entry, displayIdx) => {
+      {allItems.map((entry, displayIdx) => {
         const editKey = `${date}|${entry.targetType}|${entry.idx}`;
         const isEdited = editedKeys.has(editKey);
         const origCleanName = originalNames.get(editKey);
@@ -385,28 +385,6 @@ const MergedTableCell: React.FC<{
           />
         );
       })}
-      {hasMore && !expanded && (
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            setExpanded(true);
-          }}
-          className="text-[10px] text-blue-500 hover:text-blue-700 font-medium pl-1"
-        >
-          +{allItems.length - 8}개 더보기
-        </button>
-      )}
-      {hasMore && expanded && (
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            setExpanded(false);
-          }}
-          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
-        >
-          접기
-        </button>
-      )}
     </div>
   );
 };
@@ -423,19 +401,14 @@ const TableCell: React.FC<{
   allComments: ReviewComment[];
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
 }> = ({ items, date, targetType, editedKeys, originalNames, commentCounts, allComments, onAction }) => {
-  const [expanded, setExpanded] = useState(false);
-
   const validItems = useMemo(
     () => items.map((item, idx) => ({ item, originalIdx: idx })).filter(({ item }) => isValidMenuItem(item.name)),
     [items]
   );
 
-  const displayItems = expanded ? validItems : validItems.slice(0, 8);
-  const hasMore = validItems.length > 8;
-
   return (
     <div className="space-y-0.5">
-      {displayItems.map(({ item, originalIdx }) => {
+      {validItems.map(({ item, originalIdx }) => {
         const editKey = `${date}|${targetType}|${originalIdx}`;
         const isEdited = editedKeys.has(editKey);
         const origCleanName = originalNames.get(editKey);
@@ -458,28 +431,6 @@ const TableCell: React.FC<{
           />
         );
       })}
-      {hasMore && !expanded && (
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            setExpanded(true);
-          }}
-          className="text-[10px] text-blue-500 hover:text-blue-700 font-medium pl-1"
-        >
-          +{validItems.length - 8}개 더보기
-        </button>
-      )}
-      {hasMore && expanded && (
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            setExpanded(false);
-          }}
-          className="text-[10px] text-gray-400 hover:text-gray-600 pl-1"
-        >
-          접기
-        </button>
-      )}
     </div>
   );
 };
@@ -842,6 +793,77 @@ const MealPlanHistory: React.FC = () => {
     return result;
   }, [monthPlans]);
 
+  // ── 카테고리 감지 + 날짜별 메뉴 종합 ──
+  const detectMenuGubun = useCallback((rawName: string): string => {
+    const name = rawName.replace(/\s+/g, '');
+    const clean = name.replace(/_냉장|_반조리|_냉동/g, '');
+    const isFrozen = name.includes('_냉동') || name.includes('냉동');
+    const isRefrig = name.includes('_냉장') || name.includes('냉장');
+
+    if (/국|찌개|탕/.test(clean)) {
+      if (isFrozen) return '냉동국';
+      if (isRefrig) return '냉장국';
+      return '국/탕';
+    }
+    if (/무침|나물/.test(clean)) return '무침/나물';
+    if (/볶음/.test(clean)) return '볶음';
+    if (/조림/.test(clean)) return '조림';
+    if (/전$/.test(clean) || /동그랑땡|계란말이|호박전|김치전|부추전|파전/.test(clean)) return '전류';
+    if (/김치|깍두기|총각|겉절이|백김치|장아찌/.test(clean)) return '김치/절임';
+    if (/밥$|덮밥|볶음밥|비빔밥|주먹밥|오므라이스/.test(clean)) return '밥류';
+    if (/샐러드|피클/.test(clean)) return '샐러드';
+    return '기타';
+  }, []);
+
+  const categorySummary = useMemo(() => {
+    const result = new Map<string, { cat: string; count: number }[]>();
+    for (const plan of monthPlans) {
+      const key = `${plan.date}-${plan.cycleType}`;
+      const catNames = new Map<string, Set<string>>();
+      for (const target of plan.targets) {
+        for (const item of target.items) {
+          if (!isValidMenuItem(item.name)) continue;
+          const { cleanName } = parseMenuItem(item.name);
+          const cat = detectMenuGubun(item.name);
+          if (!catNames.has(cat)) catNames.set(cat, new Set());
+          catNames.get(cat)!.add(cleanName);
+        }
+      }
+      const sorted = Array.from(catNames.entries())
+        .map(([cat, names]) => ({ cat, count: names.size }))
+        .sort((a, b) => b.count - a.count);
+      result.set(key, sorted);
+    }
+    return result;
+  }, [monthPlans, detectMenuGubun]);
+
+  // ── 열 너비 자동 계산 ──
+  const columnWidths = useMemo(() => {
+    return columns.map(col => {
+      let maxItems = 0;
+      for (const plan of monthPlans) {
+        const targetMap = new Map(plan.targets.map(t => [t.targetType, t]));
+        if (col.type === 'standalone') {
+          const target = targetMap.get(col.target);
+          if (target) {
+            const validCount = target.items.filter(i => isValidMenuItem(i.name)).length;
+            maxItems = Math.max(maxItems, validCount);
+          }
+        } else {
+          const base = targetMap.get(col.group.baseTarget);
+          const plus = targetMap.get(col.group.plusTarget);
+          const baseCount = base ? base.items.filter(i => isValidMenuItem(i.name)).length : 0;
+          const plusCount = plus ? plus.items.filter(i => isValidMenuItem(i.name)).length : 0;
+          maxItems = Math.max(maxItems, baseCount + plusCount);
+        }
+      }
+      if (maxItems <= 4) return 120;
+      if (maxItems <= 6) return 140;
+      if (maxItems <= 8) return 160;
+      return 180;
+    });
+  }, [columns, monthPlans]);
+
   // 네비게이션
   const goToPrevMonth = useCallback(() => {
     setViewMonth(m => {
@@ -918,11 +940,19 @@ const MealPlanHistory: React.FC = () => {
         comment: `메뉴 변경 완료: "${oldCleanName}" → "${newCleanName}"`,
         status: 'resolved',
       });
+
+      // 원래 검토 의견을 남긴 사람의 부서를 재검토 필요로 리셋
+      const reviewerNames = [...new Set(existingComments.map(c => c.reviewer))];
+      if (reviewerNames.length > 0) {
+        resetDepartmentsForReReview(planKey, reviewerNames);
+        refreshReviewStatus();
+      }
+
       loadCommentsForPlan(planKey);
 
       setSwapTarget(null);
     },
-    [swapTarget, loadCommentsForPlan, commentCache, user]
+    [swapTarget, loadCommentsForPlan, commentCache, user, refreshReviewStatus]
   );
 
   // 액션 핸들러
@@ -1069,10 +1099,14 @@ const MealPlanHistory: React.FC = () => {
                 <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[68px]">
                   검토상태
                 </th>
+                <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[100px]">
+                  메뉴 종합
+                </th>
                 {columns.map((col, idx) => (
                   <th
                     key={idx}
-                    className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200 min-w-[180px]"
+                    className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200"
+                    style={{ minWidth: columnWidths[idx] }}
                   >
                     <span
                       className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${getColumnColor(col)}`}
@@ -1162,6 +1196,38 @@ const MealPlanHistory: React.FC = () => {
                                 ))}
                               </div>
                             )}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    {/* 메뉴 종합 */}
+                    <td className="px-1.5 py-2 border-r border-gray-200 align-top">
+                      {(() => {
+                        const sumKey = `${plan.date}-${plan.cycleType}`;
+                        const cats = categorySummary.get(sumKey) || [];
+                        const CAT_COLORS: Record<string, string> = {
+                          '국/탕': 'bg-blue-50 text-blue-700',
+                          냉장국: 'bg-cyan-50 text-cyan-700',
+                          냉동국: 'bg-indigo-50 text-indigo-700',
+                          '무침/나물': 'bg-green-50 text-green-700',
+                          볶음: 'bg-orange-50 text-orange-700',
+                          조림: 'bg-amber-50 text-amber-700',
+                          전류: 'bg-yellow-50 text-yellow-700',
+                          '김치/절임': 'bg-red-50 text-red-600',
+                          밥류: 'bg-purple-50 text-purple-700',
+                          샐러드: 'bg-emerald-50 text-emerald-700',
+                          기타: 'bg-gray-50 text-gray-600',
+                        };
+                        return (
+                          <div className="flex flex-wrap gap-0.5">
+                            {cats.map(c => (
+                              <span
+                                key={c.cat}
+                                className={`inline-flex px-1 py-0.5 rounded text-[9px] font-medium whitespace-nowrap ${CAT_COLORS[c.cat] || CAT_COLORS['기타']}`}
+                              >
+                                {c.cat} {c.count}
+                              </span>
+                            ))}
                           </div>
                         );
                       })()}

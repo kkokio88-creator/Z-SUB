@@ -193,6 +193,87 @@ const KIDS_FRIENDLY_KEYWORDS = [
   '소고기야채',
 ];
 
+// ── 시니어 적합 메뉴 자동 감지 ──
+const SENIOR_EXCLUDE_KEYWORDS = [
+  '오징어',
+  '쥐포',
+  '마른오징어',
+  '육포',
+  '진미채', // 질긴 것
+  '돈까스',
+  '탕수육',
+  '탕수',
+  '튀김',
+  '깐풍',
+  '커틀릿', // 튀김류
+  '파스타',
+  '스테이크',
+  '까르보나라',
+  '마카로니', // 서양/퓨전
+  '피자',
+  '치킨',
+  '함박',
+  '핫도그',
+  '떡볶이',
+  '궁중떡볶이', // 질긴 떡류
+];
+const SENIOR_FRIENDLY_KEYWORDS = [
+  '시금치',
+  '고사리',
+  '도라지',
+  '취나물',
+  '곤드레', // 전통 나물
+  '숙주',
+  '콩나물',
+  '미나리',
+  '냉이',
+  '달래',
+  '씀바귀',
+  '무나물',
+  '고구마순',
+  '호박잎',
+  '부추',
+  '깻잎',
+  '감자조림',
+  '우엉조림',
+  '연근조림',
+  '장조림',
+  '두부조림', // 부드러운 조림
+  '멸치볶음',
+  '어묵볶음', // 전통 볶음
+  '된장',
+  '미역국',
+  '곰탕',
+  '설렁탕',
+  '사골', // 전통국
+  '시래기',
+  '배추국',
+  '소고기무국',
+  '황태',
+  '두부',
+  '순두부',
+  '두부전', // 두부류
+  '호박전',
+  '동그랑땡',
+  '김치전',
+  '부추전', // 전류
+  '나물무침',
+  '무침',
+  '나물', // 무침/나물
+  '깍두기',
+  '백김치',
+  '총각',
+  '배추김치', // 김치류
+];
+
+export function isSeniorFriendly(name: string, isSpicy: boolean): boolean {
+  if (isSpicy) return false;
+  const normalized = name.replace(/\s+/g, '');
+  if (SENIOR_EXCLUDE_KEYWORDS.some(kw => normalized.includes(kw))) return false;
+  if (SENIOR_FRIENDLY_KEYWORDS.some(kw => normalized.includes(kw))) return true;
+  return false;
+}
+
 export function isKidFriendly(name: string, isSpicy: boolean): boolean {
   if (isSpicy) return false;
   if (name.startsWith('아이들')) return true;
@@ -220,6 +301,10 @@ export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => {
   const spicy = row[9] === 'TRUE';
   if (isKidFriendly(menuName, spicy) && !tags.includes('아이선호')) {
     tags.push('아이선호');
+  }
+  // 시니어 적합 메뉴 자동 태깅
+  if (isSeniorFriendly(menuName, spicy) && !tags.includes('시니어')) {
+    tags.push('시니어');
   }
 
   return {

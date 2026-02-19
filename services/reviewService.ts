@@ -143,6 +143,32 @@ export const getReviewComments = (planId: string): ReviewComment[] => {
   return allComments[planId] || [];
 };
 
+// 메뉴 변경 시 해당 검토자의 부서 상태를 재검토 필요로 리셋
+export const resetDepartmentsForReReview = (planId: string, reviewerNames: string[]): PlanReviewRecord | null => {
+  const reviews = loadReviews();
+  const review = reviews.find(r => r.planId === planId);
+  if (!review) return null;
+
+  const nameSet = new Set(reviewerNames);
+  let changed = false;
+
+  for (const dept of review.departments) {
+    if (dept.reviewer && nameSet.has(dept.reviewer) && dept.status !== 'pending') {
+      dept.status = 'pending';
+      dept.comment = `[재검토 필요] 메뉴 변경됨 (이전: ${dept.comment})`;
+      dept.reviewedAt = null;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    review.status = 'review_requested';
+    saveReviews(reviews);
+  }
+
+  return review;
+};
+
 export const resolveComment = (planId: string, commentId: string): ReviewComment | null => {
   const allComments = loadComments();
   const planComments = allComments[planId] || [];

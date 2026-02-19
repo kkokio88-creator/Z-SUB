@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { AlertTriangle, Package, DollarSign, ClipboardList, RefreshCw } from 'lucide-react';
+import DashboardMenuAnalysis from './DashboardMenuAnalysis';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart, Cell } from 'recharts';
 import { useMenu } from '../context/MenuContext';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
@@ -282,7 +283,10 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. 중복 위험 분석 */}
+      {/* 4. 메뉴 분석 (유사 클러스터 / 반찬 갭 / 히스토리 태그 학습) */}
+      <DashboardMenuAnalysis />
+
+      {/* 5. 중복 위험 분석 */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="w-5 h-5 text-gray-500" />
