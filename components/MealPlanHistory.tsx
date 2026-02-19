@@ -716,6 +716,17 @@ const MealPlanHistory: React.FC = () => {
   // 코멘트 캐시: planKey → ReviewComment[]
   const [commentCache, setCommentCache] = useState<Record<string, ReviewComment[]>>({});
 
+  // 출고량 설정 로드
+  const [shipmentConfig, setShipmentConfig] = useState<Record<string, { 화수목: number; 금토월: number }>>({});
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('zsub_shipment_config');
+      if (saved) setShipmentConfig(JSON.parse(saved));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const loadCommentsForPlan = useCallback((planKey: string) => {
     const comments = getReviewComments(planKey);
     setCommentCache(prev => ({ ...prev, [planKey]: comments }));
@@ -793,49 +804,31 @@ const MealPlanHistory: React.FC = () => {
     return result;
   }, [monthPlans]);
 
-  // ── 카테고리 감지 + 날짜별 메뉴 종합 ──
-  const detectMenuGubun = useCallback((rawName: string): string => {
-    const name = rawName.replace(/\s+/g, '');
-    const clean = name.replace(/_냉장|_반조리|_냉동/g, '');
-    const isFrozen = name.includes('_냉동') || name.includes('냉동');
-    const isRefrig = name.includes('_냉장') || name.includes('냉장');
-
-    if (/국|찌개|탕/.test(clean)) {
-      if (isFrozen) return '냉동국';
-      if (isRefrig) return '냉장국';
-      return '국/탕';
-    }
-    if (/무침|나물/.test(clean)) return '무침/나물';
-    if (/볶음/.test(clean)) return '볶음';
-    if (/조림/.test(clean)) return '조림';
-    if (/전$/.test(clean) || /동그랑땡|계란말이|호박전|김치전|부추전|파전/.test(clean)) return '전류';
-    if (/김치|깍두기|총각|겉절이|백김치|장아찌/.test(clean)) return '김치/절임';
-    if (/밥$|덮밥|볶음밥|비빔밥|주먹밥|오므라이스/.test(clean)) return '밥류';
-    if (/샐러드|피클/.test(clean)) return '샐러드';
-    return '기타';
-  }, []);
-
-  const categorySummary = useMemo(() => {
-    const result = new Map<string, { cat: string; count: number }[]>();
+  // ── 날짜별 생산수량 계산 ──
+  const productionSummary = useMemo(() => {
+    const result = new Map<string, { name: string; qty: number }[]>();
     for (const plan of monthPlans) {
       const key = `${plan.date}-${plan.cycleType}`;
-      const catNames = new Map<string, Set<string>>();
+      const menuQty = new Map<string, number>();
+
       for (const target of plan.targets) {
+        const volume = shipmentConfig[target.targetType]?.[plan.cycleType] || 0;
+        if (volume === 0) continue;
+
         for (const item of target.items) {
           if (!isValidMenuItem(item.name)) continue;
           const { cleanName } = parseMenuItem(item.name);
-          const cat = detectMenuGubun(item.name);
-          if (!catNames.has(cat)) catNames.set(cat, new Set());
-          catNames.get(cat)!.add(cleanName);
+          menuQty.set(cleanName, (menuQty.get(cleanName) || 0) + volume);
         }
       }
-      const sorted = Array.from(catNames.entries())
-        .map(([cat, names]) => ({ cat, count: names.size }))
-        .sort((a, b) => b.count - a.count);
+
+      const sorted = Array.from(menuQty.entries())
+        .map(([name, qty]) => ({ name, qty }))
+        .sort((a, b) => b.qty - a.qty);
       result.set(key, sorted);
     }
     return result;
-  }, [monthPlans, detectMenuGubun]);
+  }, [monthPlans, shipmentConfig]);
 
   // ── 열 너비 자동 계산 ──
   const columnWidths = useMemo(() => {
@@ -1093,14 +1086,14 @@ const MealPlanHistory: React.FC = () => {
                 <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[72px]">
                   날짜
                 </th>
-                <th className="sticky left-[72px] z-30 bg-gray-50 px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[40px]">
+                <th className="sticky left-[72px] z-30 bg-gray-50 px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
                   주기
                 </th>
-                <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[68px]">
+                <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
                   검토상태
                 </th>
-                <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[100px]">
-                  메뉴 종합
+                <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[120px]">
+                  생산수량
                 </th>
                 {columns.map((col, idx) => (
                   <th
@@ -1133,7 +1126,7 @@ const MealPlanHistory: React.FC = () => {
                       {formatDate(plan.date)}
                     </td>
                     <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-gray-200 text-center align-top">
-                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600">
+                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
                         {plan.cycleType}
                       </span>
                     </td>
@@ -1170,7 +1163,7 @@ const MealPlanHistory: React.FC = () => {
                           <div className="flex flex-col items-center gap-1">
                             <button
                               onClick={() => setSelectedReview(plan)}
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors ${s.cls}`}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors whitespace-nowrap ${s.cls}`}
                             >
                               <StatusIcon className="w-3 h-3" />
                               {s.label}
@@ -1200,33 +1193,24 @@ const MealPlanHistory: React.FC = () => {
                         );
                       })()}
                     </td>
-                    {/* 메뉴 종합 */}
+                    {/* 생산수량 */}
                     <td className="px-1.5 py-2 border-r border-gray-200 align-top">
                       {(() => {
                         const sumKey = `${plan.date}-${plan.cycleType}`;
-                        const cats = categorySummary.get(sumKey) || [];
-                        const CAT_COLORS: Record<string, string> = {
-                          '국/탕': 'bg-blue-50 text-blue-700',
-                          냉장국: 'bg-cyan-50 text-cyan-700',
-                          냉동국: 'bg-indigo-50 text-indigo-700',
-                          '무침/나물': 'bg-green-50 text-green-700',
-                          볶음: 'bg-orange-50 text-orange-700',
-                          조림: 'bg-amber-50 text-amber-700',
-                          전류: 'bg-yellow-50 text-yellow-700',
-                          '김치/절임': 'bg-red-50 text-red-600',
-                          밥류: 'bg-purple-50 text-purple-700',
-                          샐러드: 'bg-emerald-50 text-emerald-700',
-                          기타: 'bg-gray-50 text-gray-600',
-                        };
+                        const items = productionSummary.get(sumKey) || [];
+                        if (items.length === 0) {
+                          return <span className="text-[10px] text-gray-300 whitespace-nowrap">설정 필요</span>;
+                        }
                         return (
-                          <div className="flex flex-wrap gap-0.5">
-                            {cats.map(c => (
-                              <span
-                                key={c.cat}
-                                className={`inline-flex px-1 py-0.5 rounded text-[9px] font-medium whitespace-nowrap ${CAT_COLORS[c.cat] || CAT_COLORS['기타']}`}
+                          <div className="space-y-px">
+                            {items.map(item => (
+                              <div
+                                key={item.name}
+                                className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap"
                               >
-                                {c.cat} {c.count}
-                              </span>
+                                <span className="text-gray-600 truncate">{item.name}</span>
+                                <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
+                              </div>
                             ))}
                           </div>
                         );

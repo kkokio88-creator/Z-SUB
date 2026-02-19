@@ -9,8 +9,10 @@ import {
   Server,
   Activity,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 import PlanManagement from './PlanManagement';
+import { TargetType } from '../types';
 import { useToast } from '../context/ToastContext';
 import { checkSheetsConnection } from '../services/sheetsService';
 import { checkMISHealth } from '../services/misService';
@@ -18,7 +20,7 @@ import { checkZPPSHealth } from '../services/zppsService';
 
 const SystemSettings: React.FC = () => {
   const { addToast } = useToast();
-  const [activeSection, setActiveSection] = useState<'algorithm' | 'integration' | 'policy'>('algorithm');
+  const [activeSection, setActiveSection] = useState<'algorithm' | 'integration' | 'policy' | 'shipment'>('algorithm');
 
   // AI Algorithm State
   const [aiManual, setAiManual] = useState('');
@@ -27,6 +29,9 @@ const SystemSettings: React.FC = () => {
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [misApiUrl, setMisApiUrl] = useState('https://api.z-sub.com/v1/mis/sync');
   const [zppsApiUrl, setZppsApiUrl] = useState('https://api.z-sub.com/v1/zpps/update');
+
+  // Shipment volume config
+  const [shipmentConfig, setShipmentConfig] = useState<Record<string, { 화수목: number; 금토월: number }>>({});
 
   // Connection Test States
   const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({
@@ -55,6 +60,15 @@ const SystemSettings: React.FC = () => {
     }
 
     if (savedSheet) setGoogleSheetUrl(savedSheet);
+
+    const savedShipment = localStorage.getItem('zsub_shipment_config');
+    if (savedShipment) {
+      try {
+        setShipmentConfig(JSON.parse(savedShipment));
+      } catch {
+        /* ignore */
+      }
+    }
   }, []);
 
   const handleSave = () => {
@@ -62,6 +76,7 @@ const SystemSettings: React.FC = () => {
     localStorage.setItem('zsub_sheet_url', googleSheetUrl);
     localStorage.setItem('zsub_mis_url', misApiUrl);
     localStorage.setItem('zsub_zpps_url', zppsApiUrl);
+    localStorage.setItem('zsub_shipment_config', JSON.stringify(shipmentConfig));
 
     addToast({
       type: 'success',
@@ -160,6 +175,12 @@ const SystemSettings: React.FC = () => {
           >
             <Settings className="w-4 h-4" /> 식단 정책
           </button>
+          <button
+            onClick={() => setActiveSection('shipment')}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'shipment' ? 'bg-orange-50 text-orange-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            <BarChart3 className="w-4 h-4" /> 출고량 설정
+          </button>
         </nav>
         <div className="p-4 border-t border-gray-100 text-center">
           <div className="text-[10px] text-gray-400">Z-SUB System v2.5.0</div>
@@ -175,12 +196,14 @@ const SystemSettings: React.FC = () => {
               {activeSection === 'algorithm' && 'AI 식단 구성 매뉴얼'}
               {activeSection === 'integration' && '외부 시스템 및 데이터 연동'}
               {activeSection === 'policy' && '식단 정책 및 구성 설정'}
+              {activeSection === 'shipment' && '출고량 시뮬레이션 설정'}
             </h2>
             <p className="text-sm text-gray-500 mt-1">
               {activeSection === 'algorithm' && 'AI가 식단을 생성할 때 반드시 준수해야 할 자연어 규칙을 설정합니다.'}
               {activeSection === 'integration' && 'MIS, ZPPS 및 구글 시트와의 실시간 데이터 동기화 상태를 관리합니다.'}
               {activeSection === 'policy' &&
                 '기본 식단과 파생된 옵션 상품을 그룹별로 관리하고, 원가율 정책을 수립합니다.'}
+              {activeSection === 'shipment' && '식단 유형별 평균 출고량을 설정하여 생산수량 시뮬레이션에 활용합니다.'}
             </p>
           </div>
           {activeSection !== 'policy' && (
@@ -350,6 +373,76 @@ const SystemSettings: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 4. Shipment Section */}
+          {activeSection === 'shipment' && (
+            <div className="space-y-6 max-w-3xl">
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex gap-3 items-start">
+                <BarChart3 className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-orange-900 text-sm">출고량 시뮬레이션</h4>
+                  <p className="text-xs text-orange-700 mt-1">
+                    식단 유형별 평균 출고량(식수)을 입력하면, 히스토리 탭에서 메뉴별 예상 생산수량을 확인할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">식단 유형</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">화수목 (식)</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">금토월 (식)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {Object.values(TargetType).map(target => (
+                      <tr key={target} className="hover:bg-gray-50/50">
+                        <td className="px-4 py-2.5 text-xs font-medium text-gray-700">
+                          {target.replace(/ 식단$/, '')}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            value={shipmentConfig[target]?.['화수목'] || 0}
+                            onChange={e => {
+                              const val = parseInt(e.target.value) || 0;
+                              setShipmentConfig(prev => ({
+                                ...prev,
+                                [target]: { 화수목: val, 금토월: prev[target]?.['금토월'] || 0 },
+                              }));
+                            }}
+                            className="w-20 text-center text-sm border border-gray-300 rounded-lg py-1.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            value={shipmentConfig[target]?.['금토월'] || 0}
+                            onChange={e => {
+                              const val = parseInt(e.target.value) || 0;
+                              setShipmentConfig(prev => ({
+                                ...prev,
+                                [target]: { 화수목: prev[target]?.['화수목'] || 0, 금토월: val },
+                              }));
+                            }}
+                            className="w-20 text-center text-sm border border-gray-300 rounded-lg py-1.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-gray-400">
+                * 설정한 출고량은 히스토리 탭의 &quot;생산수량&quot; 열에서 메뉴별 예상 생산량 계산에 사용됩니다.
+              </p>
             </div>
           )}
         </div>
