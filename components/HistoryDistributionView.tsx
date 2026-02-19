@@ -1,83 +1,118 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { HistoricalMealPlan } from '../types';
+import { TargetType } from '../types';
 
-const PROCESS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  '국/탕': { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200' },
-  냉장국: { bg: 'bg-cyan-50', text: 'text-cyan-800', border: 'border-cyan-200' },
-  냉동국: { bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200' },
-  밥류: { bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-200' },
-  '무침/나물': { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-200' },
-  볶음: { bg: 'bg-orange-50', text: 'text-orange-800', border: 'border-orange-200' },
-  조림: { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200' },
-  전류: { bg: 'bg-yellow-50', text: 'text-yellow-800', border: 'border-yellow-200' },
-  '김치/절임': { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-200' },
-  샐러드: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
-  기타: { bg: 'bg-gray-50', text: 'text-gray-800', border: 'border-gray-200' },
+const TARGET_LABELS: Record<string, string> = {
+  [TargetType.VALUE]: '실속',
+  [TargetType.SENIOR_HEALTH]: '건강시니어',
+  [TargetType.SENIOR]: '시니어',
+  [TargetType.YOUTH]: '청소연구소',
+  [TargetType.YOUTH_MAIN]: '청소메인',
+  [TargetType.FAMILY_PLUS]: '든든가족',
+  [TargetType.FAMILY]: '가족',
+  [TargetType.KIDS_PLUS]: '든든아이',
+  [TargetType.KIDS]: '아이',
+  [TargetType.SIDE_ONLY]: '골고루반찬',
+  [TargetType.FIRST_MEET]: '첫만남',
+  [TargetType.TODDLER_PLUS]: '든든유아',
+  [TargetType.TODDLER]: '유아',
+  [TargetType.CHILD_PLUS]: '든든어린이',
+  [TargetType.CHILD]: '어린이',
 };
 
-interface ProcessGroup {
-  process: string;
-  items: { name: string; qty: number }[];
-  totalQty: number;
-}
+const TARGET_ORDER = Object.values(TargetType);
 
 interface Props {
   monthPlans: HistoricalMealPlan[];
-  productionSummary: Map<string, ProcessGroup[]>;
   formatDate: (d: string) => string;
 }
 
-const HistoryDistributionView: React.FC<Props> = ({ monthPlans, productionSummary, formatDate }) => {
+const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) => {
+  const allTargets = useMemo(() => {
+    const set = new Set<string>();
+    for (const plan of monthPlans) {
+      for (const t of plan.targets) set.add(t.targetType);
+    }
+    return TARGET_ORDER.filter(t => set.has(t));
+  }, [monthPlans]);
+
   if (monthPlans.length === 0) return null;
 
   return (
-    <div className="flex-1 overflow-auto space-y-4 print:space-y-2">
+    <div className="flex-1 overflow-auto space-y-6 print:space-y-2">
       {monthPlans.map(plan => {
-        const key = `${plan.date}-${plan.cycleType}`;
-        const groups = productionSummary.get(key) || [];
-        if (groups.length === 0) return null;
-
-        const totalAll = groups.reduce((s, g) => s + g.totalQty, 0);
+        const targetMap = new Map(plan.targets.map(t => [t.targetType, t]));
+        const maxItems = Math.max(...plan.targets.map(t => t.items.filter(i => i.name && i.name.trim()).length), 0);
 
         return (
           <div
-            key={key}
-            className="bg-white border border-gray-200 rounded-xl overflow-hidden print:break-inside-avoid print:rounded-none print:border-black"
+            key={`${plan.date}-${plan.cycleType}`}
+            className="bg-white border border-gray-300 rounded-lg overflow-hidden print:break-inside-avoid print:rounded-none print:border-black"
           >
-            <div className="bg-gray-800 text-white px-4 py-2.5 flex items-center justify-between print:bg-black">
-              <span className="font-bold text-sm">{formatDate(plan.date)}</span>
+            {/* 헤더 */}
+            <div className="bg-gray-800 text-white px-5 py-3 flex items-center justify-between print:bg-black">
               <div className="flex items-center gap-3">
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{plan.cycleType}</span>
-                <span className="text-xs font-bold">합계 {totalAll}식</span>
+                <span className="font-bold text-base">{formatDate(plan.date)}</span>
+                <span className="text-sm bg-white/20 px-2.5 py-0.5 rounded">{plan.cycleType}</span>
               </div>
+              <span className="text-sm font-medium">{plan.targets.length}개 식단</span>
             </div>
-            <div className="divide-y divide-gray-100">
-              {groups.map(group => {
-                const colors = PROCESS_STYLES[group.process] || PROCESS_STYLES['기타'];
-                return (
-                  <div key={group.process} className="flex">
-                    <div
-                      className={`w-24 shrink-0 ${colors.bg} ${colors.text} px-3 py-2 text-xs font-bold flex items-center border-r ${colors.border} print:w-20`}
-                    >
-                      {group.process}
-                    </div>
-                    <div className="flex-1 px-3 py-1.5">
-                      {group.items.map(item => (
-                        <div key={item.name} className="flex items-center justify-between py-0.5 text-sm">
-                          <span className="text-gray-800">{item.name}</span>
-                          <span className="font-bold text-gray-900 tabular-nums">{item.qty}식</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div
-                      className={`w-16 shrink-0 ${colors.bg} flex items-center justify-center border-l ${colors.border} print:w-14`}
-                    >
-                      <span className={`text-xs font-bold ${colors.text}`}>{group.totalQty}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+
+            {/* 타겟별 메뉴 테이블 */}
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-100 print:bg-gray-200">
+                  <th className="px-2 py-2 text-center text-xs font-bold text-gray-400 border-b border-r border-gray-200 w-8">
+                    #
+                  </th>
+                  {allTargets.map(t => {
+                    const target = targetMap.get(t);
+                    return (
+                      <th
+                        key={t}
+                        className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-gray-200 ${target ? 'text-gray-700' : 'text-gray-300'}`}
+                      >
+                        {TARGET_LABELS[t] || t}
+                        {target && (
+                          <span className="block text-[9px] text-gray-400 font-normal">{target.itemCount}품</span>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: maxItems }, (_, rowIdx) => (
+                  <tr key={rowIdx} className="border-b border-gray-100 print:border-gray-300">
+                    <td className="px-2 py-1.5 text-center text-xs text-gray-400 border-r border-gray-200 font-medium">
+                      {rowIdx + 1}
+                    </td>
+                    {allTargets.map(t => {
+                      const target = targetMap.get(t);
+                      if (!target)
+                        return (
+                          <td key={t} className="px-2 py-1.5 text-center border-r border-gray-100 text-gray-200">
+                            —
+                          </td>
+                        );
+                      const validItems = target.items.filter(i => i.name && i.name.trim());
+                      const item = validItems[rowIdx];
+                      return (
+                        <td key={t} className="px-2 py-1.5 text-center border-r border-gray-100 text-sm">
+                          {item ? (
+                            <span className="text-gray-800">
+                              {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
+                            </span>
+                          ) : (
+                            <span className="text-gray-200">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         );
       })}

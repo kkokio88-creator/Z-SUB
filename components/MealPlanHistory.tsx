@@ -20,6 +20,7 @@ import { useMenu } from '../context/MenuContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { TargetType } from '../types';
+import { TARGET_CONFIGS } from '../constants';
 import type {
   HistoricalMenuItem,
   HistoricalTargetPlan,
@@ -888,6 +889,35 @@ const MealPlanHistory: React.FC = () => {
     return result;
   }, [monthPlans, shipmentConfig]);
 
+  // ── 타겟별 할인 정보 계산 ──
+  const discountSummary = useMemo(() => {
+    const result = new Map<string, { sumRecPrice: number; targetPrice: number; totalCost: number }>();
+    for (const plan of monthPlans) {
+      for (const target of plan.targets) {
+        const key = `${plan.date}-${plan.cycleType}-${target.targetType}`;
+        const config = TARGET_CONFIGS[target.targetType as TargetType];
+        if (!config) continue;
+        let sumRecPrice = 0;
+        let totalCost = 0;
+        target.items.forEach((item, idx) => {
+          if (!isValidMenuItem(item.name)) return;
+          const editKey = `${plan.date}|${target.targetType}|${idx}`;
+          const edited = editedPlans.get(editKey);
+          if (edited) {
+            const newMenu = menuItems.find(m => m.name === edited.newName);
+            sumRecPrice += newMenu?.recommendedPrice || item.price;
+            totalCost += newMenu?.cost || item.cost;
+          } else {
+            sumRecPrice += item.price;
+            totalCost += item.cost;
+          }
+        });
+        result.set(key, { sumRecPrice, targetPrice: config.targetPrice, totalCost });
+      }
+    }
+    return result;
+  }, [monthPlans, editedPlans, menuItems]);
+
   // ── 열 너비 자동 계산 ──
   const columnWidths = useMemo(() => {
     return columns.map(col => {
@@ -945,26 +975,44 @@ const MealPlanHistory: React.FC = () => {
 
   const exportToHistoryCSV = useCallback(() => {
     if (monthPlans.length === 0) return;
-    const header = '날짜,주기,공정,메뉴명,수량';
-    const rows: string[] = [];
-    for (const plan of monthPlans) {
-      const key = `${plan.date}-${plan.cycleType}`;
-      const groups = productionSummary.get(key) || [];
-      for (const g of groups) {
-        for (const item of g.items) {
-          rows.push(`${plan.date},"${plan.cycleType}","${g.process}","${item.name}",${item.qty}`);
+    let csv: string;
+    const suffix = viewMode === 'ingredient' ? '재료검토' : viewMode === 'distribution' ? '현장배포' : '식단표';
+    if (viewMode === 'ingredient' || viewMode === 'distribution') {
+      const header = '날짜,주기,식단유형,메뉴명,판매가,원가';
+      const rows: string[] = [];
+      for (const plan of monthPlans) {
+        for (const target of plan.targets) {
+          for (const item of target.items) {
+            if (!item.name || !item.name.trim()) continue;
+            rows.push(
+              `${plan.date},"${plan.cycleType}","${TARGET_LABELS[target.targetType] || target.targetType}","${item.name}",${item.price},${item.cost}`
+            );
+          }
         }
       }
+      csv = [header, ...rows].join('\n');
+    } else {
+      const header = '날짜,주기,공정,메뉴명,수량';
+      const rows: string[] = [];
+      for (const plan of monthPlans) {
+        const key = `${plan.date}-${plan.cycleType}`;
+        const groups = productionSummary.get(key) || [];
+        for (const g of groups) {
+          for (const item of g.items) {
+            rows.push(`${plan.date},"${plan.cycleType}","${g.process}","${item.name}",${item.qty}`);
+          }
+        }
+      }
+      csv = [header, ...rows].join('\n');
     }
-    const csv = [header, ...rows].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `식단히스토리_${viewYear}년${viewMonth + 1}월.csv`;
+    a.download = `식단히스토리_${viewYear}년${viewMonth + 1}월_${suffix}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [monthPlans, productionSummary, viewYear, viewMonth]);
+  }, [monthPlans, productionSummary, viewYear, viewMonth, viewMode]);
 
   const exportToHistoryPDF = useCallback(async () => {
     if (!contentRef.current) return;
@@ -1212,17 +1260,9 @@ const MealPlanHistory: React.FC = () => {
             <p className="font-medium">이 달의 식단 데이터가 없습니다</p>
           </div>
         ) : viewMode === 'ingredient' ? (
-          <HistoryIngredientView
-            monthPlans={monthPlans}
-            productionSummary={productionSummary}
-            formatDate={formatDate}
-          />
+          <HistoryIngredientView monthPlans={monthPlans} formatDate={formatDate} />
         ) : viewMode === 'distribution' ? (
-          <HistoryDistributionView
-            monthPlans={monthPlans}
-            productionSummary={productionSummary}
-            formatDate={formatDate}
-          />
+          <HistoryDistributionView monthPlans={monthPlans} formatDate={formatDate} />
         ) : (
           <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
             <table className="w-full border-collapse">
@@ -1237,7 +1277,7 @@ const MealPlanHistory: React.FC = () => {
                   <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
                     검토상태
                   </th>
-                  <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[120px]">
+                  <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[220px]">
                     생산수량
                   </th>
                   {columns.map((col, idx) => (
@@ -1338,7 +1378,7 @@ const MealPlanHistory: React.FC = () => {
                           );
                         })()}
                       </td>
-                      {/* 생산수량 */}
+                      {/* 생산수량 (2열 배치) */}
                       <td className="px-1.5 py-2 border-r border-gray-200 align-top">
                         {(() => {
                           const sumKey = `${plan.date}-${plan.cycleType}`;
@@ -1346,27 +1386,43 @@ const MealPlanHistory: React.FC = () => {
                           if (groups.length === 0) {
                             return <span className="text-[10px] text-gray-300 whitespace-nowrap">설정 필요</span>;
                           }
-                          return (
-                            <div className="space-y-1">
-                              {groups.map(group => {
-                                const pc = PROCESS_COLORS[group.process] || PROCESS_COLORS['기타'];
-                                return (
-                                  <div key={group.process}>
-                                    <div className={`text-[9px] font-bold px-1 py-0.5 rounded ${pc.badge} mb-0.5`}>
-                                      {group.process} ({group.totalQty})
-                                    </div>
-                                    {group.items.map(item => (
-                                      <div
-                                        key={item.name}
-                                        className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1"
-                                      >
-                                        <span className="text-gray-600 truncate">{item.name}</span>
-                                        <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
-                                      </div>
-                                    ))}
+                          const leftCol: typeof groups = [];
+                          const rightCol: typeof groups = [];
+                          let leftH = 0;
+                          let rightH = 0;
+                          for (const g of groups) {
+                            const h = g.items.length + 1;
+                            if (leftH <= rightH) {
+                              leftCol.push(g);
+                              leftH += h;
+                            } else {
+                              rightCol.push(g);
+                              rightH += h;
+                            }
+                          }
+                          const renderGroup = (group: (typeof groups)[0]) => {
+                            const pc = PROCESS_COLORS[group.process] || PROCESS_COLORS['기타'];
+                            return (
+                              <div key={group.process}>
+                                <div className={`text-[9px] font-bold px-1 py-0.5 rounded ${pc.badge} mb-0.5`}>
+                                  {group.process} ({group.totalQty})
+                                </div>
+                                {group.items.map(item => (
+                                  <div
+                                    key={item.name}
+                                    className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1"
+                                  >
+                                    <span className="text-gray-600 truncate">{item.name}</span>
+                                    <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
                                   </div>
-                                );
-                              })}
+                                ))}
+                              </div>
+                            );
+                          };
+                          return (
+                            <div className="grid grid-cols-2 gap-x-2">
+                              <div className="space-y-1">{leftCol.map(renderGroup)}</div>
+                              <div className="space-y-1">{rightCol.map(renderGroup)}</div>
                             </div>
                           );
                         })()}
@@ -1385,8 +1441,21 @@ const MealPlanHistory: React.FC = () => {
                             );
                           const items = getItems(plan.date, col.target, target.items);
                           const planKey = makeReviewKey(plan.date, plan.cycleType);
+                          const discKey = `${plan.date}-${plan.cycleType}-${col.target}`;
+                          const dInfo = discountSummary.get(discKey);
                           return (
                             <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                              {dInfo && dInfo.sumRecPrice > dInfo.targetPrice && (
+                                <div className="mb-1 flex items-center justify-between px-0.5 py-0.5 bg-red-50 rounded text-[9px]">
+                                  <span className="text-gray-500 tabular-nums">
+                                    권장 {dInfo.sumRecPrice.toLocaleString()}
+                                  </span>
+                                  <span className="text-red-500 font-bold tabular-nums">
+                                    -{(dInfo.sumRecPrice - dInfo.targetPrice).toLocaleString()} (
+                                    {(((dInfo.sumRecPrice - dInfo.targetPrice) / dInfo.sumRecPrice) * 100).toFixed(0)}%)
+                                  </span>
+                                </div>
+                              )}
                               <TableCell
                                 items={items}
                                 date={plan.date}
@@ -1414,8 +1483,46 @@ const MealPlanHistory: React.FC = () => {
                         const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
                         const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
                         const mergedPlanKey = makeReviewKey(plan.date, plan.cycleType);
+                        const baseDiscKey = `${plan.date}-${plan.cycleType}-${col.group.baseTarget}`;
+                        const baseDInfo = discountSummary.get(baseDiscKey);
+                        const plusDiscKey = `${plan.date}-${plan.cycleType}-${col.group.plusTarget}`;
+                        const plusDInfo = discountSummary.get(plusDiscKey);
                         return (
                           <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                            {(baseDInfo || plusDInfo) && (
+                              <div className="mb-1 space-y-0.5">
+                                {baseDInfo && baseDInfo.sumRecPrice > baseDInfo.targetPrice && (
+                                  <div className="flex items-center justify-between px-0.5 py-0.5 bg-red-50 rounded text-[9px]">
+                                    <span className="text-gray-500 tabular-nums">
+                                      권장 {baseDInfo.sumRecPrice.toLocaleString()}
+                                    </span>
+                                    <span className="text-red-500 font-bold tabular-nums">
+                                      -{(baseDInfo.sumRecPrice - baseDInfo.targetPrice).toLocaleString()} (
+                                      {(
+                                        ((baseDInfo.sumRecPrice - baseDInfo.targetPrice) / baseDInfo.sumRecPrice) *
+                                        100
+                                      ).toFixed(0)}
+                                      %)
+                                    </span>
+                                  </div>
+                                )}
+                                {plusDInfo && plusDInfo.sumRecPrice > plusDInfo.targetPrice && (
+                                  <div className="flex items-center justify-between px-0.5 py-0.5 bg-orange-50 rounded text-[9px]">
+                                    <span className="text-gray-400 tabular-nums">
+                                      {col.group.plusBadge} {plusDInfo.sumRecPrice.toLocaleString()}
+                                    </span>
+                                    <span className="text-orange-500 font-bold tabular-nums">
+                                      -{(plusDInfo.sumRecPrice - plusDInfo.targetPrice).toLocaleString()} (
+                                      {(
+                                        ((plusDInfo.sumRecPrice - plusDInfo.targetPrice) / plusDInfo.sumRecPrice) *
+                                        100
+                                      ).toFixed(0)}
+                                      %)
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <MergedTableCell
                               baseItems={baseItems}
                               plusItems={plusItems}

@@ -1,54 +1,41 @@
 import React, { useMemo } from 'react';
 import type { HistoricalMealPlan } from '../types';
+import { TargetType } from '../types';
+import { TARGET_CONFIGS } from '../constants';
 
-const PROCESS_ORDER = [
-  '국/탕',
-  '냉장국',
-  '냉동국',
-  '밥류',
-  '무침/나물',
-  '볶음',
-  '조림',
-  '전류',
-  '김치/절임',
-  '샐러드',
-  '기타',
-];
-
-const PROCESS_COLORS: Record<string, string> = {
-  '국/탕': 'bg-blue-50 text-blue-700',
-  냉장국: 'bg-cyan-50 text-cyan-700',
-  냉동국: 'bg-indigo-50 text-indigo-700',
-  밥류: 'bg-purple-50 text-purple-700',
-  '무침/나물': 'bg-green-50 text-green-700',
-  볶음: 'bg-orange-50 text-orange-700',
-  조림: 'bg-amber-50 text-amber-700',
-  전류: 'bg-yellow-50 text-yellow-700',
-  '김치/절임': 'bg-red-50 text-red-600',
-  샐러드: 'bg-emerald-50 text-emerald-700',
-  기타: 'bg-gray-50 text-gray-600',
+const TARGET_LABELS: Record<string, string> = {
+  [TargetType.VALUE]: '실속',
+  [TargetType.SENIOR_HEALTH]: '건강시니어',
+  [TargetType.SENIOR]: '시니어',
+  [TargetType.YOUTH]: '청소연구소',
+  [TargetType.YOUTH_MAIN]: '청소메인',
+  [TargetType.FAMILY_PLUS]: '든든가족',
+  [TargetType.FAMILY]: '가족',
+  [TargetType.KIDS_PLUS]: '든든아이',
+  [TargetType.KIDS]: '아이',
+  [TargetType.SIDE_ONLY]: '골고루반찬',
+  [TargetType.FIRST_MEET]: '첫만남',
+  [TargetType.TODDLER_PLUS]: '든든유아',
+  [TargetType.TODDLER]: '유아',
+  [TargetType.CHILD_PLUS]: '든든어린이',
+  [TargetType.CHILD]: '어린이',
 };
 
-interface ProcessGroup {
-  process: string;
-  items: { name: string; qty: number }[];
-  totalQty: number;
-}
+const TARGET_ORDER = Object.values(TargetType);
 
 interface Props {
   monthPlans: HistoricalMealPlan[];
-  productionSummary: Map<string, ProcessGroup[]>;
   formatDate: (d: string) => string;
 }
 
-const HistoryIngredientView: React.FC<Props> = ({ monthPlans, productionSummary, formatDate }) => {
-  const usedProcesses = useMemo(() => {
-    const used = new Set<string>();
-    for (const groups of productionSummary.values()) {
-      for (const g of groups) used.add(g.process);
+const HistoryIngredientView: React.FC<Props> = ({ monthPlans, formatDate }) => {
+  const allTargets = useMemo(() => {
+    const set = new Set<string>();
+    for (const plan of monthPlans) {
+      for (const t of plan.targets) set.add(t.targetType);
     }
-    return PROCESS_ORDER.filter(p => used.has(p));
-  }, [productionSummary]);
+    return TARGET_ORDER.filter(t => set.has(t));
+  }, [monthPlans]);
 
   if (monthPlans.length === 0) return null;
 
@@ -57,33 +44,35 @@ const HistoryIngredientView: React.FC<Props> = ({ monthPlans, productionSummary,
       <table className="w-full border-collapse text-xs">
         <thead className="sticky top-0 z-20">
           <tr className="bg-gray-50">
-            <th className="sticky left-0 z-30 bg-gray-50 px-3 py-2.5 text-left font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[90px]">
+            <th className="sticky left-0 z-30 bg-gray-50 px-3 py-2.5 text-left font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
               날짜
             </th>
-            <th className="px-2 py-2.5 text-center font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[50px]">
+            <th className="px-2 py-2.5 text-center font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[48px]">
               주기
             </th>
-            {usedProcesses.map(p => (
-              <th
-                key={p}
-                className="px-2 py-2.5 text-center font-semibold border-b border-r border-gray-200 min-w-[120px]"
-              >
-                <span
-                  className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${PROCESS_COLORS[p] || PROCESS_COLORS['기타']}`}
+            {allTargets.map(t => {
+              const config = TARGET_CONFIGS[t];
+              return (
+                <th
+                  key={t}
+                  className="px-2 py-2 text-center font-semibold border-b border-r border-gray-200 min-w-[150px]"
                 >
-                  {p}
-                </span>
-              </th>
-            ))}
+                  <div className="font-bold text-gray-700 text-[11px]">{TARGET_LABELS[t] || t}</div>
+                  {config && (
+                    <div className="text-[9px] text-gray-400 font-normal mt-0.5 tabular-nums">
+                      판매 {config.targetPrice.toLocaleString()}원
+                    </div>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
           {monthPlans.map(plan => {
-            const key = `${plan.date}-${plan.cycleType}`;
-            const groups = productionSummary.get(key) || [];
-            const processMap = new Map(groups.map(g => [g.process, g]));
+            const targetMap = new Map(plan.targets.map(t => [t.targetType, t]));
             return (
-              <tr key={key} className="border-b border-gray-100 hover:bg-gray-50/30">
+              <tr key={`${plan.date}-${plan.cycleType}`} className="border-b border-gray-100 hover:bg-gray-50/30">
                 <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-gray-200 font-medium text-gray-700 whitespace-nowrap align-top">
                   {formatDate(plan.date)}
                 </td>
@@ -92,29 +81,61 @@ const HistoryIngredientView: React.FC<Props> = ({ monthPlans, productionSummary,
                     {plan.cycleType}
                   </span>
                 </td>
-                {usedProcesses.map(p => {
-                  const group = processMap.get(p);
-                  if (!group)
+                {allTargets.map(t => {
+                  const target = targetMap.get(t);
+                  if (!target)
                     return (
-                      <td key={p} className="px-2 py-2 border-r border-gray-100 text-center text-gray-300 align-top">
+                      <td key={t} className="px-2 py-2 border-r border-gray-100 text-center text-gray-300 align-top">
                         —
                       </td>
                     );
+                  const config = TARGET_CONFIGS[t];
+                  const costRatio = target.totalPrice > 0 ? (target.totalCost / target.totalPrice) * 100 : 0;
+                  const discount = target.totalPrice - (config?.targetPrice || 0);
+                  const discountRate = target.totalPrice > 0 ? (discount / target.totalPrice) * 100 : 0;
+
                   return (
-                    <td key={p} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                    <td key={t} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                      {/* 메뉴 아이템 */}
                       <div className="space-y-0.5">
-                        {group.items.map(item => (
-                          <div
-                            key={item.name}
-                            className="flex items-center justify-between gap-1 text-[11px] leading-tight"
-                          >
-                            <span className="text-gray-700 truncate">{item.name}</span>
-                            <span className="text-gray-900 font-bold shrink-0 tabular-nums">{item.qty}</span>
-                          </div>
-                        ))}
+                        {target.items
+                          .filter(i => i.name && i.name.trim())
+                          .map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-1 text-[11px] leading-tight">
+                              <span className="text-gray-700 truncate flex-1">
+                                {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
+                              </span>
+                              <span className="text-blue-600 font-medium shrink-0 tabular-nums text-[10px]">
+                                {item.price > 0 ? item.price.toLocaleString() : '-'}
+                              </span>
+                              <span className="text-gray-400 shrink-0 tabular-nums text-[9px]">
+                                /{item.cost > 0 ? item.cost.toLocaleString() : '-'}
+                              </span>
+                            </div>
+                          ))}
                       </div>
-                      <div className="mt-1 pt-1 border-t border-gray-100 text-[9px] text-gray-400 font-bold text-right">
-                        소계 {group.totalQty}
+                      {/* 합계 */}
+                      <div className="mt-1.5 pt-1.5 border-t border-gray-200 space-y-0.5">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-gray-400">합계</span>
+                          <span className="font-bold text-gray-700 tabular-nums">
+                            {target.totalPrice.toLocaleString()}원
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-gray-400">원가</span>
+                          <span className="text-gray-500 tabular-nums">
+                            {target.totalCost.toLocaleString()} ({costRatio.toFixed(0)}%)
+                          </span>
+                        </div>
+                        {config && discount > 0 && (
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-red-400">할인</span>
+                            <span className="font-bold text-red-500 tabular-nums">
+                              -{discount.toLocaleString()} ({discountRate.toFixed(0)}%)
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </td>
                   );
