@@ -12,6 +12,8 @@ import {
   PanelLeft,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -26,18 +28,19 @@ const SidebarItem: React.FC<{
   collapsed?: boolean;
   onClick: () => void;
 }> = ({ icon: Icon, label, active, collapsed, onClick }) => (
-  <button
+  <Button
+    variant="ghost"
     onClick={onClick}
     title={collapsed ? label : undefined}
     className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-medium rounded-lg transition-colors ${
       active
-        ? 'bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-100'
+        ? 'bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-100 hover:bg-primary-50 hover:text-primary-700'
         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
     }`}
   >
     <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
     {!collapsed && label}
-  </button>
+  </Button>
 );
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
@@ -56,13 +59,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
         >
           <Leaf className="w-6 h-6 text-primary-600 flex-shrink-0" />
           {!collapsed && <span className="text-xl font-bold text-gray-800 tracking-tight ml-2">Z-SUB</span>}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setCollapsed(c => !c)}
-            className={`${collapsed ? '' : 'ml-auto'} p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors`}
+            className={`${collapsed ? '' : 'ml-auto'} h-7 w-7`}
             title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
           >
             {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-          </button>
+          </Button>
         </div>
 
         <nav className={`flex-1 ${collapsed ? 'px-1' : 'px-3'} py-6 space-y-1 overflow-y-auto`}>
@@ -78,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
           />
           <SidebarItem
             icon={Utensils}
-            label="지능형 식단 생성"
+            label="AI 식단 구성"
             active={activeTab === 'planner'}
             collapsed={collapsed}
             onClick={() => onTabChange('planner')}
@@ -136,9 +141,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
                   <p className="text-sm font-medium text-gray-700">{user?.displayName || '사용자'}</p>
                   <p className="text-xs text-gray-500">{roleLabel[user?.role || 'manager']}</p>
                 </div>
-                <button onClick={logout} className="ml-auto text-gray-400 hover:text-gray-600 transition-colors">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={logout}
+                  className="ml-auto h-8 w-8 text-gray-400 hover:text-gray-600 transition-colors"
+                  title="로그아웃"
+                >
                   <LogOut className="w-5 h-5" />
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -157,7 +168,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               )}
               {activeTab === 'planner' && (
                 <>
-                  <Utensils className="w-6 h-6 text-gray-400" /> 지능형 식단 생성
+                  <Utensils className="w-6 h-6 text-gray-400" /> AI 식단 구성
                 </>
               )}
               {activeTab === 'master-data' && (
@@ -182,14 +193,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               <p className="text-xs font-bold text-gray-800">2024년 3월 5일 (화)</p>
               <p className="text-[10px] text-gray-500">A조 배송일</p>
             </div>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center gap-1">
+            <Badge variant="success" className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               정상 운영
-            </span>
+            </Badge>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth">{children}</div>
+        <div className="flex-1 overflow-y-auto px-3 py-4 sm:p-6 scroll-smooth">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </div>
       </main>
     </div>
   );

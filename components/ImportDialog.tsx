@@ -2,6 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { X, Upload, ArrowRight, CheckCircle, AlertTriangle } from 'lucide-react';
 import { parseCSV, executeImport, mapRowToMenuItem, type ColumnMapping } from '../services/importService';
 import type { MenuItem } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 interface Props {
   existingItems: MenuItem[];
@@ -104,17 +107,15 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="p-5 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-800">CSV 가져오기</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="px-6 pt-4 flex items-center gap-2 text-xs font-medium">
           {allSteps.map((s, i) => (
             <React.Fragment key={s}>
-              <span className={`px-2 py-1 rounded ${step === s ? 'bg-gray-900 text-white' : 'text-gray-400'}`}>
-                {stepLabels[i]}
-              </span>
+              <Badge variant={step === s ? 'default' : 'outline'}>{stepLabels[i]}</Badge>
               {i < 3 && <ArrowRight className="w-3 h-3 text-gray-300" />}
             </React.Fragment>
           ))}
@@ -125,7 +126,7 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
             <div className="flex flex-col items-center justify-center py-12">
               <Upload className="w-12 h-12 text-gray-300 mb-4" />
               <p className="text-sm text-gray-600 mb-4">CSV 파일을 선택해주세요</p>
-              <input type="file" accept=".csv" onChange={handleFileSelect} className="text-sm" />
+              <Input type="file" accept=".csv" onChange={handleFileSelect} className="text-sm w-auto" />
             </div>
           )}
 
@@ -151,13 +152,13 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
                   </select>
                 </div>
               ))}
-              <button
+              <Button
                 onClick={() => setStep('preview')}
                 disabled={!mappings.some(m => m.fieldName === 'name')}
-                className="mt-4 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg disabled:opacity-40 hover:bg-gray-800"
+                className="mt-4"
               >
                 다음: 미리보기
-              </button>
+              </Button>
             </div>
           )}
 
@@ -196,12 +197,9 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
                 </table>
               </div>
               {rows.length > 5 && <p className="text-xs text-gray-400 mt-2">...외 {rows.length - 5}행</p>}
-              <button
-                onClick={handleExecute}
-                className="mt-4 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700"
-              >
+              <Button onClick={handleExecute} className="mt-4 bg-green-600 hover:bg-green-700">
                 가져오기 실행
-              </button>
+              </Button>
             </div>
           )}
 
@@ -225,9 +223,9 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
                   ))}
                 </div>
               )}
-              <button onClick={onClose} className="mt-6 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg">
+              <Button onClick={onClose} className="mt-6">
                 닫기
-              </button>
+              </Button>
             </div>
           )}
         </div>

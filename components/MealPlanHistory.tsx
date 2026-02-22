@@ -15,6 +15,9 @@ import {
   Download,
   FileText,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { useMenu } from '../context/MenuContext';
 import { useAuth } from '../context/AuthContext';
@@ -515,16 +518,16 @@ const SwapModal: React.FC<{
         <div className="px-5 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-gray-800">메뉴 교체</h3>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+            <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
               <X className="w-5 h-5 text-gray-400" />
-            </button>
+            </Button>
           </div>
           <p className="text-sm text-gray-500 mb-3">
             현재: <span className="font-medium text-gray-700">{parseMenuItem(currentName).cleanName}</span>
           </p>
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -537,13 +540,15 @@ const SwapModal: React.FC<{
             {Object.entries(INGREDIENT_COLORS)
               .filter(([k]) => k !== 'other')
               .map(([key, val]) => (
-                <button
+                <Button
                   key={key}
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIngredientFilter(f => (f === key ? '' : key))}
                   className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${ingredientFilter === key ? `${val.bg} ${val.text} border-current font-bold` : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
                 >
                   {val.label}
-                </button>
+                </Button>
               ))}
           </div>
         </div>
@@ -555,10 +560,11 @@ const SwapModal: React.FC<{
               {candidates.map(item => {
                 const colors = INGREDIENT_COLORS[item.mainIngredient] || INGREDIENT_COLORS.other;
                 return (
-                  <button
+                  <Button
                     key={item.id}
+                    variant="ghost"
                     onClick={() => onSelect(item.name)}
-                    className={`w-full text-left px-3 py-2 rounded-lg border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all flex items-center justify-between`}
+                    className={`w-full text-left px-3 py-2 rounded-lg border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all flex items-center justify-between h-auto`}
                   >
                     <span className="text-sm text-gray-700 truncate">{item.name}</span>
                     <div className="flex items-center gap-2 text-xs text-gray-400 shrink-0 ml-2">
@@ -570,7 +576,7 @@ const SwapModal: React.FC<{
                         {item.cost.toLocaleString()}
                       </span>
                     </div>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -595,26 +601,28 @@ const ActionModal: React.FC<{
         <p className="text-sm font-bold text-gray-800 truncate">{parseMenuItem(menuName).cleanName}</p>
       </div>
       <div className="p-2 space-y-1">
-        <button
+        <Button
+          variant="ghost"
           onClick={onComment}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 text-left transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 text-left transition-colors h-auto justify-start"
         >
           <MessageSquare className="w-4 h-4 text-blue-500" />
           <div>
             <div className="text-sm font-medium text-gray-800">의견 남기기</div>
             <div className="text-[11px] text-gray-400">이 메뉴에 코멘트 작성</div>
           </div>
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           onClick={onSwap}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-orange-50 text-left transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-orange-50 text-left transition-colors h-auto justify-start"
         >
           <Replace className="w-4 h-4 text-orange-500" />
           <div>
             <div className="text-sm font-medium text-gray-800">메뉴 변경</div>
             <div className="text-[11px] text-gray-400">다른 메뉴로 교체</div>
           </div>
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -661,9 +669,9 @@ const CommentModal: React.FC<{
               {scopeKey.startsWith('PROD|') ? '전체 식단 공통 코멘트' : '코멘트'} ({scopeComments.length})
             </p>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+          <Button variant="ghost" size="sm" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
             <X className="w-4 h-4 text-gray-400" />
-          </button>
+          </Button>
         </div>
 
         {/* 기존 코멘트 */}
@@ -685,7 +693,7 @@ const CommentModal: React.FC<{
 
         {/* 입력 */}
         <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
-          <input
+          <Input
             type="text"
             value={text}
             onChange={e => setText(e.target.value)}
@@ -694,13 +702,9 @@ const CommentModal: React.FC<{
             className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             autoFocus
           />
-          <button
-            onClick={handleSubmit}
-            disabled={!text.trim()}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          <Button onClick={handleSubmit} disabled={!text.trim()} className="px-3 py-2 bg-blue-600 hover:bg-blue-700">
             <Send className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -1200,39 +1204,41 @@ const MealPlanHistory: React.FC = () => {
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <button onClick={goToPrevMonth} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+          <Button variant="outline" size="sm" onClick={goToPrevMonth} className="p-2">
             <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
+          </Button>
           <h2 className="text-2xl font-bold text-gray-800 min-w-[160px] text-center">
             {viewYear}년 {viewMonth + 1}월
           </h2>
-          <button onClick={goToNextMonth} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+          <Button variant="outline" size="sm" onClick={goToNextMonth} className="p-2">
             <ChevronRight className="w-5 h-5 text-gray-600" />
-          </button>
-          <button
-            onClick={goToToday}
-            className="ml-2 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
+          </Button>
+          <Button variant="outline" size="sm" onClick={goToToday} className="ml-2 text-xs font-medium">
             오늘
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={refresh}
             disabled={isLoading}
-            className="ml-2 p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+            className="ml-2 p-1.5"
             title="시트에서 새로고침"
           >
             <RefreshCw className={`w-4 h-4 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
+          </Button>
           {monthPlans.length > 0 && (
-            <span className="ml-2 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-full">
+            <Badge variant="secondary" className="ml-2 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50">
               {monthPlans.length}건
-            </span>
+            </Badge>
           )}
         </div>
         {editedPlans.size > 0 && (
-          <span className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
+          <Badge
+            variant="outline"
+            className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border-amber-200"
+          >
             {editedPlans.size}건 수정됨
-          </span>
+          </Badge>
         )}
       </div>
 
@@ -1246,14 +1252,18 @@ const MealPlanHistory: React.FC = () => {
             { key: 'completed' as const, label: '완료', color: 'bg-green-50 text-green-600 border-green-300' },
           ] as const
         ).map(f => (
-          <button
+          <Button
             key={f.key}
+            variant={reviewFilter === f.key ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setReviewFilter(f.key)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${reviewFilter === f.key ? f.color + ' ring-1 ring-offset-1' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+            className={`px-3 py-1.5 text-xs font-bold ${reviewFilter === f.key ? f.color + ' ring-1 ring-offset-1' : 'bg-white text-gray-500 border-gray-200'}`}
           >
             {f.label}
-            <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-white/60">{filterCounts[f.key]}</span>
-          </button>
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0.5 text-[10px] bg-white/60">
+              {filterCounts[f.key]}
+            </Badge>
+          </Button>
         ))}
       </div>
 
@@ -1265,30 +1275,36 @@ const MealPlanHistory: React.FC = () => {
             { key: 'ingredient' as const, label: '재료검토' },
             { key: 'distribution' as const, label: '현장배포' },
           ].map(v => (
-            <button
+            <Button
               key={v.key}
+              variant={viewMode === v.key ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setViewMode(v.key)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === v.key ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 text-xs font-bold ${viewMode === v.key ? 'bg-white text-gray-800 shadow-sm' : ''}`}
             >
               {v.label}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex items-center gap-1.5">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={exportToHistoryCSV}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1 text-xs font-medium"
             title="CSV 다운로드"
           >
             <Download className="w-3.5 h-3.5" /> CSV
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={exportToHistoryPDF}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1 text-xs font-medium"
             title="PDF 다운로드"
           >
             <FileText className="w-3.5 h-3.5" /> PDF
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1388,13 +1404,15 @@ const MealPlanHistory: React.FC = () => {
                           };
                           return (
                             <div className="flex flex-col items-center gap-1">
-                              <button
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setSelectedReview(plan)}
-                                className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors whitespace-nowrap ${s.cls}`}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full whitespace-nowrap ${s.cls}`}
                               >
                                 <StatusIcon className="w-3 h-3" />
                                 {s.label}
-                              </button>
+                              </Button>
                               {record && record.departments && record.departments.length > 0 && (
                                 <div className="flex flex-col gap-0.5 mt-0.5">
                                   {record.departments.map(dept => (

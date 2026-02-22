@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, HelpCircle, Info } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { Button } from '@/components/ui/button';
 
 const ConfirmDialog: React.FC = () => {
   const { confirmState, resolveConfirm } = useToast();
@@ -13,12 +14,6 @@ const ConfirmDialog: React.FC = () => {
     danger: <AlertTriangle className="w-6 h-6 text-red-500" />,
     warning: <HelpCircle className="w-6 h-6 text-yellow-500" />,
     default: <Info className="w-6 h-6 text-blue-500" />,
-  };
-
-  const confirmBtnStyle = {
-    danger: 'bg-red-600 hover:bg-red-700 text-white',
-    warning: 'bg-yellow-600 hover:bg-yellow-700 text-white',
-    default: 'bg-gray-900 hover:bg-black text-white',
   };
 
   return (
@@ -34,18 +29,16 @@ const ConfirmDialog: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-3 p-4 bg-gray-50 border-t border-gray-100 justify-end">
-          <button
-            onClick={() => resolveConfirm(false)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
+          <Button variant="outline" onClick={() => resolveConfirm(false)}>
             {confirmState.cancelLabel ?? '취소'}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={variant === 'danger' ? 'destructive' : undefined}
+            className={variant === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : undefined}
             onClick={() => resolveConfirm(true)}
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors shadow-sm ${confirmBtnStyle[variant]}`}
           >
             {confirmState.confirmLabel ?? '확인'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

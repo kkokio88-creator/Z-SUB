@@ -98,12 +98,14 @@ const generateWeeklyCycle = (
   prevWeekIngredients: Set<string>,
   enableDuplicationCheck: boolean,
   prevWeekMenuNames: string[] = [],
-  excludedNames?: Set<string>
+  historyContext?: { excludedNames: Set<string>; menuLastUsed: Map<string, string> }
 ): WeeklyCyclePlan => {
+  const excludedNames = historyContext?.excludedNames;
   const config = TARGET_CONFIGS[target];
   const warnings: string[] = [];
   let selectedItems: MenuItem[] = [];
   const ingredientCount: Record<string, number> = {};
+  const usedHistory: Record<string, string> = {};
 
   // Filter valid items
   const availableMenu = menuDB.filter(item => {
@@ -176,9 +178,36 @@ const generateWeeklyCycle = (
     const priceSorted = [...safePool].sort((a, b) => b.recommendedPrice - a.recommendedPrice);
     const topPool = priceSorted.slice(
       0,
-      Math.max((count as number) * 2, Math.min(pickPool.length, (count as number) + 4))
+      Math.max((count as number) + 2, Math.min(pickPool.length, (count as number) + 4))
     );
-    const selected = shuffle(topPool).slice(0, count as number);
+    let selected = shuffle(topPool).slice(0, count as number);
+
+    // 갯수 보장 폴백: excludedNames 제외 해제하여 재시도
+    if (selected.length < (count as number) && excludedNames && excludedNames.size > 0) {
+      const deficit = (count as number) - selected.length;
+      const selectedIds = new Set(selected.map(s => s.id));
+      const fallbackPool = menuDB.filter(m => {
+        if (m.category !== category) return false;
+        if (selectedIds.has(m.id)) return false;
+        if (enableDuplicationCheck && usedItemIds.has(m.id)) return false;
+        if (config.bannedTags.length > 0 && m.tags.some(tag => config.bannedTags.includes(tag))) return false;
+        if ((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy) return false;
+        if (config.requiredTags.length > 0 && !m.tags.some(tag => config.requiredTags.includes(tag))) return false;
+        return true;
+      });
+      const extras = shuffle(fallbackPool).slice(0, deficit);
+      // 히스토리 메뉴 사용 기록
+      if (historyContext?.menuLastUsed) {
+        extras.forEach(item => {
+          const clean = normalizeMenuName(item.name);
+          const lastUsed = historyContext.menuLastUsed.get(clean);
+          if (lastUsed) {
+            usedHistory[clean] = lastUsed;
+          }
+        });
+      }
+      selected = [...selected, ...extras];
+    }
 
     // 갯수 미달 경고
     if (selected.length < (count as number)) {
@@ -218,6 +247,7 @@ const generateWeeklyCycle = (
     totalPrice,
     isValid: warnings.length === 0,
     warnings,
+    usedHistory: Object.keys(usedHistory).length > 0 ? usedHistory : undefined,
   };
 };
 
@@ -292,7 +322,7 @@ const boostWeekPrice = (
   const ceiling = config.targetPrice * 1.1;
   let attempts = 0;
 
-  while (items.reduce((s, i) => s + i.recommendedPrice, 0) < config.targetPrice && attempts < items.length) {
+  while (items.reduce((s, i) => s + i.recommendedPrice, 0) < config.targetPrice && attempts < items.length * 2) {
     const currentTotal = items.reduce((s, i) => s + i.recommendedPrice, 0);
     if (currentTotal >= ceiling) break;
 
@@ -349,7 +379,8 @@ export const generateMonthlyMealPlan = (
   cycleType: CycleType,
   enableDuplicationCheck: boolean,
   menuDB: MenuItem[],
-  excludedNames?: Set<string>
+  excludedNames?: Set<string>,
+  menuLastUsed?: Map<string, string>
 ): MonthlyMealPlan => {
   const config = TARGET_CONFIGS[target];
 
@@ -361,7 +392,8 @@ export const generateMonthlyMealPlan = (
       cycleType,
       enableDuplicationCheck,
       menuDB,
-      excludedNames
+      excludedNames,
+      menuLastUsed
     );
     return createSubsetPlan(parentPlan, target);
   }
@@ -372,6 +404,11 @@ export const generateMonthlyMealPlan = (
   let prevWeekIngredients = new Set<string>();
   let prevWeekMenuNames: string[] = [];
 
+  const historyCtx =
+    excludedNames || menuLastUsed
+      ? { excludedNames: excludedNames || new Set<string>(), menuLastUsed: menuLastUsed || new Map<string, string>() }
+      : undefined;
+
   for (let i = 1; i <= 4; i++) {
     let weekPlan = generateWeeklyCycle(
       i,
@@ -381,7 +418,7 @@ export const generateMonthlyMealPlan = (
       prevWeekIngredients,
       enableDuplicationCheck,
       prevWeekMenuNames,
-      excludedNames
+      historyCtx
     );
 
     // 가격 미달 시 boostWeekPrice로 보정
@@ -410,7 +447,8 @@ export const getSwapCandidates = (
   currentPlan: MonthlyMealPlan,
   itemToSwap: MenuItem,
   targetWeekIndex: number,
-  menuDB: MenuItem[]
+  menuDB: MenuItem[],
+  excludedNames?: Set<string>
 ): MenuItem[] => {
   const allUsedIds = new Set<string>();
   currentPlan.weeks.forEach(w => w.items.forEach(i => allUsedIds.add(i.id)));
@@ -424,6 +462,9 @@ export const getSwapCandidates = (
     if (item.id === itemToSwap.id) return false; // self
     if (item.category !== itemToSwap.category) return false; // same category
     if (allUsedIds.has(item.id)) return false; // 60 day rule
+
+    // 60일 동요일 히스토리 제외
+    if (excludedNames && excludedNames.has(normalizeMenuName(item.name))) return false;
 
     // Banned tags
     if (config.bannedTags.some(t => item.tags.includes(t))) return false;

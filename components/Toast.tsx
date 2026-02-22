@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { useToast, type ToastType } from '../context/ToastContext';
+import { Button } from '@/components/ui/button';
 
 const iconMap: Record<ToastType, React.ElementType> = {
   success: CheckCircle,
@@ -42,12 +43,9 @@ const ToastContainer: React.FC = () => {
               <p className="text-sm font-bold">{toast.title}</p>
               {toast.message && <p className="text-xs mt-0.5 opacity-80">{toast.message}</p>}
             </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="flex-shrink-0 p-0.5 hover:bg-black/5 rounded transition-colors"
-            >
+            <Button variant="ghost" size="icon" onClick={() => removeToast(toast.id)} className="flex-shrink-0 h-6 w-6">
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         );
       })}

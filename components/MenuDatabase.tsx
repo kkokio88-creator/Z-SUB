@@ -25,6 +25,8 @@ import { useAuth } from '../context/AuthContext';
 import { validateMenuItem, type ValidationError } from '../services/validationService';
 import { addAuditEntry } from '../services/auditService';
 import { autoClassifyBatch } from '../services/autoClassifyService';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const PAGE_SIZE = 50;
 
@@ -440,47 +442,57 @@ const MenuDatabase: React.FC = () => {
             <span className="text-xs font-normal text-gray-400 ml-1">({filteredItems.length.toLocaleString()}개)</span>
           </h3>
           <div className="flex gap-1.5">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleAutoClassify}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium rounded hover:bg-amber-100 transition-colors"
+              className="flex items-center gap-1 bg-amber-50 border-amber-200 text-amber-700 text-xs font-medium hover:bg-amber-100"
               title="주재료 기본값인 항목에 자동 분류 적용"
             >
               <Wand2 className="w-3.5 h-3.5" /> 자동분류
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleCleanup}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 text-gray-600 text-xs font-medium rounded hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1 text-xs font-medium"
               title="빈 이름/중복 항목 정리"
             >
               <Eraser className="w-3.5 h-3.5" /> 정리
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleRefresh}
               disabled={isLoading}
-              className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="p-1.5"
               title="\uC2DC\uD2B8 \uC0C8\uB85C\uACE0\uCE68"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowImportDialog(true)}
-              className="p-1.5 bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
+              className="p-1.5"
               title="CSV \uAC00\uC838\uC624\uAE30"
             >
               <Upload className="w-4 h-4" />
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
               onClick={handleCreateNew}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors"
+              className="flex items-center gap-1 bg-primary-600 text-white text-xs font-medium hover:bg-primary-700"
             >
               <Plus className="w-3.5 h-3.5" /> 신규추가
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
               onClick={handleSave}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+              className="flex items-center gap-1 bg-green-600 text-white text-xs font-medium hover:bg-green-700"
             >
               <Save className="w-3.5 h-3.5" /> 저장
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -508,30 +520,34 @@ const MenuDatabase: React.FC = () => {
         {/* Filters Row */}
         <div className="flex gap-2 items-center flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
               type="text"
               placeholder="\uBA54\uB274\uBA85, \uCF54\uB4DC \uAC80\uC0C9..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full pl-9 pr-3 py-1.5 text-sm"
             />
           </div>
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-            <button
+            <Button
+              variant={filterCategory === 'ALL' ? 'default' : 'outline'}
+              size="sm"
               onClick={() => setFilterCategory('ALL')}
-              className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full border ${filterCategory === 'ALL' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+              className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full ${filterCategory === 'ALL' ? 'bg-gray-800 text-white border-gray-800' : ''}`}
             >
               전체
-            </button>
+            </Button>
             {Object.values(MenuCategory).map(cat => (
-              <button
+              <Button
                 key={cat}
+                variant={filterCategory === cat ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setFilterCategory(cat)}
-                className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full border ${filterCategory === cat ? 'bg-primary-50 border-primary-200 text-primary-700 font-medium' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full ${filterCategory === cat ? 'bg-primary-50 border-primary-200 text-primary-700 font-medium' : ''}`}
               >
                 {cat}
-              </button>
+              </Button>
             ))}
           </div>
           <select
@@ -551,24 +567,23 @@ const MenuDatabase: React.FC = () => {
         <div className="px-4 py-2 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
           <span className="text-xs font-medium text-primary-700">{selectedIds.size}개 선택됨</span>
           <div className="flex gap-2">
-            <button
+            <Button
+              size="sm"
               onClick={() => setShowBulkEdit(true)}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+              className="flex items-center gap-1 text-xs font-medium bg-primary-600 hover:bg-primary-700"
             >
               <Edit3 className="w-3 h-3" /> 일괄 편집
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
               onClick={handleDeleteSelected}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700"
+              className="flex items-center gap-1 text-xs font-medium bg-red-600 hover:bg-red-700"
             >
               <Trash2 className="w-3 h-3" /> 삭제
-            </button>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="px-2 py-1 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())} className="text-xs">
               선택 해제
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -579,11 +594,11 @@ const MenuDatabase: React.FC = () => {
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr className="border-b border-gray-200">
               <th className="w-10 px-3 py-2">
-                <input
+                <Input
                   type="checkbox"
                   checked={pageItems.length > 0 && selectedIds.size === pageItems.length}
                   onChange={toggleSelectAll}
-                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 shadow-none"
                 />
               </th>
               <SortHeader field="category" label="구분" className="text-left w-24" />
@@ -614,11 +629,11 @@ const MenuDatabase: React.FC = () => {
                   onClick={() => setModalItem(item)}
                 >
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                    <input
+                    <Input
                       type="checkbox"
                       checked={selectedIds.has(item.id)}
                       onChange={() => toggleSelectItem(item.id)}
-                      className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 shadow-none"
                     />
                   </td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
@@ -673,22 +688,24 @@ const MenuDatabase: React.FC = () => {
                   <td className="px-1.5 py-1.5" onClick={e => e.stopPropagation()}>
                     <div className="flex flex-wrap gap-0.5">
                       {Object.values(TasteProfile).map(taste => (
-                        <button
+                        <Button
                           key={taste}
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             const newTastes = item.tastes.includes(taste)
                               ? item.tastes.filter(t => t !== taste)
                               : [...item.tastes, taste];
                             handleUpdateItem(item.id, 'tastes', newTastes);
                           }}
-                          className={`px-1 py-0.5 text-[9px] rounded border transition-colors ${
+                          className={`px-1 py-0.5 h-auto text-[9px] rounded border transition-colors ${
                             item.tastes.includes(taste)
                               ? 'bg-primary-100 text-primary-700 border-primary-200 font-bold'
                               : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'
                           }`}
                         >
                           {taste.replace('맛', '').replace('함', '')}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </td>
@@ -702,14 +719,16 @@ const MenuDatabase: React.FC = () => {
                     <span className="text-xs font-medium text-gray-700">{item.cost.toLocaleString()}</span>
                   </td>
                   <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleUpdateItem(item.id, 'isUnused', !item.isUnused)}
-                      className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
+                      className={`px-2 py-0.5 h-auto text-[11px] font-medium rounded-full transition-colors ${
                         item.isUnused ? 'bg-gray-200 text-gray-500' : 'bg-green-100 text-green-700'
                       }`}
                     >
                       {item.isUnused ? '미사용' : '사용'}
-                    </button>
+                    </Button>
                   </td>
                   <td className="px-3 py-2 text-center">
                     {item.isSpicy && <Flame className="w-3.5 h-3.5 text-red-400 mx-auto" />}
@@ -734,23 +753,27 @@ const MenuDatabase: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={safePage === 0}
-            className="p-1 rounded border border-gray-300 bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+            className="p-1"
           >
             <ChevronLeft className="w-4 h-4" />
-          </button>
+          </Button>
           <span className="text-xs text-gray-600 min-w-[60px] text-center">
             {safePage + 1} / {totalPages}
           </span>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={safePage >= totalPages - 1}
-            className="p-1 rounded border border-gray-300 bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+            className="p-1"
           >
             <ChevronRight className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
 

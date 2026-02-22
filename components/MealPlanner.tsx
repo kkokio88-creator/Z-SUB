@@ -19,7 +19,6 @@ import {
   Printer,
   Download,
   FileText,
-  Replace,
   Upload,
 } from 'lucide-react';
 import { MAJOR_INGREDIENTS, TARGET_CONFIGS } from '../constants';
@@ -36,6 +35,10 @@ import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportServi
 import { pushMealPlan } from '../services/syncManager';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { addSyncRecord } from '../services/syncTracker';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+// Card/CardContent available but not yet used in this component
 
 // ── 식재료별 컬러 맵 ──
 const PLANNER_INGREDIENT_COLORS: Record<
@@ -138,27 +141,58 @@ const MealPlanner: React.FC = () => {
     setTimeout(() => {
       const activeMenu = menuItems.filter(item => !item.isUnused);
 
-      // 60일 이내 히스토리 메뉴명 수집 → 중복 방지
+      // 60일 이내 히스토리 메뉴명 수집 → cycleType별 동요일 중복 방지
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 60);
       const cutoffStr = cutoff.toISOString().slice(0, 10);
-      const excludedNames = new Set<string>();
-      historicalPlans
-        .filter(p => p.date >= cutoffStr)
-        .forEach(p =>
-          p.targets.forEach(t =>
-            t.items.forEach(item => {
-              const clean = item.name
-                .replace(/_냉장|_반조리|_냉동/g, '')
-                .replace(/\s+\d+$/, '')
-                .trim();
-              if (clean) excludedNames.add(clean);
-            })
-          )
-        );
+      const recentPlans = historicalPlans.filter(p => p.date >= cutoffStr);
 
-      const planA = generateMonthlyMealPlan(target, monthLabel, '화수목', checkDupes, activeMenu, excludedNames);
-      const planB = generateMonthlyMealPlan(target, monthLabel, '금토월', checkDupes, activeMenu, excludedNames);
+      const buildExcludedForCycle = (cycleType: '화수목' | '금토월') => {
+        const excluded = new Set<string>();
+        const lastUsed = new Map<string, string>();
+        recentPlans
+          .filter(p => p.cycleType === cycleType)
+          .forEach(p =>
+            p.targets.forEach(t =>
+              t.items.forEach(item => {
+                const clean = item.name
+                  .replace(/_냉장|_반조리|_냉동/g, '')
+                  .replace(/\s+\d+$/, '')
+                  .trim();
+                if (clean) {
+                  excluded.add(clean);
+                  const existing = lastUsed.get(clean);
+                  if (!existing || p.date > existing) {
+                    lastUsed.set(clean, p.date);
+                  }
+                }
+              })
+            )
+          );
+        return { excluded, lastUsed };
+      };
+
+      const ctxA = buildExcludedForCycle('화수목');
+      const ctxB = buildExcludedForCycle('금토월');
+
+      const planA = generateMonthlyMealPlan(
+        target,
+        monthLabel,
+        '화수목',
+        checkDupes,
+        activeMenu,
+        ctxA.excluded,
+        ctxA.lastUsed
+      );
+      const planB = generateMonthlyMealPlan(
+        target,
+        monthLabel,
+        '금토월',
+        checkDupes,
+        activeMenu,
+        ctxB.excluded,
+        ctxB.lastUsed
+      );
       setPlans({ A: planA, B: planB });
       setIsGenerating(false);
       addAuditEntry({
@@ -412,23 +446,25 @@ const MealPlanner: React.FC = () => {
   // 채소를 제외한 주요 식재료 목록
   const trackedIngredients = useMemo(() => MAJOR_INGREDIENTS.filter(ing => ing.key !== 'vegetable'), []);
 
-  // Helper: Per-week Ingredient Counts
+  // Helper: Per-week Ingredient Counts (with menu names for tooltip)
   const ingredientCountsByWeek = useMemo(() => {
     if (!plans.A || !plans.B) return null;
-    const result: Record<string, Record<string, number>> = {};
-    const total: Record<string, number> = {};
-    trackedIngredients.forEach(ing => (total[ing.key] = 0));
+    const result: Record<string, Record<string, { count: number; names: string[] }>> = {};
+    const total: Record<string, { count: number; names: string[] }> = {};
+    trackedIngredients.forEach(ing => (total[ing.key] = { count: 0, names: [] }));
 
     const processPlan = (plan: MonthlyMealPlan, label: string) => {
       plan.weeks.forEach(week => {
         const key = `${label}-${week.weekIndex}`;
-        const counts: Record<string, number> = {};
-        trackedIngredients.forEach(ing => (counts[ing.key] = 0));
+        const counts: Record<string, { count: number; names: string[] }> = {};
+        trackedIngredients.forEach(ing => (counts[ing.key] = { count: 0, names: [] }));
         week.items.forEach(item => {
           const ingKey = item.mainIngredient;
           if (counts[ingKey] !== undefined) {
-            counts[ingKey]++;
-            total[ingKey]++;
+            counts[ingKey].count++;
+            counts[ingKey].names.push(item.name);
+            total[ingKey].count++;
+            total[ingKey].names.push(item.name);
           }
         });
         result[key] = counts;
@@ -440,6 +476,23 @@ const MealPlanner: React.FC = () => {
     result['total'] = total;
     return result;
   }, [plans.A, plans.B, trackedIngredients]);
+  // 크로스데이(A↔B) 겹침 메뉴 감지
+  const crossDayDuplicates = useMemo(() => {
+    if (!plans.A || !plans.B) return new Set<string>();
+    const normalize = (n: string) =>
+      n
+        .replace(/_냉장|_반조리|_냉동/g, '')
+        .replace(/\s+\d+$/, '')
+        .trim();
+    const namesA = new Set(plans.A.weeks.flatMap(w => w.items.map(i => normalize(i.name))));
+    const namesB = new Set(plans.B.weeks.flatMap(w => w.items.map(i => normalize(i.name))));
+    const overlap = new Set<string>();
+    namesA.forEach(n => {
+      if (namesB.has(n)) overlap.add(n);
+    });
+    return overlap;
+  }, [plans.A, plans.B]);
+
   const currentBudgetCap = TARGET_CONFIGS[target].budgetCap;
   const targetPrice = TARGET_CONFIGS[target].targetPrice;
 
@@ -467,12 +520,14 @@ const MealPlanner: React.FC = () => {
             </span>
           )}
         </div>
-        <button
+        <Button
+          variant="outline"
           onClick={() => handleExpertReview(plan)}
-          className="text-xs flex items-center gap-1 text-gray-600 hover:text-purple-600 font-bold bg-white border border-gray-300 px-2 py-1 rounded shadow-sm"
+          size="sm"
+          className="text-xs flex items-center gap-1 text-gray-600 hover:text-purple-600 font-bold px-2 py-1"
         >
           <BrainCircuit className="w-3 h-3" /> AI 검수
-        </button>
+        </Button>
       </div>
 
       {/* 식재료 범례 */}
@@ -513,11 +568,11 @@ const MealPlanner: React.FC = () => {
                 }`}
               >
                 <div className="flex justify-between text-gray-500">
-                  <span>정책 판매가</span>
+                  <span>식단 판매가</span>
                   <span className="font-medium">{targetPrice.toLocaleString()}원</span>
                 </div>
                 <div className="flex justify-between text-gray-500 mt-0.5">
-                  <span>단품합산</span>
+                  <span>단품 합산가</span>
                   <span className="font-medium">{week.totalPrice.toLocaleString()}원</span>
                 </div>
                 <div
@@ -525,7 +580,7 @@ const MealPlanner: React.FC = () => {
                     isPriceCompliant ? 'border-green-200 text-green-700' : 'border-red-200 text-red-600'
                   }`}
                 >
-                  <span>{isPriceCompliant ? '✓ 할인 적용' : '✗ 할인 미달'}</span>
+                  <span>{isPriceCompliant ? '✓ 가격 충족' : '✗ 가격 미달'}</span>
                   <span>
                     {isPriceCompliant ? '-' : '+'}
                     {Math.abs(priceDiff).toLocaleString()}원
@@ -538,14 +593,21 @@ const MealPlanner: React.FC = () => {
                 {week.items.map((item, itemIdx) => {
                   const isExtra = parentItemCount !== null && itemIdx >= parentItemCount;
                   const ingColor = PLANNER_INGREDIENT_COLORS[item.mainIngredient] || DEFAULT_INGREDIENT_COLOR;
+                  const cleanName = item.name
+                    .replace(/_냉장|_반조리|_냉동/g, '')
+                    .replace(/\s+\d+$/, '')
+                    .trim();
+                  const isCrossDup = crossDayDuplicates.has(cleanName);
+                  const historyDate = week.usedHistory?.[cleanName];
 
                   return (
                     <div key={item.id}>
                       <div
                         onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
+                        title={isCrossDup ? '다른 주기에도 사용됨' : undefined}
                         className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${ingColor.bg} hover:ring-1 hover:ring-gray-300 ${
                           isExtra ? 'border border-amber-300 border-l-2' : ''
-                        }`}
+                        } ${isCrossDup ? 'ring-1 ring-orange-400' : ''}`}
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -556,7 +618,17 @@ const MealPlanner: React.FC = () => {
                                 : 'bg-green-500'
                           }`}
                         ></span>
-                        <span className={`font-medium truncate flex-1 ${ingColor.text}`}>{item.name}</span>
+                        <span className={`font-medium truncate flex-1 ${ingColor.text}`}>
+                          {item.name}
+                          {historyDate && (
+                            <span
+                              className="ml-1 text-[10px] text-gray-400 font-normal"
+                              title="이전 사용일 (갯수 보장)"
+                            >
+                              ({historyDate.slice(5)})
+                            </span>
+                          )}
+                        </span>
                         <span className="text-[10px] text-gray-400 shrink-0 ml-1">
                           {item.recommendedPrice.toLocaleString()}
                         </span>
@@ -578,14 +650,19 @@ const MealPlanner: React.FC = () => {
     </div>
   );
 
-  const IngredientCell: React.FC<{ count: number; isTotal?: boolean }> = ({ count, isTotal }) => {
+  const IngredientCell: React.FC<{ count: number; isTotal?: boolean; menuNames?: string[] }> = ({
+    count,
+    isTotal,
+    menuNames,
+  }) => {
     if (count === 0) return <span className="text-gray-300">-</span>;
     let colorClass = 'bg-green-100 text-green-700';
     if (count >= 4) colorClass = 'bg-red-100 text-red-700 font-bold';
     else if (count >= 2) colorClass = 'bg-orange-100 text-orange-700 font-bold';
     return (
       <span
-        className={`inline-flex items-center justify-center w-6 h-6 rounded text-[11px] ${isTotal ? 'font-bold' : ''} ${colorClass}`}
+        title={menuNames && menuNames.length > 0 ? menuNames.join(', ') : undefined}
+        className={`inline-flex items-center justify-center w-6 h-6 rounded text-[11px] cursor-default ${isTotal ? 'font-bold' : ''} ${colorClass}`}
       >
         {count}
       </span>
@@ -600,7 +677,7 @@ const MealPlanner: React.FC = () => {
         <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex flex-col">
-              <label className="text-xs font-bold text-gray-500 mb-1">식단 대상</label>
+              <Label className="text-xs font-bold text-gray-500 mb-1">식단 대상</Label>
               <select
                 value={target}
                 onChange={e => setTarget(e.target.value as TargetType)}
@@ -615,7 +692,7 @@ const MealPlanner: React.FC = () => {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-bold text-gray-500 mb-1">연도</label>
+              <Label className="text-xs font-bold text-gray-500 mb-1">연도</Label>
               <select
                 value={selectedYear}
                 onChange={e => setSelectedYear(Number(e.target.value))}
@@ -630,7 +707,7 @@ const MealPlanner: React.FC = () => {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-bold text-gray-500 mb-1">월</label>
+              <Label className="text-xs font-bold text-gray-500 mb-1">월</Label>
               <select
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(Number(e.target.value))}
@@ -645,8 +722,8 @@ const MealPlanner: React.FC = () => {
             </div>
 
             <div className="flex items-center h-full pt-6 ml-2">
-              <label className="inline-flex items-center cursor-pointer">
-                <input
+              <Label className="inline-flex items-center cursor-pointer">
+                <Input
                   type="checkbox"
                   checked={checkDupes}
                   onChange={e => setCheckDupes(e.target.checked)}
@@ -654,26 +731,27 @@ const MealPlanner: React.FC = () => {
                 />
                 <div className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
                 <span className="ms-2 text-sm font-medium text-gray-600">60일 중복 제외</span>
-              </label>
+              </Label>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              variant="outline"
               onClick={handleOpenHistory}
-              className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-bold shadow-sm transition-all"
+              className="flex items-center gap-2 px-4 py-3 rounded-xl font-bold shadow-sm"
             >
               <History className="w-5 h-5 text-gray-500" />
               히스토리
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleGenerate}
               disabled={isGenerating}
               className={`flex items-center gap-2 px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-xl font-bold shadow-lg transition-all active:scale-95 ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
             >
               {isGenerating ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
               {isGenerating ? '식단 생성 중...' : '통합 식단(화수목/금토월) 자동 생성'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -685,24 +763,23 @@ const MealPlanner: React.FC = () => {
             </div>
 
             {/* 히스토리 등록 Button */}
-            <button
+            <Button
               onClick={handleRegisterToHistory}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-all"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm"
             >
               <Upload className="w-3 h-3" />
               히스토리에 등록
-            </button>
+            </Button>
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
 
             {/* MIS Button */}
-            <button
+            <Button
               onClick={handleRegisterToMIS}
               disabled={misSyncStatus === 'syncing' || misSyncStatus === 'done'}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
-                misSyncStatus === 'done'
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              variant="outline"
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold ${
+                misSyncStatus === 'done' ? 'bg-green-50 text-green-700 border-green-200' : ''
               }`}
             >
               {misSyncStatus === 'syncing' ? (
@@ -713,16 +790,17 @@ const MealPlanner: React.FC = () => {
                 <Database className="w-3 h-3" />
               )}
               {misSyncStatus === 'done' ? 'MIS 등록 완료' : '식단 정보 MIS 등록'}
-            </button>
+            </Button>
 
             {/* ZPPS Button */}
-            <button
+            <Button
               onClick={handleSyncToZPPS}
               disabled={unsavedChangesCount === 0 || zppsSyncStatus === 'syncing'}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
+              variant="outline"
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold ${
                 unsavedChangesCount > 0
                   ? 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse hover:bg-orange-100'
-                  : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
+                  : 'bg-gray-50 text-gray-300 border-gray-200'
               }`}
             >
               {zppsSyncStatus === 'syncing' ? (
@@ -731,45 +809,55 @@ const MealPlanner: React.FC = () => {
                 <ArrowRightLeft className="w-3 h-3" />
               )}
               ZPPS 변경 연동 {unsavedChangesCount > 0 && `(${unsavedChangesCount}건)`}
-            </button>
+            </Button>
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
 
             {/* Save */}
-            <button
+            <Button
+              variant="outline"
               onClick={handleSaveVersion}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
             >
               <Download className="w-3 h-3" /> 저장
-            </button>
+            </Button>
             {/* Diff */}
-            <button
+            <Button
+              variant="outline"
               onClick={handleDiffWithPrevious}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
             >
               비교
-            </button>
+            </Button>
             {/* Print */}
-            <button
+            <Button
+              variant="outline"
               onClick={() => plans.A && printMealPlan(plans.A)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
             >
               <Printer className="w-3 h-3" /> 인쇄
-            </button>
+            </Button>
             {/* PDF Export */}
-            <button
+            <Button
+              variant="outline"
               onClick={() => plans.A && exportToPDF(plans.A)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
             >
               <FileText className="w-3 h-3" /> PDF
-            </button>
+            </Button>
             {/* CSV Export */}
-            <button
+            <Button
+              variant="outline"
               onClick={() => plans.A && exportToCSV(plans.A)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
             >
               CSV
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -843,32 +931,35 @@ const MealPlanner: React.FC = () => {
                     </thead>
                     <tbody>
                       {trackedIngredients.map(ing => {
-                        const totalCount = ingredientCountsByWeek['total']?.[ing.key] || 0;
                         return (
                           <tr key={ing.key} className="border-b border-gray-100 hover:bg-gray-50/50">
                             <td className="px-2 py-1.5 font-medium text-gray-700 sticky left-0 bg-white">
                               {ing.label}
                             </td>
                             {[1, 2, 3, 4].map(w => {
-                              const count = ingredientCountsByWeek[`A-${w}`]?.[ing.key] || 0;
+                              const data = ingredientCountsByWeek[`A-${w}`]?.[ing.key];
                               return (
                                 <td key={`A-${w}`} className="px-2 py-1.5 text-center">
-                                  <IngredientCell count={count} />
+                                  <IngredientCell count={data?.count || 0} menuNames={data?.names} />
                                 </td>
                               );
                             })}
                             <td className="px-0 py-1.5 bg-gray-100"></td>
                             {[1, 2, 3, 4].map(w => {
-                              const count = ingredientCountsByWeek[`B-${w}`]?.[ing.key] || 0;
+                              const data = ingredientCountsByWeek[`B-${w}`]?.[ing.key];
                               return (
                                 <td key={`B-${w}`} className="px-2 py-1.5 text-center">
-                                  <IngredientCell count={count} />
+                                  <IngredientCell count={data?.count || 0} menuNames={data?.names} />
                                 </td>
                               );
                             })}
                             <td className="px-0 py-1.5 bg-gray-100"></td>
                             <td className="px-2 py-1.5 text-center">
-                              <IngredientCell count={totalCount} isTotal />
+                              <IngredientCell
+                                count={ingredientCountsByWeek['total']?.[ing.key]?.count || 0}
+                                isTotal
+                                menuNames={ingredientCountsByWeek['total']?.[ing.key]?.names}
+                              />
                             </td>
                           </tr>
                         );
@@ -906,12 +997,9 @@ const MealPlanner: React.FC = () => {
                   <span className="ml-2 text-gray-400">({swapCandidates.length}개 사용 가능)</span>
                 </p>
               </div>
-              <button
-                onClick={() => setSwapTarget(null)}
-                className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setSwapTarget(null)} className="p-2 rounded-full">
                 <X className="w-5 h-5 text-gray-600" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-2 overflow-y-auto flex-1 bg-gray-50">
@@ -927,10 +1015,11 @@ const MealPlanner: React.FC = () => {
                     .map(candidate => {
                       const priceDiff = candidate.recommendedPrice - swapTarget.item.recommendedPrice;
                       return (
-                        <button
+                        <Button
                           key={candidate.id}
+                          variant="outline"
                           onClick={() => performSwap(candidate)}
-                          className="w-full bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group"
+                          className="w-full bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group h-auto"
                         >
                           <div className="flex items-center gap-3">
                             <div
@@ -967,7 +1056,7 @@ const MealPlanner: React.FC = () => {
                               {priceDiff > 0 ? `+${priceDiff.toLocaleString()}` : priceDiff.toLocaleString()}원
                             </div>
                           </div>
-                        </button>
+                        </Button>
                       );
                     })}
                 </div>
@@ -986,9 +1075,9 @@ const MealPlanner: React.FC = () => {
                 <BrainCircuit className="w-6 h-6" />
                 AI 전문가 검수 리포트
               </h3>
-              <button onClick={() => setShowReviewModal(false)} className="p-2 hover:bg-gray-100 rounded-full">
+              <Button variant="ghost" size="sm" onClick={() => setShowReviewModal(false)} className="p-2 rounded-full">
                 <X className="w-6 h-6 text-gray-500" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-8 overflow-y-auto space-y-8">

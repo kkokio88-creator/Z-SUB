@@ -27,6 +27,10 @@ import {
 } from '../services/reviewService';
 import { exportHistoricalPlanToCSV, exportHistoricalPlanToPDF } from '../services/historyReviewService';
 import type { HistoricalMealPlan, PlanReviewRecord, ReviewDepartment, ReviewComment } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 
 const DEPT_ICONS: Record<ReviewDepartment, React.ElementType> = {
   quality: Shield,
@@ -170,22 +174,10 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-bold text-gray-800">{plan.date} 식단 검토</h2>
-            <span
-              className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                plan.cycleType === '화수목' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
-              }`}
-            >
-              {plan.cycleType}
-            </span>
+            <Badge variant={plan.cycleType === '화수목' ? 'info' : 'warning'}>{plan.cycleType}</Badge>
             {review && (
-              <span
-                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                  review.status === 'finalized'
-                    ? 'bg-green-100 text-green-700'
-                    : review.status === 'approved'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-yellow-100 text-yellow-700'
-                }`}
+              <Badge
+                variant={review.status === 'finalized' ? 'success' : review.status === 'approved' ? 'info' : 'warning'}
               >
                 {review.status === 'draft'
                   ? '초안'
@@ -194,17 +186,17 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                     : review.status === 'approved'
                       ? '승인 완료'
                       : '최종 확정'}
-              </span>
+              </Badge>
             )}
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-200 transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Plan Summary */}
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+          <Card className="p-4 bg-gray-50">
             <h3 className="text-sm font-bold text-gray-700 mb-3">식단 요약</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {plan.targets.map(t => (
@@ -229,7 +221,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
 
           {/* Department Review Cards */}
           {review && (
@@ -259,19 +251,27 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                           <span className="text-sm font-medium text-gray-700">
                             {DEPARTMENT_LABELS[dept.department]}
                           </span>
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${style.bg} ${style.text}`}
+                          <Badge
+                            variant={
+                              dept.status === 'approved'
+                                ? 'success'
+                                : dept.status === 'rejected'
+                                  ? 'destructive'
+                                  : 'secondary'
+                            }
                           >
                             <StatusIcon className="w-3 h-3" /> {style.label}
-                          </span>
+                          </Badge>
                         </div>
                         {dept.status === 'pending' && review.status !== 'finalized' && (
-                          <button
+                          <Button
+                            variant="link"
+                            size="sm"
                             onClick={() => setActiveDept(isActive ? null : dept.department)}
-                            className="text-xs text-blue-600 font-medium hover:underline"
+                            className="text-xs text-blue-600 font-medium h-auto p-0"
                           >
                             {isActive ? '접기' : '검토하기'}
-                          </button>
+                          </Button>
                         )}
                       </div>
 
@@ -292,18 +292,21 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                             rows={2}
                           />
                           <div className="flex gap-2">
-                            <button
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
                               onClick={() => handleDeptReview(dept.department, true)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-green-600 rounded-lg hover:bg-green-700"
                             >
                               <CheckCircle className="w-3 h-3" /> 승인
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="h-7 text-xs"
                               onClick={() => handleDeptReview(dept.department, false)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-red-500 rounded-lg hover:bg-red-600"
                             >
                               <XCircle className="w-3 h-3" /> 반려
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -326,23 +329,18 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
 
             {/* Add comment */}
             <div className="flex gap-2 mb-4">
-              <input
+              <Input
                 type="text"
                 value={newComment}
                 onChange={e => setNewComment(e.target.value)}
                 placeholder="코멘트를 입력하세요..."
-                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleAddComment();
                 }}
               />
-              <button
-                onClick={handleAddComment}
-                disabled={!newComment.trim()}
-                className="px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
+              <Button onClick={handleAddComment} disabled={!newComment.trim()} size="icon">
                 <Send className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             {topLevelComments.length === 0 ? (
@@ -370,16 +368,18 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                         )}
                       </div>
                       {review?.status !== 'finalized' && (
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleResolveComment(comment.id)}
-                          className={`text-[10px] font-medium px-2 py-0.5 rounded border transition-colors ${
+                          className={`text-[10px] font-medium h-auto px-2 py-0.5 ${
                             comment.status === 'resolved'
                               ? 'text-gray-500 bg-white border-gray-200 hover:bg-gray-50'
                               : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100'
                           }`}
                         >
                           {comment.status === 'resolved' ? '재오픈' : '해결'}
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <p className="text-xs text-gray-700 mb-1">{comment.comment}</p>
@@ -404,34 +404,33 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                     {/* Reply input */}
                     {replyTarget === comment.id ? (
                       <div className="mt-2 ml-4 flex gap-1">
-                        <input
+                        <Input
                           type="text"
                           value={replyText}
                           onChange={e => setReplyText(e.target.value)}
                           placeholder="답글 입력..."
-                          className="flex-1 text-[11px] border border-gray-200 rounded px-2 py-1 focus:ring-1 focus:ring-blue-400"
+                          className="flex-1 text-[11px] h-6 px-2 py-1"
                           onKeyDown={e => {
                             if (e.key === 'Enter') handleSubmitReply();
                           }}
                           autoFocus
                         />
-                        <button
-                          onClick={handleSubmitReply}
-                          className="px-2 py-1 text-[10px] font-bold text-white bg-blue-500 rounded hover:bg-blue-600"
-                        >
+                        <Button onClick={handleSubmitReply} size="icon" className="h-6 w-6">
                           <Send className="w-2.5 h-2.5" />
-                        </button>
+                        </Button>
                       </div>
                     ) : (
-                      <button
+                      <Button
+                        variant="link"
+                        size="sm"
                         onClick={() => {
                           setReplyTarget(comment.id);
                           setReplyText('');
                         }}
-                        className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-0.5"
+                        className="mt-1 text-[10px] text-blue-500 h-auto p-0 gap-0.5"
                       >
                         <Reply className="w-2.5 h-2.5" /> 답글
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -443,35 +442,23 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportHistoricalPlanToCSV(plan)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
+            <Button variant="outline" size="sm" onClick={() => exportHistoricalPlanToCSV(plan)}>
               <Download className="w-3 h-3" /> CSV
-            </button>
-            <button
-              onClick={() => exportHistoricalPlanToPDF(plan)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportHistoricalPlanToPDF(plan)}>
               <FileText className="w-3 h-3" /> PDF
-            </button>
+            </Button>
           </div>
 
           <div className="flex items-center gap-2">
             {allApproved && review?.status === 'approved' && (
-              <button
-                onClick={handleFinalize}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm"
-              >
+              <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleFinalize}>
                 <CheckCircle className="w-4 h-4" /> 최종 확정
-              </button>
+              </Button>
             )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
+            <Button variant="outline" onClick={onClose}>
               닫기
-            </button>
+            </Button>
           </div>
         </div>
       </div>

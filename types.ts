@@ -86,6 +86,7 @@ export interface WeeklyCyclePlan {
   totalPrice: number;
   isValid: boolean;
   warnings: string[];
+  usedHistory?: Record<string, string>; // 메뉴명 → YYYY-MM-DD (갯수 보장으로 선택된 히스토리 메뉴)
 }
 
 // 월간 식단 (4주치)

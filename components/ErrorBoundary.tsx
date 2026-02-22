@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   children: React.ReactNode;
@@ -37,13 +38,10 @@ class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-gray-500 mb-4">
               {this.state.error?.message || '예기치 않은 오류가 발생했습니다.'}
             </p>
-            <button
-              onClick={this.handleReset}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800"
-            >
+            <Button onClick={this.handleReset}>
               <RefreshCw className="w-4 h-4" />
               다시 시도
-            </button>
+            </Button>
           </div>
         </div>
       );

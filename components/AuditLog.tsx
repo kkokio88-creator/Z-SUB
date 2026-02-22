@@ -3,6 +3,10 @@ import { Search, Filter, Clock, User, ChevronRight, Trash2, FileText } from 'luc
 import { getAuditLog, clearAuditLog, type AuditEntry } from '../services/auditService';
 import { useToast } from '../context/ToastContext';
 import AuditEntryDetail from './AuditEntryDetail';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 
 const ACTION_LABELS: Record<string, string> = {
   'menu.create': '메뉴 생성',
@@ -81,24 +85,21 @@ const AuditLog: React.FC = () => {
           <h2 className="text-xl font-bold text-gray-800">감사 로그</h2>
           <p className="text-sm text-gray-500 mt-1">시스템 변경 이력 {entries.length}건</p>
         </div>
-        <button
-          onClick={handleClear}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-        >
+        <Button variant="destructive" size="sm" onClick={handleClear}>
           <Trash2 className="w-4 h-4" /> 전체 삭제
-        </button>
+        </Button>
       </div>
 
       {/* Filters */}
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
+          <Input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="이름, 동작으로 검색..."
-            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="pl-10"
           />
         </div>
         <div className="relative">
@@ -120,7 +121,7 @@ const AuditLog: React.FC = () => {
       </div>
 
       {/* Log List */}
-      <div className="flex-1 overflow-y-auto bg-white rounded-xl border border-gray-200 shadow-sm">
+      <Card className="flex-1 overflow-y-auto">
         {entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400">
             <FileText className="w-12 h-12 mb-3 opacity-50" />
@@ -130,17 +131,16 @@ const AuditLog: React.FC = () => {
         ) : (
           <div className="divide-y divide-gray-100">
             {entries.map(entry => (
-              <button
+              <Button
                 key={entry.id}
+                variant="ghost"
                 onClick={() => setSelectedEntry(entry)}
-                className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                className="w-full flex items-center gap-4 px-5 py-3.5 h-auto rounded-none justify-start text-left"
               >
                 <div className="flex-shrink-0">
-                  <span
-                    className={`inline-flex items-center px-2 py-1 text-xs font-bold rounded ${getActionColor(entry.action)}`}
-                  >
+                  <Badge className={`font-bold rounded ${getActionColor(entry.action)}`}>
                     {ACTION_LABELS[entry.action] || entry.action}
-                  </span>
+                  </Badge>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">{entry.entityName}</p>
@@ -157,11 +157,11 @@ const AuditLog: React.FC = () => {
                   </span>
                   <ChevronRight className="w-4 h-4" />
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };

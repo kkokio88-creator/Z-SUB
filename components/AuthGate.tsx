@@ -1,6 +1,10 @@
 import React, { useState, type ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Leaf, LogIn, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
 
 const AuthGate: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading, isOfflineMode, login } = useAuth();
@@ -34,7 +38,7 @@ const AuthGate: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <div className="flex items-center justify-center h-screen bg-gray-50">
       <div className="w-full max-w-sm">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+        <Card className="p-8">
           <div className="flex items-center justify-center gap-2 mb-6">
             <Leaf className="w-8 h-8 text-primary-600" />
             <span className="text-2xl font-bold text-gray-800">Z-SUB</span>
@@ -48,36 +52,25 @@ const AuthGate: React.FC<{ children: ReactNode }> = ({ children }) => {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">이메일</label>
-              <input
+              <Label className="block mb-1">이메일</Label>
+              <Input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
                 placeholder="admin@z-sub.com"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">비밀번호</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
-              />
+              <Label className="block mb-1">비밀번호</Label>
+              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition-colors disabled:opacity-50"
-            >
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
               {isSubmitting ? '로그인 중...' : '로그인'}
-            </button>
+            </Button>
           </form>
-        </div>
+        </Card>
       </div>
     </div>
   );

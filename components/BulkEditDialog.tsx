@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { MenuCategory } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface BulkEditDialogProps {
   selectedCount: number;
@@ -37,15 +40,15 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-800">일괄 편집 ({selectedCount}개 선택)</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5 text-gray-400" />
-          </button>
+          </Button>
         </div>
 
         <div className="p-5 space-y-5">
           {/* Category */}
           <div>
-            <label className="text-xs font-bold text-gray-500 mb-1.5 block">카테고리 변경</label>
+            <Label className="mb-1.5 block">카테고리 변경</Label>
             <select
               value={category}
               onChange={e => setCategory(e.target.value as MenuCategory | '')}
@@ -62,7 +65,7 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
 
           {/* Add Tags */}
           <div>
-            <label className="text-xs font-bold text-gray-500 mb-1.5 block">태그 추가</label>
+            <Label className="mb-1.5 block">태그 추가</Label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {addTags.map(tag => (
                 <span
@@ -70,18 +73,22 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
                   className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-100"
                 >
                   +{tag}
-                  <button onClick={() => setAddTags(t => t.filter(x => x !== tag))} className="ml-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setAddTags(t => t.filter(x => x !== tag))}
+                    className="ml-1 h-auto w-auto p-0"
+                  >
                     <X className="w-3 h-3" />
-                  </button>
+                  </Button>
                 </span>
               ))}
             </div>
-            <input
+            <Input
               type="text"
               value={addTagInput}
               onChange={e => setAddTagInput(e.target.value)}
               placeholder="태그 입력 후 Enter"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-primary-500"
               onKeyDown={e => {
                 if (e.key === 'Enter' && addTagInput.trim()) {
                   setAddTags(prev => [...prev, addTagInput.trim()]);
@@ -93,7 +100,7 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
 
           {/* Remove Tags */}
           <div>
-            <label className="text-xs font-bold text-gray-500 mb-1.5 block">태그 제거</label>
+            <Label className="mb-1.5 block">태그 제거</Label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {removeTags.map(tag => (
                 <span
@@ -101,18 +108,22 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
                   className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-700 border border-red-100"
                 >
                   -{tag}
-                  <button onClick={() => setRemoveTags(t => t.filter(x => x !== tag))} className="ml-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setRemoveTags(t => t.filter(x => x !== tag))}
+                    className="ml-1 h-auto w-auto p-0"
+                  >
                     <X className="w-3 h-3" />
-                  </button>
+                  </Button>
                 </span>
               ))}
             </div>
-            <input
+            <Input
               type="text"
               value={removeTagInput}
               onChange={e => setRemoveTagInput(e.target.value)}
               placeholder="제거할 태그 입력 후 Enter"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-primary-500"
               onKeyDown={e => {
                 if (e.key === 'Enter' && removeTagInput.trim()) {
                   setRemoveTags(prev => [...prev, removeTagInput.trim()]);
@@ -124,7 +135,7 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
 
           {/* Usage Status */}
           <div>
-            <label className="text-xs font-bold text-gray-500 mb-1.5 block">사용 상태</label>
+            <Label className="mb-1.5 block">사용 상태</Label>
             <select
               value={isUnused}
               onChange={e => setIsUnused(e.target.value as '' | 'true' | 'false')}
@@ -138,19 +149,12 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
         </div>
 
         <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
+          <Button variant="outline" onClick={onClose}>
             취소
-          </button>
-          <button
-            onClick={handleApply}
-            disabled={!hasChanges}
-            className="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          </Button>
+          <Button onClick={handleApply} disabled={!hasChanges}>
             적용
-          </button>
+          </Button>
         </div>
       </div>
     </div>

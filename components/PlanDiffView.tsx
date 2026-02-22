@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, X } from 'lucide-react';
 import type { MonthlyMealPlan } from '../types';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   before: MonthlyMealPlan;
@@ -14,9 +15,9 @@ const PlanDiffView: React.FC<Props> = ({ before, after, onClose }) => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
         <div className="p-5 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">버전 비교</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">

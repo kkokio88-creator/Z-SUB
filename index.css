@@ -2,12 +2,45 @@
 
 @theme {
   --font-sans: 'Noto Sans KR', sans-serif;
+
+  /* Legacy color scale (backward compat) */
   --color-primary-50: #ecfdf5;
   --color-primary-100: #d1fae5;
   --color-primary-500: #10b981;
   --color-primary-600: #059669;
   --color-primary-700: #047857;
   --color-primary-900: #064e3b;
+
+  /* shadcn semantic tokens */
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+
+  --color-primary: #059669;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #f5f5f4;
+  --color-secondary-foreground: #1c1917;
+
+  --color-muted: #f5f5f4;
+  --color-muted-foreground: #78716c;
+
+  --color-accent: #f5f5f4;
+  --color-accent-foreground: #1c1917;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #e7e5e4;
+  --color-input: #e7e5e4;
+  --color-ring: #059669;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
 
 @media print {

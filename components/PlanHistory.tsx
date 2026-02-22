@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock, Trash2, RotateCcw, X } from 'lucide-react';
 import { getVersions, deleteVersion, type PlanVersion } from '../services/historyService';
 import { useToast } from '../context/ToastContext';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   planId: string;
@@ -49,9 +50,9 @@ const PlanHistory: React.FC<Props> = ({ planId, onRestore, onClose }) => {
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <Clock className="w-5 h-5 text-gray-400" /> 식단 히스토리
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -75,20 +76,18 @@ const PlanHistory: React.FC<Props> = ({ planId, onRestore, onClose }) => {
                     <p className="text-xs text-gray-500">{new Date(v.savedAt).toLocaleString('ko-KR')}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleRestore(v)}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                      title="복원"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => handleRestore(v)} title="복원">
                       <RotateCcw className="w-4 h-4" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleDelete(v.id)}
-                      className="p-1.5 text-red-500 hover:bg-red-50 rounded"
                       title="삭제"
+                      className="text-red-500 hover:bg-red-50"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}

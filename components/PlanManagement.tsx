@@ -17,6 +17,9 @@ import { MenuCategory, TargetType, MealPlanConfig } from '../types';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { addAuditEntry } from '../services/auditService';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface ManagedMealPlanConfig extends MealPlanConfig {
   id: string;
@@ -215,24 +218,28 @@ const PlanManagement: React.FC = () => {
     <div className="flex flex-col items-center gap-1">
       <span className={`text-[10px] font-bold ${colorClass}`}>{label}</span>
       <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => handleUpdate(config.id, `composition.${category}`, (config.composition[category] || 0) - 1)}
-          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-l-lg transition-colors"
+          className="w-6 h-6 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-l-lg rounded-r-none"
         >
           <Minus className="w-3 h-3" />
-        </button>
-        <input
+        </Button>
+        <Input
           type="number"
           value={config.composition[category] || 0}
           readOnly
           className="w-8 text-center bg-transparent border-none p-0 text-sm font-bold text-gray-800 focus:ring-0"
         />
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => handleUpdate(config.id, `composition.${category}`, (config.composition[category] || 0) + 1)}
-          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-r-lg transition-colors"
+          className="w-6 h-6 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-r-lg rounded-l-none"
         >
           <Plus className="w-3 h-3" />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -240,69 +247,62 @@ const PlanManagement: React.FC = () => {
   return (
     <div className="flex flex-col h-full gap-6">
       {/* 1. Header & Global Controls */}
-      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <Settings className="w-6 h-6 text-primary-600" />
-              식단 정책 관리
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              기본 식단과 파생된 옵션 상품을 그룹별로 관리하고, 원가율 정책을 수립합니다.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {hasUnsavedChanges && (
-              <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs font-bold border border-orange-200 animate-pulse flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> 저장되지 않음
-              </span>
-            )}
-            <button
-              onClick={handleSaveAll}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white font-medium rounded-lg hover:bg-black shadow-md transition-all active:scale-95"
-            >
-              <Save className="w-4 h-4" />
-              변경사항 저장
-            </button>
-          </div>
-        </div>
-
-        {/* Global Ratio Toolbar */}
-        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-white rounded-md border border-gray-200 shadow-sm">
-              <Percent className="w-4 h-4 text-gray-500" />
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Settings className="w-6 h-6 text-primary-600" />
+                식단 정책 관리
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                기본 식단과 파생된 옵션 상품을 그룹별로 관리하고, 원가율 정책을 수립합니다.
+              </p>
             </div>
-            <span className="text-sm font-bold text-gray-700">전체 목표 원가율 설정</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative w-24">
-              <input
-                type="number"
-                value={globalCostRatio}
-                onChange={e => setGlobalCostRatio(parseFloat(e.target.value))}
-                className="w-full pl-3 pr-6 py-2 text-sm font-bold border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 shadow-sm"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">%</span>
+            <div className="flex items-center gap-3">
+              {hasUnsavedChanges && (
+                <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs font-bold border border-orange-200 animate-pulse flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> 저장되지 않음
+                </span>
+              )}
+              <Button onClick={handleSaveAll}>
+                <Save className="w-4 h-4" />
+                변경사항 저장
+              </Button>
             </div>
-            <button
-              onClick={handleApplyGlobalRatio}
-              className="text-xs bg-white border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-100 font-bold text-gray-700 shadow-sm transition-colors"
-            >
-              일괄 적용
-            </button>
           </div>
 
-          <div className="flex-1"></div>
+          {/* Global Ratio Toolbar */}
+          <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-white rounded-md border border-gray-200 shadow-sm">
+                <Percent className="w-4 h-4 text-gray-500" />
+              </div>
+              <span className="text-sm font-bold text-gray-700">전체 목표 원가율 설정</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-24">
+                <Input
+                  type="number"
+                  value={globalCostRatio}
+                  onChange={e => setGlobalCostRatio(parseFloat(e.target.value))}
+                  className="pr-6"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">%</span>
+              </div>
+              <Button variant="outline" onClick={handleApplyGlobalRatio}>
+                일괄 적용
+              </Button>
+            </div>
 
-          <button
-            onClick={handleAddBasePlan}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold rounded-lg shadow transition-colors"
-          >
-            <PlusCircle className="w-4 h-4" /> 새 기본 식단 추가
-          </button>
-        </div>
-      </div>
+            <div className="flex-1"></div>
+
+            <Button onClick={handleAddBasePlan}>
+              <PlusCircle className="w-4 h-4" /> 새 기본 식단 추가
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 2. Plan Groups List */}
       <div className="flex-1 overflow-y-auto space-y-6 pb-10">
@@ -315,7 +315,7 @@ const PlanManagement: React.FC = () => {
                   <Layers className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
-                  <input
+                  <Input
                     type="text"
                     value={base.target}
                     onChange={e => handleUpdate(base.id, 'target', e.target.value)}
@@ -326,18 +326,22 @@ const PlanManagement: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handleAddOptionPlan(base.id, base.target)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 text-blue-700 text-xs font-bold rounded-lg hover:bg-blue-50 transition-colors"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
                 >
                   <ArrowDownRight className="w-3 h-3" /> 옵션 상품 추가
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => handleDeletePlan(base.id)}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="text-gray-400 hover:text-red-500 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -374,11 +378,11 @@ const PlanManagement: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">판매가</span>
                           <div className="flex items-center gap-1">
-                            <input
+                            <Input
                               type="number"
                               value={base.targetPrice}
                               onChange={e => handleUpdate(base.id, 'targetPrice', parseInt(e.target.value))}
-                              className="w-20 text-right font-bold text-gray-900 border-b border-gray-200 focus:border-primary-500 focus:ring-0 p-0 text-sm"
+                              className="w-20 text-right p-0 border-none border-b rounded-none"
                             />
                             <span className="text-xs text-gray-500">원</span>
                           </div>
@@ -386,11 +390,11 @@ const PlanManagement: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">원가율</span>
                           <div className="flex items-center gap-1">
-                            <input
+                            <Input
                               type="number"
                               value={base.targetCostRatio}
                               onChange={e => handleUpdate(base.id, 'targetCostRatio', parseFloat(e.target.value))}
-                              className="w-12 text-right font-bold text-gray-900 border-b border-gray-200 focus:border-primary-500 focus:ring-0 p-0 text-sm"
+                              className="w-12 text-right p-0 border-none border-b rounded-none"
                             />
                             <span className="text-xs text-gray-500">%</span>
                           </div>
@@ -412,15 +416,20 @@ const PlanManagement: React.FC = () => {
                               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-100"
                             >
                               {tag}{' '}
-                              <button onClick={() => handleRemoveTag(base.id, 'requiredTags', tag)}>
-                                <X className="w-3 h-3 ml-1" />
-                              </button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-4 h-4 p-0 ml-1"
+                                onClick={() => handleRemoveTag(base.id, 'requiredTags', tag)}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
                             </span>
                           ))}
-                          <input
+                          <Input
                             type="text"
                             placeholder="+ 필수태그"
-                            className="w-16 text-[10px] border-none p-0 focus:ring-0"
+                            className="w-16 text-[10px] border-none p-0 focus:ring-0 h-auto"
                             onKeyDown={e =>
                               e.key === 'Enter' &&
                               (handleAddTag(base.id, 'requiredTags', e.currentTarget.value),
@@ -435,15 +444,20 @@ const PlanManagement: React.FC = () => {
                               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-red-50 text-red-700 border border-red-100"
                             >
                               {tag}{' '}
-                              <button onClick={() => handleRemoveTag(base.id, 'bannedTags', tag)}>
-                                <X className="w-3 h-3 ml-1" />
-                              </button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-4 h-4 p-0 ml-1"
+                                onClick={() => handleRemoveTag(base.id, 'bannedTags', tag)}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
                             </span>
                           ))}
-                          <input
+                          <Input
                             type="text"
                             placeholder="+ 제외태그"
-                            className="w-16 text-[10px] border-none p-0 focus:ring-0 text-red-500 placeholder-red-300"
+                            className="w-16 text-[10px] border-none p-0 focus:ring-0 text-red-500 placeholder-red-300 h-auto"
                             onKeyDown={e =>
                               e.key === 'Enter' &&
                               (handleAddTag(base.id, 'bannedTags', e.currentTarget.value), (e.currentTarget.value = ''))
@@ -463,11 +477,11 @@ const PlanManagement: React.FC = () => {
                         <span className="inline-block px-2 py-0.5 mb-1 rounded text-[10px] font-bold bg-white border border-gray-200 text-gray-500">
                           옵션 (Option)
                         </span>
-                        <input
+                        <Input
                           type="text"
                           value={opt.target}
                           onChange={e => handleUpdate(opt.id, 'target', e.target.value)}
-                          className="block w-full font-medium text-gray-700 bg-transparent border-none p-0 focus:ring-0 text-sm"
+                          className="block w-full font-medium text-gray-700 bg-transparent border-none p-0 focus:ring-0 text-sm h-auto"
                         />
                       </td>
                       <td className="p-4">
@@ -482,22 +496,22 @@ const PlanManagement: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-400">판매가</span>
                             <div className="flex items-center gap-1">
-                              <input
+                              <Input
                                 type="number"
                                 value={opt.targetPrice}
                                 onChange={e => handleUpdate(opt.id, 'targetPrice', parseInt(e.target.value))}
-                                className="w-20 text-right font-medium text-gray-700 bg-transparent border-b border-gray-200 focus:border-primary-500 focus:ring-0 p-0 text-sm"
+                                className="w-20 text-right p-0 border-none border-b rounded-none bg-transparent"
                               />
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-400">원가율</span>
                             <div className="flex items-center gap-1">
-                              <input
+                              <Input
                                 type="number"
                                 value={opt.targetCostRatio}
                                 onChange={e => handleUpdate(opt.id, 'targetCostRatio', parseFloat(e.target.value))}
-                                className="w-12 text-right font-medium text-gray-700 bg-transparent border-b border-gray-200 focus:border-primary-500 focus:ring-0 p-0 text-sm"
+                                className="w-12 text-right p-0 border-none border-b rounded-none bg-transparent"
                               />
                             </div>
                           </div>
@@ -517,15 +531,20 @@ const PlanManagement: React.FC = () => {
                                 className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800"
                               >
                                 {tag}{' '}
-                                <button onClick={() => handleRemoveTag(opt.id, 'requiredTags', tag)}>
-                                  <X className="w-3 h-3 ml-1" />
-                                </button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="w-4 h-4 p-0 ml-1"
+                                  onClick={() => handleRemoveTag(opt.id, 'requiredTags', tag)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
                               </span>
                             ))}
-                            <input
+                            <Input
                               type="text"
                               placeholder="+ 추가"
-                              className="w-12 text-[10px] bg-transparent border-none p-0 focus:ring-0"
+                              className="w-12 text-[10px] bg-transparent border-none p-0 focus:ring-0 h-auto"
                               onKeyDown={e =>
                                 e.key === 'Enter' &&
                                 (handleAddTag(opt.id, 'requiredTags', e.currentTarget.value),
@@ -536,12 +555,14 @@ const PlanManagement: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-4 text-right">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDeletePlan(opt.id)}
-                          className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          className="w-7 h-7 text-gray-300 hover:text-red-500 hover:bg-red-50"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
