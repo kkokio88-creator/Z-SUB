@@ -39,7 +39,7 @@ const DEPT_ICONS: Record<ReviewDepartment, React.ElementType> = {
 };
 
 const STATUS_STYLES = {
-  pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: '대기' },
+  pending: { bg: 'bg-stone-100', text: 'text-stone-600', icon: Clock, label: '대기' },
   approved: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle, label: '승인' },
   rejected: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle, label: '반려' },
 };
@@ -171,9 +171,9 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-gray-800">{plan.date} 식단 검토</h2>
+            <h2 className="text-lg font-bold text-stone-800">{plan.date} 식단 검토</h2>
             <Badge variant={plan.cycleType === '화수목' ? 'info' : 'warning'}>{plan.cycleType}</Badge>
             {review && (
               <Badge
@@ -196,18 +196,18 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Plan Summary */}
-          <Card className="p-4 bg-gray-50">
-            <h3 className="text-sm font-bold text-gray-700 mb-3">식단 요약</h3>
+          <Card className="p-4 bg-stone-50">
+            <h3 className="text-sm font-bold text-stone-700 mb-3">식단 요약</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {plan.targets.map(t => (
-                <div key={t.targetType} className="bg-white rounded-lg border border-gray-100 p-3">
-                  <div className="text-xs font-bold text-gray-600 mb-1">{t.targetType}</div>
-                  <div className="text-[11px] text-gray-500">
+                <div key={t.targetType} className="bg-white rounded-lg border border-stone-100 p-3">
+                  <div className="text-xs font-bold text-stone-600 mb-1">{t.targetType}</div>
+                  <div className="text-[11px] text-stone-500">
                     {t.items.length}품 / 원가 {t.totalCost.toLocaleString()}원
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {t.items.slice(0, 4).map((item, i) => (
-                      <span key={i} className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded">
+                      <span key={i} className="px-1.5 py-0.5 text-[10px] bg-stone-100 text-stone-600 rounded">
                         {item.name
                           .replace(/_냉장|_반조리|_냉동/g, '')
                           .replace(/\s+\d+$/, '')
@@ -215,7 +215,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                       </span>
                     ))}
                     {t.items.length > 4 && (
-                      <span className="px-1.5 py-0.5 text-[10px] text-gray-400">+{t.items.length - 4}</span>
+                      <span className="px-1.5 py-0.5 text-[10px] text-stone-400">+{t.items.length - 4}</span>
                     )}
                   </div>
                 </div>
@@ -226,7 +226,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
           {/* Department Review Cards */}
           {review && (
             <div>
-              <h3 className="text-sm font-bold text-gray-700 mb-3">부서별 검토</h3>
+              <h3 className="text-sm font-bold text-stone-700 mb-3">부서별 검토</h3>
               <div className="space-y-3">
                 {review.departments.map(dept => {
                   const style = STATUS_STYLES[dept.status];
@@ -239,7 +239,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                       key={dept.department}
                       className={`rounded-xl border p-4 ${
                         dept.status === 'pending'
-                          ? 'border-gray-200'
+                          ? 'border-stone-200'
                           : dept.status === 'approved'
                             ? 'border-green-200 bg-green-50/30'
                             : 'border-red-200 bg-red-50/30'
@@ -247,8 +247,8 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium text-gray-700">
+                          <Icon className="w-4 h-4 text-stone-500" />
+                          <span className="text-sm font-medium text-stone-700">
                             {DEPARTMENT_LABELS[dept.department]}
                           </span>
                           <Badge
@@ -276,7 +276,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                       </div>
 
                       {dept.comment && (
-                        <p className="mt-2 text-xs text-gray-600 bg-white rounded-lg p-2.5 border border-gray-100">
+                        <p className="mt-2 text-xs text-stone-600 bg-white rounded-lg p-2.5 border border-stone-100">
                           {dept.reviewer && <span className="font-medium">{dept.reviewer}: </span>}
                           {dept.comment}
                         </p>
@@ -288,7 +288,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                             value={reviewComment}
                             onChange={e => setReviewComment(e.target.value)}
                             placeholder="검토 의견을 입력하세요..."
-                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none"
+                            className="w-full text-sm border border-stone-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none"
                             rows={2}
                           />
                           <div className="flex gap-2">
@@ -319,11 +319,11 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
 
           {/* Threaded Comments */}
           <div>
-            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-              <MessageSquare className="w-4 h-4 text-gray-500" />
+            <h3 className="text-sm font-bold text-stone-700 mb-3 flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4 text-stone-500" />
               코멘트
               {topLevelComments.length > 0 && (
-                <span className="text-xs font-normal text-gray-400">({topLevelComments.length})</span>
+                <span className="text-xs font-normal text-stone-400">({topLevelComments.length})</span>
               )}
             </h3>
 
@@ -344,7 +344,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
             </div>
 
             {topLevelComments.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-4">등록된 코멘트가 없습니다.</p>
+              <p className="text-xs text-stone-400 text-center py-4">등록된 코멘트가 없습니다.</p>
             ) : (
               <div className="space-y-3">
                 {topLevelComments.map(comment => (
@@ -352,15 +352,15 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                     key={comment.id}
                     className={`rounded-lg border p-3 ${
                       comment.status === 'resolved'
-                        ? 'border-gray-200 bg-gray-50 opacity-60'
-                        : 'border-gray-200 bg-white'
+                        ? 'border-stone-200 bg-stone-50 opacity-60'
+                        : 'border-stone-200 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-medium text-gray-600">{comment.reviewer}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className="text-[11px] text-gray-400">{DEPARTMENT_LABELS[comment.department]}</span>
+                        <span className="text-[11px] font-medium text-stone-600">{comment.reviewer}</span>
+                        <span className="text-stone-300">·</span>
+                        <span className="text-[11px] text-stone-400">{DEPARTMENT_LABELS[comment.department]}</span>
                         {comment.status === 'resolved' && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">
                             해결
@@ -374,7 +374,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                           onClick={() => handleResolveComment(comment.id)}
                           className={`text-[10px] font-medium h-auto px-2 py-0.5 ${
                             comment.status === 'resolved'
-                              ? 'text-gray-500 bg-white border-gray-200 hover:bg-gray-50'
+                              ? 'text-stone-500 bg-white border-stone-200 hover:bg-stone-50'
                               : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100'
                           }`}
                         >
@@ -382,8 +382,8 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                         </Button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-700 mb-1">{comment.comment}</p>
-                    <div className="text-[10px] text-gray-400">
+                    <p className="text-xs text-stone-700 mb-1">{comment.comment}</p>
+                    <div className="text-[10px] text-stone-400">
                       {new Date(comment.createdAt).toLocaleString('ko-KR')}
                     </div>
 
@@ -391,13 +391,13 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                     {(repliesByParent[comment.id] || []).map(reply => (
                       <div key={reply.id} className="ml-4 mt-2 pl-3 border-l-2 border-blue-200">
                         <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="text-[11px] font-medium text-gray-600">{reply.reviewer}</span>
-                          <span className="text-gray-300">·</span>
-                          <span className="text-[10px] text-gray-400">
+                          <span className="text-[11px] font-medium text-stone-600">{reply.reviewer}</span>
+                          <span className="text-stone-300">·</span>
+                          <span className="text-[10px] text-stone-400">
                             {new Date(reply.createdAt).toLocaleString('ko-KR')}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-600">{reply.comment}</p>
+                        <p className="text-xs text-stone-600">{reply.comment}</p>
                       </div>
                     ))}
 
@@ -440,7 +440,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => exportHistoricalPlanToCSV(plan)}>
               <Download className="w-3 h-3" /> CSV

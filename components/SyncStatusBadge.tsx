@@ -9,7 +9,7 @@ interface Props {
 }
 
 const config: Record<BadgeStatus, { icon: React.ElementType; color: string; text: string }> = {
-  idle: { icon: Clock, color: 'bg-gray-100 text-gray-500', text: '대기' },
+  idle: { icon: Clock, color: 'bg-stone-100 text-stone-500', text: '대기' },
   syncing: { icon: RefreshCw, color: 'bg-blue-100 text-blue-600', text: '동기화 중' },
   done: { icon: CheckCircle, color: 'bg-green-100 text-green-600', text: '완료' },
   error: { icon: AlertCircle, color: 'bg-red-100 text-red-600', text: '오류' },

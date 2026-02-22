@@ -217,12 +217,12 @@ const PlanManagement: React.FC = () => {
   ) => (
     <div className="flex flex-col items-center gap-1">
       <span className={`text-[10px] font-bold ${colorClass}`}>{label}</span>
-      <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
+      <div className="flex items-center bg-stone-50 rounded-lg border border-stone-200">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => handleUpdate(config.id, `composition.${category}`, (config.composition[category] || 0) - 1)}
-          className="w-6 h-6 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-l-lg rounded-r-none"
+          className="w-6 h-6 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-l-lg rounded-r-none"
         >
           <Minus className="w-3 h-3" />
         </Button>
@@ -230,13 +230,13 @@ const PlanManagement: React.FC = () => {
           type="number"
           value={config.composition[category] || 0}
           readOnly
-          className="w-8 text-center bg-transparent border-none p-0 text-sm font-bold text-gray-800 focus:ring-0"
+          className="w-8 text-center bg-transparent border-none p-0 text-sm font-bold text-stone-800 focus:ring-0"
         />
         <Button
           variant="ghost"
           size="icon"
           onClick={() => handleUpdate(config.id, `composition.${category}`, (config.composition[category] || 0) + 1)}
-          className="w-6 h-6 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-r-lg rounded-l-none"
+          className="w-6 h-6 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-r-lg rounded-l-none"
         >
           <Plus className="w-3 h-3" />
         </Button>
@@ -251,11 +251,11 @@ const PlanManagement: React.FC = () => {
         <CardContent className="p-5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-stone-800 flex items-center gap-2">
                 <Settings className="w-6 h-6 text-primary-600" />
                 식단 정책 관리
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-stone-500 mt-1">
                 기본 식단과 파생된 옵션 상품을 그룹별로 관리하고, 원가율 정책을 수립합니다.
               </p>
             </div>
@@ -273,12 +273,12 @@ const PlanManagement: React.FC = () => {
           </div>
 
           {/* Global Ratio Toolbar */}
-          <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-4 bg-stone-50 p-4 rounded-lg border border-stone-200">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-white rounded-md border border-gray-200 shadow-sm">
-                <Percent className="w-4 h-4 text-gray-500" />
+              <div className="p-2 bg-white rounded-md border border-stone-200 shadow-sm">
+                <Percent className="w-4 h-4 text-stone-500" />
               </div>
-              <span className="text-sm font-bold text-gray-700">전체 목표 원가율 설정</span>
+              <span className="text-sm font-bold text-stone-700">전체 목표 원가율 설정</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative w-24">
@@ -288,7 +288,7 @@ const PlanManagement: React.FC = () => {
                   onChange={e => setGlobalCostRatio(parseFloat(e.target.value))}
                   className="pr-6"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">%</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 font-bold">%</span>
               </div>
               <Button variant="outline" onClick={handleApplyGlobalRatio}>
                 일괄 적용
@@ -307,11 +307,11 @@ const PlanManagement: React.FC = () => {
       {/* 2. Plan Groups List */}
       <div className="flex-1 overflow-y-auto space-y-6 pb-10">
         {groupedConfigs.map(({ base, options }) => (
-          <div key={base.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div key={base.id} className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
             {/* Group Header (Base Plan) */}
-            <div className="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
+            <div className="bg-stone-50 border-b border-stone-200 p-4 flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="p-2 bg-white rounded-lg border border-stone-200 shadow-sm">
                   <Layers className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
@@ -319,10 +319,10 @@ const PlanManagement: React.FC = () => {
                     type="text"
                     value={base.target}
                     onChange={e => handleUpdate(base.id, 'target', e.target.value)}
-                    className="font-bold text-lg bg-transparent border-none p-0 focus:ring-0 text-gray-900 placeholder-gray-400"
+                    className="font-bold text-lg bg-transparent border-none p-0 focus:ring-0 text-stone-900 placeholder-stone-400"
                     placeholder="기본 식단명 입력"
                   />
-                  <div className="text-xs text-gray-500 font-mono">ID: {base.id}</div>
+                  <div className="text-xs text-stone-500 font-mono">ID: {base.id}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -338,7 +338,7 @@ const PlanManagement: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleDeletePlan(base.id)}
-                  className="text-gray-400 hover:text-red-500 hover:bg-red-50"
+                  className="text-stone-400 hover:text-red-500 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -348,7 +348,7 @@ const PlanManagement: React.FC = () => {
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-white border-b border-gray-100 text-gray-500 font-semibold text-xs uppercase">
+                <thead className="bg-white border-b border-stone-100 text-stone-500 font-semibold text-xs uppercase">
                   <tr>
                     <th className="p-4 w-[20%]">구분 / 상품명</th>
                     <th className="p-4 w-[25%] text-center">메뉴 구성 (개수)</th>
@@ -357,14 +357,14 @@ const PlanManagement: React.FC = () => {
                     <th className="p-4 w-[5%]"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-stone-50">
                   {/* Base Plan Row */}
                   <tr className="bg-white">
                     <td className="p-4">
-                      <span className="inline-block px-2 py-0.5 mb-1 rounded text-[10px] font-bold bg-gray-800 text-white">
+                      <span className="inline-block px-2 py-0.5 mb-1 rounded text-[10px] font-bold bg-stone-800 text-white">
                         기본 (Base)
                       </span>
-                      <div className="font-bold text-gray-900">{base.target}</div>
+                      <div className="font-bold text-stone-900">{base.target}</div>
                     </td>
                     <td className="p-4">
                       <div className="flex justify-center gap-4">
@@ -376,7 +376,7 @@ const PlanManagement: React.FC = () => {
                     <td className="p-4">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">판매가</span>
+                          <span className="text-xs text-stone-500">판매가</span>
                           <div className="flex items-center gap-1">
                             <Input
                               type="number"
@@ -384,11 +384,11 @@ const PlanManagement: React.FC = () => {
                               onChange={e => handleUpdate(base.id, 'targetPrice', parseInt(e.target.value))}
                               className="w-20 text-right p-0 border-none border-b rounded-none"
                             />
-                            <span className="text-xs text-gray-500">원</span>
+                            <span className="text-xs text-stone-500">원</span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">원가율</span>
+                          <span className="text-xs text-stone-500">원가율</span>
                           <div className="flex items-center gap-1">
                             <Input
                               type="number"
@@ -396,11 +396,11 @@ const PlanManagement: React.FC = () => {
                               onChange={e => handleUpdate(base.id, 'targetCostRatio', parseFloat(e.target.value))}
                               className="w-12 text-right p-0 border-none border-b rounded-none"
                             />
-                            <span className="text-xs text-gray-500">%</span>
+                            <span className="text-xs text-stone-500">%</span>
                           </div>
                         </div>
-                        <div className="pt-1 mt-1 border-t border-gray-100 flex justify-between">
-                          <span className="text-xs font-bold text-gray-400">원가한도</span>
+                        <div className="pt-1 mt-1 border-t border-stone-100 flex justify-between">
+                          <span className="text-xs font-bold text-stone-400">원가한도</span>
                           <span className="text-xs font-bold text-primary-600">
                             {base.budgetCap.toLocaleString()}원
                           </span>
@@ -471,30 +471,30 @@ const PlanManagement: React.FC = () => {
 
                   {/* Option Plans Rows */}
                   {options.map(opt => (
-                    <tr key={opt.id} className="bg-gray-50/50 hover:bg-blue-50/30 transition-colors">
+                    <tr key={opt.id} className="bg-stone-50/50 hover:bg-emerald-50/40 transition-colors">
                       <td className="p-4 pl-8 relative">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 border-l-2 border-b-2 border-gray-300 rounded-bl-md"></div>
-                        <span className="inline-block px-2 py-0.5 mb-1 rounded text-[10px] font-bold bg-white border border-gray-200 text-gray-500">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 border-l-2 border-b-2 border-stone-300 rounded-bl-md"></div>
+                        <span className="inline-block px-2 py-0.5 mb-1 rounded text-[10px] font-bold bg-white border border-stone-200 text-stone-500">
                           옵션 (Option)
                         </span>
                         <Input
                           type="text"
                           value={opt.target}
                           onChange={e => handleUpdate(opt.id, 'target', e.target.value)}
-                          className="block w-full font-medium text-gray-700 bg-transparent border-none p-0 focus:ring-0 text-sm h-auto"
+                          className="block w-full font-medium text-stone-700 bg-transparent border-none p-0 focus:ring-0 text-sm h-auto"
                         />
                       </td>
                       <td className="p-4">
                         <div className="flex justify-center gap-4 opacity-90">
-                          {renderCompositionStepper(opt, MenuCategory.SOUP, '국', 'text-gray-500')}
-                          {renderCompositionStepper(opt, MenuCategory.MAIN, '메인', 'text-gray-500')}
-                          {renderCompositionStepper(opt, MenuCategory.SIDE, '반찬', 'text-gray-500')}
+                          {renderCompositionStepper(opt, MenuCategory.SOUP, '국', 'text-stone-500')}
+                          {renderCompositionStepper(opt, MenuCategory.MAIN, '메인', 'text-stone-500')}
+                          {renderCompositionStepper(opt, MenuCategory.SIDE, '반찬', 'text-stone-500')}
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-2 opacity-90">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">판매가</span>
+                            <span className="text-xs text-stone-400">판매가</span>
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
@@ -505,7 +505,7 @@ const PlanManagement: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">원가율</span>
+                            <span className="text-xs text-stone-400">원가율</span>
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
@@ -515,14 +515,14 @@ const PlanManagement: React.FC = () => {
                               />
                             </div>
                           </div>
-                          <div className="pt-1 mt-1 border-t border-gray-200 flex justify-between">
-                            <span className="text-xs font-bold text-gray-400">원가한도</span>
-                            <span className="text-xs font-bold text-gray-500">{opt.budgetCap.toLocaleString()}원</span>
+                          <div className="pt-1 mt-1 border-t border-stone-200 flex justify-between">
+                            <span className="text-xs font-bold text-stone-400">원가한도</span>
+                            <span className="text-xs font-bold text-stone-500">{opt.budgetCap.toLocaleString()}원</span>
                           </div>
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs text-gray-400 italic mb-1">기본 태그 상속됨</div>
+                        <div className="text-xs text-stone-400 italic mb-1">기본 태그 상속됨</div>
                         <div className="space-y-1">
                           <div className="flex flex-wrap gap-1">
                             {opt.requiredTags.map(tag => (
@@ -559,7 +559,7 @@ const PlanManagement: React.FC = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDeletePlan(opt.id)}
-                          className="w-7 h-7 text-gray-300 hover:text-red-500 hover:bg-red-50"
+                          className="w-7 h-7 text-stone-300 hover:text-red-500 hover:bg-red-50"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -569,10 +569,10 @@ const PlanManagement: React.FC = () => {
 
                   {/* Empty State for Options */}
                   {options.length === 0 && (
-                    <tr className="bg-gray-50/30">
+                    <tr className="bg-stone-50/30">
                       <td
                         colSpan={5}
-                        className="p-4 text-center text-xs text-gray-400 border-t border-dashed border-gray-200"
+                        className="p-4 text-center text-xs text-stone-400 border-t border-dashed border-stone-200"
                       >
                         등록된 옵션 상품이 없습니다. 상단 '옵션 상품 추가' 버튼을 눌러 구성하세요.
                       </td>

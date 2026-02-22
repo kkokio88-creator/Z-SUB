@@ -21,14 +21,14 @@ const ConfirmDialog: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 p-2 bg-gray-50 rounded-full">{iconMap[variant]}</div>
+            <div className="flex-shrink-0 p-2 bg-stone-50 rounded-full">{iconMap[variant]}</div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-gray-900">{confirmState.title}</h3>
-              <p className="text-sm text-gray-600 mt-2 whitespace-pre-line leading-relaxed">{confirmState.message}</p>
+              <h3 className="text-lg font-bold text-stone-900">{confirmState.title}</h3>
+              <p className="text-sm text-stone-600 mt-2 whitespace-pre-line leading-relaxed">{confirmState.message}</p>
             </div>
           </div>
         </div>
-        <div className="flex gap-3 p-4 bg-gray-50 border-t border-gray-100 justify-end">
+        <div className="flex gap-3 p-4 bg-stone-50 border-t border-stone-100 justify-end">
           <Button variant="outline" onClick={() => resolveConfirm(false)}>
             {confirmState.cancelLabel ?? '취소'}
           </Button>

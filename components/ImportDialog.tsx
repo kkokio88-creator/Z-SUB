@@ -105,8 +105,8 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-800">CSV 가져오기</h3>
+        <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-800">CSV 가져오기</h3>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
@@ -116,7 +116,7 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
           {allSteps.map((s, i) => (
             <React.Fragment key={s}>
               <Badge variant={step === s ? 'default' : 'outline'}>{stepLabels[i]}</Badge>
-              {i < 3 && <ArrowRight className="w-3 h-3 text-gray-300" />}
+              {i < 3 && <ArrowRight className="w-3 h-3 text-stone-300" />}
             </React.Fragment>
           ))}
         </div>
@@ -124,25 +124,25 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'upload' && (
             <div className="flex flex-col items-center justify-center py-12">
-              <Upload className="w-12 h-12 text-gray-300 mb-4" />
-              <p className="text-sm text-gray-600 mb-4">CSV 파일을 선택해주세요</p>
+              <Upload className="w-12 h-12 text-stone-300 mb-4" />
+              <p className="text-sm text-stone-600 mb-4">CSV 파일을 선택해주세요</p>
               <Input type="file" accept=".csv" onChange={handleFileSelect} className="text-sm w-auto" />
             </div>
           )}
 
           {step === 'mapping' && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-stone-600 mb-4">
                 각 CSV 컬럼을 메뉴 필드에 매핑해주세요. ({rows.length}행 감지됨)
               </p>
               {mappings.map((m, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <span className="w-40 text-sm font-mono bg-gray-50 px-3 py-2 rounded truncate">{m.csvColumn}</span>
-                  <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <span className="w-40 text-sm font-mono bg-stone-50 px-3 py-2 rounded truncate">{m.csvColumn}</span>
+                  <ArrowRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
                   <select
                     value={m.fieldName}
                     onChange={e => handleMapping(i, e.target.value as keyof MenuItem | '')}
-                    className="flex-1 text-sm border-gray-200 rounded-lg"
+                    className="flex-1 text-sm border-stone-200 rounded-lg"
                   >
                     {FIELD_OPTIONS.map(o => (
                       <option key={o.value} value={o.value}>
@@ -164,15 +164,15 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
 
           {step === 'preview' && (
             <div>
-              <p className="text-sm text-gray-600 mb-3">총 {rows.length}행 (처음 5행 미리보기)</p>
-              <div className="overflow-auto max-h-64 border border-gray-200 rounded-lg">
+              <p className="text-sm text-stone-600 mb-3">총 {rows.length}행 (처음 5행 미리보기)</p>
+              <div className="overflow-auto max-h-64 border border-stone-200 rounded-lg">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50">
+                    <tr className="bg-stone-50">
                       {mappings
                         .filter(m => m.fieldName)
                         .map(m => (
-                          <th key={m.csvColumn} className="px-3 py-2 text-left font-bold text-gray-600">
+                          <th key={m.csvColumn} className="px-3 py-2 text-left font-bold text-stone-600">
                             {FIELD_OPTIONS.find(o => o.value === m.fieldName)?.label}
                           </th>
                         ))}
@@ -180,13 +180,13 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
                   </thead>
                   <tbody>
                     {rows.slice(0, 5).map((row, ri) => (
-                      <tr key={ri} className="border-t border-gray-100">
+                      <tr key={ri} className="border-t border-stone-100">
                         {mappings
                           .filter(m => m.fieldName)
                           .map(m => {
                             const ci = headers.indexOf(m.csvColumn);
                             return (
-                              <td key={m.csvColumn} className="px-3 py-2 text-gray-700">
+                              <td key={m.csvColumn} className="px-3 py-2 text-stone-700">
                                 {row[ci] || '-'}
                               </td>
                             );
@@ -196,7 +196,7 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
                   </tbody>
                 </table>
               </div>
-              {rows.length > 5 && <p className="text-xs text-gray-400 mt-2">...외 {rows.length - 5}행</p>}
+              {rows.length > 5 && <p className="text-xs text-stone-400 mt-2">...외 {rows.length - 5}행</p>}
               <Button onClick={handleExecute} className="mt-4 bg-green-600 hover:bg-green-700">
                 가져오기 실행
               </Button>
@@ -210,8 +210,8 @@ const ImportDialog: React.FC<Props> = ({ existingItems, onImport, onClose }) => 
               ) : (
                 <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
               )}
-              <h4 className="text-lg font-bold text-gray-800">가져오기 완료</h4>
-              <p className="text-sm text-gray-600 mt-2">
+              <h4 className="text-lg font-bold text-stone-800">가져오기 완료</h4>
+              <p className="text-sm text-stone-600 mt-2">
                 {result.imported}건 가져옴 / {result.skipped}건 건너뜀
               </p>
               {result.errors.length > 0 && (

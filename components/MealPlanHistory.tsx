@@ -162,29 +162,35 @@ const INGREDIENT_KEYWORDS: Record<string, string[]> = {
 };
 
 const INGREDIENT_COLORS: Record<string, { bg: string; borderL: string; text: string; dot: string; label: string }> = {
-  beef: { bg: 'bg-white', borderL: 'border-l-red-400', text: 'text-gray-700', dot: 'bg-red-400', label: '소고기' },
-  pork: { bg: 'bg-white', borderL: 'border-l-rose-400', text: 'text-gray-700', dot: 'bg-rose-400', label: '한돈' },
-  chicken: { bg: 'bg-white', borderL: 'border-l-amber-400', text: 'text-gray-700', dot: 'bg-amber-400', label: '닭' },
-  fish: { bg: 'bg-white', borderL: 'border-l-sky-400', text: 'text-gray-700', dot: 'bg-sky-400', label: '생선' },
-  tofu: { bg: 'bg-white', borderL: 'border-l-yellow-300', text: 'text-gray-700', dot: 'bg-yellow-300', label: '두부' },
-  egg: { bg: 'bg-white', borderL: 'border-l-orange-300', text: 'text-gray-700', dot: 'bg-orange-300', label: '달걀' },
-  potato: { bg: 'bg-white', borderL: 'border-l-stone-400', text: 'text-gray-700', dot: 'bg-stone-400', label: '감자' },
-  seaweed: { bg: 'bg-white', borderL: 'border-l-teal-400', text: 'text-gray-700', dot: 'bg-teal-400', label: '해조류' },
+  beef: { bg: 'bg-white', borderL: 'border-l-red-400', text: 'text-stone-700', dot: 'bg-red-400', label: '소고기' },
+  pork: { bg: 'bg-white', borderL: 'border-l-rose-400', text: 'text-stone-700', dot: 'bg-rose-400', label: '한돈' },
+  chicken: { bg: 'bg-white', borderL: 'border-l-amber-400', text: 'text-stone-700', dot: 'bg-amber-400', label: '닭' },
+  fish: { bg: 'bg-white', borderL: 'border-l-sky-400', text: 'text-stone-700', dot: 'bg-sky-400', label: '생선' },
+  tofu: { bg: 'bg-white', borderL: 'border-l-yellow-300', text: 'text-stone-700', dot: 'bg-yellow-300', label: '두부' },
+  egg: { bg: 'bg-white', borderL: 'border-l-orange-300', text: 'text-stone-700', dot: 'bg-orange-300', label: '달걀' },
+  potato: { bg: 'bg-white', borderL: 'border-l-stone-400', text: 'text-stone-700', dot: 'bg-stone-400', label: '감자' },
+  seaweed: {
+    bg: 'bg-white',
+    borderL: 'border-l-teal-400',
+    text: 'text-stone-700',
+    dot: 'bg-teal-400',
+    label: '해조류',
+  },
   mushroom: {
     bg: 'bg-white',
     borderL: 'border-l-violet-300',
-    text: 'text-gray-700',
+    text: 'text-stone-700',
     dot: 'bg-violet-300',
     label: '버섯',
   },
   vegetable: {
     bg: 'bg-white',
     borderL: 'border-l-green-400',
-    text: 'text-gray-700',
+    text: 'text-stone-700',
     dot: 'bg-green-400',
     label: '채소',
   },
-  other: { bg: 'bg-white', borderL: 'border-l-gray-300', text: 'text-gray-500', dot: 'bg-gray-300', label: '기타' },
+  other: { bg: 'bg-white', borderL: 'border-l-stone-300', text: 'text-stone-500', dot: 'bg-stone-300', label: '기타' },
 };
 
 function detectIngredient(name: string): string {
@@ -238,7 +244,7 @@ const PROCESS_COLORS: Record<string, { bg: string; text: string; badge: string }
   전류: { bg: 'bg-yellow-50', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700' },
   '김치/절임': { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-100 text-red-700' },
   샐러드: { bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
-  기타: { bg: 'bg-gray-50', text: 'text-gray-600', badge: 'bg-gray-100 text-gray-600' },
+  기타: { bg: 'bg-stone-50', text: 'text-stone-600', badge: 'bg-stone-100 text-stone-600' },
 };
 
 function detectProcess(name: string): string {
@@ -259,13 +265,13 @@ function detectProcess(name: string): string {
 
 const IngredientLegend: React.FC = () => (
   <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
-    <span className="text-[11px] font-medium text-gray-500">주재료:</span>
+    <span className="text-[11px] font-medium text-stone-500">주재료:</span>
     {Object.entries(INGREDIENT_COLORS)
       .filter(([k]) => k !== 'other')
       .map(([key, val]) => (
         <div key={key} className="flex items-center gap-1">
           <span className={`w-2.5 h-2.5 rounded-full ${val.dot}`} />
-          <span className="text-[11px] text-gray-600">{val.label}</span>
+          <span className="text-[11px] text-stone-600">{val.label}</span>
         </div>
       ))}
   </div>
@@ -306,12 +312,12 @@ const MenuItemRow: React.FC<{
   return (
     <div
       onClick={() => onAction(targetType, idx, item.name)}
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-stone-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
       title={isEdited && originalName ? `변경: ${originalName} → ${cleanName}` : item.name}
     >
       <span className={`${colors.text} truncate flex-1`}>{cleanName}</span>
       {quantity !== null && (
-        <span className="px-1 py-0 text-[9px] font-bold text-gray-400 bg-gray-50 rounded shrink-0">{quantity}</span>
+        <span className="px-1 py-0 text-[9px] font-bold text-stone-400 bg-stone-50 rounded shrink-0">{quantity}</span>
       )}
       {isPlusOnly && plusBadge && (
         <span className="px-1 py-0 text-[9px] font-medium text-slate-500 bg-slate-100 rounded shrink-0">
@@ -334,9 +340,9 @@ const MenuItemRow: React.FC<{
               <MessageSquare className="w-2.5 h-2.5" />
               {commentCount}
               {recentComments && recentComments.length > 0 && (
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-52 p-2 bg-gray-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/comment:block z-50 w-52 p-2 bg-stone-800 text-white text-[10px] rounded-lg shadow-lg pointer-events-none">
                   {isEdited && originalName && (
-                    <span className="block mb-1.5 pb-1 border-b border-gray-600 text-green-400 text-[9px]">
+                    <span className="block mb-1.5 pb-1 border-b border-stone-600 text-green-400 text-[9px]">
                       {'\u2713'} {originalName} → {cleanName}
                     </span>
                   )}
@@ -346,7 +352,7 @@ const MenuItemRow: React.FC<{
                         ? 'text-green-400'
                         : c.status === 'issue'
                           ? 'text-red-400'
-                          : 'text-gray-300';
+                          : 'text-stone-300';
                     const statusPrefix = c.status === 'resolved' ? '\u2713 ' : c.status === 'issue' ? '\u2717 ' : '';
                     return (
                       <span key={i} className={`block mb-1 last:mb-0 ${statusColor}`}>
@@ -515,24 +521,24 @@ const SwapModal: React.FC<{
         className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-gray-200">
+        <div className="px-5 py-4 border-b border-stone-200">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-gray-800">메뉴 교체</h3>
+            <h3 className="text-lg font-bold text-stone-800">메뉴 교체</h3>
             <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-5 h-5 text-stone-400" />
             </Button>
           </div>
-          <p className="text-sm text-gray-500 mb-3">
-            현재: <span className="font-medium text-gray-700">{parseMenuItem(currentName).cleanName}</span>
+          <p className="text-sm text-stone-500 mb-3">
+            현재: <span className="font-medium text-stone-700">{parseMenuItem(currentName).cleanName}</span>
           </p>
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
             <Input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="메뉴명 검색..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               autoFocus
             />
           </div>
@@ -545,7 +551,7 @@ const SwapModal: React.FC<{
                   variant="outline"
                   size="sm"
                   onClick={() => setIngredientFilter(f => (f === key ? '' : key))}
-                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${ingredientFilter === key ? `${val.bg} ${val.text} border-current font-bold` : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${ingredientFilter === key ? `${val.bg} ${val.text} border-current font-bold` : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}
                 >
                   {val.label}
                 </Button>
@@ -554,7 +560,7 @@ const SwapModal: React.FC<{
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {candidates.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">검색 결과 없음</p>
+            <p className="text-center text-sm text-stone-400 py-8">검색 결과 없음</p>
           ) : (
             <div className="space-y-1">
               {candidates.map(item => {
@@ -564,10 +570,10 @@ const SwapModal: React.FC<{
                     key={item.id}
                     variant="ghost"
                     onClick={() => onSelect(item.name)}
-                    className={`w-full text-left px-3 py-2 rounded-lg border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-gray-300 transition-all flex items-center justify-between h-auto`}
+                    className={`w-full text-left px-3 py-2 rounded-lg border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-stone-300 transition-all flex items-center justify-between h-auto`}
                   >
-                    <span className="text-sm text-gray-700 truncate">{item.name}</span>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 shrink-0 ml-2">
+                    <span className="text-sm text-stone-700 truncate">{item.name}</span>
+                    <div className="flex items-center gap-2 text-xs text-stone-400 shrink-0 ml-2">
                       <span className={`px-1.5 py-0.5 rounded ${colors.bg} ${colors.text} text-[10px] font-medium`}>
                         {colors.label}
                       </span>
@@ -597,8 +603,8 @@ const ActionModal: React.FC<{
 }> = ({ menuName, onComment, onSwap, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
     <div className="bg-white rounded-xl shadow-xl w-72 overflow-hidden" onClick={e => e.stopPropagation()}>
-      <div className="px-4 py-3 border-b border-gray-100">
-        <p className="text-sm font-bold text-gray-800 truncate">{parseMenuItem(menuName).cleanName}</p>
+      <div className="px-4 py-3 border-b border-stone-100">
+        <p className="text-sm font-bold text-stone-800 truncate">{parseMenuItem(menuName).cleanName}</p>
       </div>
       <div className="p-2 space-y-1">
         <Button
@@ -608,8 +614,8 @@ const ActionModal: React.FC<{
         >
           <MessageSquare className="w-4 h-4 text-blue-500" />
           <div>
-            <div className="text-sm font-medium text-gray-800">의견 남기기</div>
-            <div className="text-[11px] text-gray-400">이 메뉴에 코멘트 작성</div>
+            <div className="text-sm font-medium text-stone-800">의견 남기기</div>
+            <div className="text-[11px] text-stone-400">이 메뉴에 코멘트 작성</div>
           </div>
         </Button>
         <Button
@@ -619,8 +625,8 @@ const ActionModal: React.FC<{
         >
           <Replace className="w-4 h-4 text-orange-500" />
           <div>
-            <div className="text-sm font-medium text-gray-800">메뉴 변경</div>
-            <div className="text-[11px] text-gray-400">다른 메뉴로 교체</div>
+            <div className="text-sm font-medium text-stone-800">메뉴 변경</div>
+            <div className="text-[11px] text-stone-400">다른 메뉴로 교체</div>
           </div>
         </Button>
       </div>
@@ -662,44 +668,44 @@ const CommentModal: React.FC<{
         className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[70vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+        <div className="px-4 py-3 border-b border-stone-100 flex justify-between items-center">
           <div>
-            <p className="text-sm font-bold text-gray-800">{parseMenuItem(menuName).cleanName}</p>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-sm font-bold text-stone-800">{parseMenuItem(menuName).cleanName}</p>
+            <p className="text-[11px] text-stone-400">
               {scopeKey.startsWith('PROD|') ? '전체 식단 공통 코멘트' : '코멘트'} ({scopeComments.length})
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
-            <X className="w-4 h-4 text-gray-400" />
+          <Button variant="ghost" size="sm" onClick={onClose} className="p-1 rounded-lg hover:bg-stone-100">
+            <X className="w-4 h-4 text-stone-400" />
           </Button>
         </div>
 
         {/* 기존 코멘트 */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           {scopeComments.length === 0 ? (
-            <p className="text-center text-sm text-gray-300 py-4">아직 코멘트가 없습니다</p>
+            <p className="text-center text-sm text-stone-300 py-4">아직 코멘트가 없습니다</p>
           ) : (
             scopeComments.map(c => (
-              <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+              <div key={c.id} className="bg-stone-50 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-gray-700">{c.reviewer}</span>
-                  <span className="text-[10px] text-gray-400">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
+                  <span className="text-xs font-bold text-stone-700">{c.reviewer}</span>
+                  <span className="text-[10px] text-stone-400">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
                 </div>
-                <p className="text-sm text-gray-600">{c.comment}</p>
+                <p className="text-sm text-stone-600">{c.comment}</p>
               </div>
             ))
           )}
         </div>
 
         {/* 입력 */}
-        <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+        <div className="px-4 py-3 border-t border-stone-100 flex gap-2">
           <Input
             type="text"
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             placeholder="의견을 입력하세요..."
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             autoFocus
           />
           <Button onClick={handleSubmit} disabled={!text.trim()} className="px-3 py-2 bg-blue-600 hover:bg-blue-700">
@@ -1197,7 +1203,7 @@ const MealPlanHistory: React.FC = () => {
   const getColumnLabel = (col: ColumnDef): string =>
     col.type === 'standalone' ? TARGET_LABELS[col.target] || col.target : col.group.groupLabel;
   const getColumnColor = (col: ColumnDef): string =>
-    col.type === 'standalone' ? TARGET_COLORS[col.target] || 'bg-gray-100 text-gray-600' : col.group.color;
+    col.type === 'standalone' ? TARGET_COLORS[col.target] || 'bg-stone-100 text-stone-600' : col.group.color;
 
   return (
     <div className="h-full flex flex-col">
@@ -1205,13 +1211,13 @@ const MealPlanHistory: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={goToPrevMonth} className="p-2">
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
           </Button>
-          <h2 className="text-2xl font-bold text-gray-800 min-w-[160px] text-center">
+          <h2 className="text-2xl font-bold text-stone-800 min-w-[160px] text-center">
             {viewYear}년 {viewMonth + 1}월
           </h2>
           <Button variant="outline" size="sm" onClick={goToNextMonth} className="p-2">
-            <ChevronRight className="w-5 h-5 text-gray-600" />
+            <ChevronRight className="w-5 h-5 text-stone-600" />
           </Button>
           <Button variant="outline" size="sm" onClick={goToToday} className="ml-2 text-xs font-medium">
             오늘
@@ -1224,7 +1230,7 @@ const MealPlanHistory: React.FC = () => {
             className="ml-2 p-1.5"
             title="시트에서 새로고침"
           >
-            <RefreshCw className={`w-4 h-4 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-stone-500 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
           {monthPlans.length > 0 && (
             <Badge variant="secondary" className="ml-2 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50">
@@ -1246,8 +1252,8 @@ const MealPlanHistory: React.FC = () => {
       <div className="flex items-center gap-2 mb-3">
         {(
           [
-            { key: 'all' as const, label: '전체', color: 'bg-gray-100 text-gray-700 border-gray-300' },
-            { key: 'pending' as const, label: '대기', color: 'bg-gray-50 text-gray-600 border-gray-300' },
+            { key: 'all' as const, label: '전체', color: 'bg-stone-100 text-stone-700 border-stone-300' },
+            { key: 'pending' as const, label: '대기', color: 'bg-stone-50 text-stone-600 border-stone-300' },
             { key: 'in_progress' as const, label: '검토중', color: 'bg-blue-50 text-blue-600 border-blue-300' },
             { key: 'completed' as const, label: '완료', color: 'bg-green-50 text-green-600 border-green-300' },
           ] as const
@@ -1257,7 +1263,7 @@ const MealPlanHistory: React.FC = () => {
             variant={reviewFilter === f.key ? 'default' : 'outline'}
             size="sm"
             onClick={() => setReviewFilter(f.key)}
-            className={`px-3 py-1.5 text-xs font-bold ${reviewFilter === f.key ? f.color + ' ring-1 ring-offset-1' : 'bg-white text-gray-500 border-gray-200'}`}
+            className={`px-3 py-1.5 text-xs font-bold ${reviewFilter === f.key ? f.color + ' ring-1 ring-offset-1' : 'bg-white text-stone-500 border-stone-200'}`}
           >
             {f.label}
             <Badge variant="secondary" className="ml-1.5 px-1.5 py-0.5 text-[10px] bg-white/60">
@@ -1269,7 +1275,7 @@ const MealPlanHistory: React.FC = () => {
 
       {/* 뷰 모드 & 내보내기 */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
+        <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg">
           {[
             { key: 'plan' as const, label: '식단표' },
             { key: 'ingredient' as const, label: '재료검토' },
@@ -1280,7 +1286,7 @@ const MealPlanHistory: React.FC = () => {
               variant={viewMode === v.key ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode(v.key)}
-              className={`px-3 py-1.5 text-xs font-bold ${viewMode === v.key ? 'bg-white text-gray-800 shadow-sm' : ''}`}
+              className={`px-3 py-1.5 text-xs font-bold ${viewMode === v.key ? 'bg-white text-stone-800 shadow-sm' : ''}`}
             >
               {v.label}
             </Button>
@@ -1313,7 +1319,7 @@ const MealPlanHistory: React.FC = () => {
       {/* 콘텐츠 */}
       <div ref={contentRef} className="flex-1 flex flex-col min-h-0">
         {monthPlans.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+          <div className="flex-1 flex flex-col items-center justify-center text-stone-400">
             <UtensilsCrossed className="w-12 h-12 mb-3 opacity-50" />
             <p className="font-medium">이 달의 식단 데이터가 없습니다</p>
           </div>
@@ -1322,26 +1328,26 @@ const MealPlanHistory: React.FC = () => {
         ) : viewMode === 'distribution' ? (
           <HistoryDistributionView monthPlans={monthPlans} formatDate={formatDate} />
         ) : (
-          <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
+          <div className="flex-1 overflow-auto border border-stone-200 rounded-xl">
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-20">
-                <tr className="bg-gray-50">
-                  <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[72px]">
+                <tr className="bg-stone-50">
+                  <th className="sticky left-0 z-30 bg-stone-50 px-2 py-2.5 text-left text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[72px]">
                     날짜
                   </th>
-                  <th className="sticky left-[72px] z-30 bg-gray-50 px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[56px]">
+                  <th className="sticky left-[72px] z-30 bg-stone-50 px-1.5 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[56px]">
                     주기
                   </th>
-                  <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[80px]">
+                  <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[80px]">
                     검토상태
                   </th>
-                  <th className="px-2 py-2.5 text-center text-xs font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[220px]">
+                  <th className="px-2 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[220px]">
                     생산수량
                   </th>
                   {columns.map((col, idx) => (
                     <th
                       key={idx}
-                      className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-gray-200"
+                      className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-stone-200"
                       style={{ minWidth: columnWidths[idx] }}
                     >
                       <span
@@ -1363,24 +1369,24 @@ const MealPlanHistory: React.FC = () => {
                   return (
                     <tr
                       key={`${plan.date}-${plan.cycleType}`}
-                      className={`border-b border-gray-100 hover:bg-gray-50/30 ${isCompleted ? 'opacity-60 bg-gray-50/50' : ''}`}
+                      className={`border-b border-stone-100 hover:bg-emerald-50/40 ${isCompleted ? 'opacity-60 bg-stone-50/50' : ''}`}
                     >
-                      <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-gray-200 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
+                      <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-stone-200 text-xs font-medium text-stone-700 whitespace-nowrap align-top">
                         {formatDate(plan.date)}
                       </td>
-                      <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-gray-200 text-center align-top">
+                      <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-stone-200 text-center align-top">
                         <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
                           {plan.cycleType}
                         </span>
                       </td>
-                      <td className="px-1.5 py-2 border-r border-gray-200 text-center align-top">
+                      <td className="px-1.5 py-2 border-r border-stone-200 text-center align-top">
                         {(() => {
                           const rKey = makeReviewKey(plan.date, plan.cycleType);
                           const record = reviewStatusMap.get(rKey);
                           const cat = record ? getFilterStatus(record.status) : 'pending';
                           const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
                             pending: {
-                              cls: 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
+                              cls: 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100',
                               label: '대기',
                               icon: Clock,
                             },
@@ -1418,7 +1424,7 @@ const MealPlanHistory: React.FC = () => {
                                   {record.departments.map(dept => (
                                     <div
                                       key={dept.department}
-                                      className="flex items-center gap-1 text-[9px] text-gray-500"
+                                      className="flex items-center gap-1 text-[9px] text-stone-500"
                                     >
                                       <span
                                         className={`w-1.5 h-1.5 rounded-full ${
@@ -1426,7 +1432,7 @@ const MealPlanHistory: React.FC = () => {
                                             ? 'bg-green-500'
                                             : dept.status === 'rejected'
                                               ? 'bg-red-500'
-                                              : 'bg-gray-300'
+                                              : 'bg-stone-300'
                                         }`}
                                       />
                                       <span>{DEPT_LABELS[dept.department] || dept.department}</span>
@@ -1439,12 +1445,12 @@ const MealPlanHistory: React.FC = () => {
                         })()}
                       </td>
                       {/* 생산수량 (2열 배치) */}
-                      <td className="px-1.5 py-2 border-r border-gray-200 align-top">
+                      <td className="px-1.5 py-2 border-r border-stone-200 align-top">
                         {(() => {
                           const sumKey = `${plan.date}-${plan.cycleType}`;
                           const groups = productionSummary.get(sumKey) || [];
                           if (groups.length === 0) {
-                            return <span className="text-[10px] text-gray-300 whitespace-nowrap">설정 필요</span>;
+                            return <span className="text-[10px] text-stone-300 whitespace-nowrap">설정 필요</span>;
                           }
                           const leftCol: typeof groups = [];
                           const rightCol: typeof groups = [];
@@ -1483,10 +1489,10 @@ const MealPlanHistory: React.FC = () => {
                                           menuName: item.name,
                                         });
                                       }}
-                                      className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1 cursor-pointer hover:bg-gray-100 rounded px-0.5 -mx-0.5"
+                                      className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1 cursor-pointer hover:bg-stone-100 rounded px-0.5 -mx-0.5"
                                     >
-                                      <span className="text-gray-600 truncate">{item.name}</span>
-                                      <span className="text-gray-800 font-bold shrink-0">{item.qty}</span>
+                                      <span className="text-stone-600 truncate">{item.name}</span>
+                                      <span className="text-stone-800 font-bold shrink-0">{item.qty}</span>
                                       {prodCommentCount > 0 && (
                                         <span className="text-[8px] text-blue-500 shrink-0">
                                           <MessageSquare className="w-2.5 h-2.5 inline" />
@@ -1514,7 +1520,7 @@ const MealPlanHistory: React.FC = () => {
                             return (
                               <td
                                 key={colIdx}
-                                className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
+                                className="px-2 py-2 border-r border-stone-100 text-center text-xs text-stone-300 align-top"
                               >
                                 —
                               </td>
@@ -1524,7 +1530,7 @@ const MealPlanHistory: React.FC = () => {
                           const discKey = `${plan.date}-${plan.cycleType}-${col.target}`;
                           const dInfo = discountSummary.get(discKey);
                           return (
-                            <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                            <td key={colIdx} className="px-2 py-1.5 border-r border-stone-100 align-top">
                               {dInfo &&
                                 (() => {
                                   const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
@@ -1540,7 +1546,7 @@ const MealPlanHistory: React.FC = () => {
                                         <div
                                           className={`flex items-center justify-between ${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
                                         >
-                                          <span className="text-gray-500">
+                                          <span className="text-stone-500">
                                             판매 {dInfo.targetPrice.toLocaleString()}
                                           </span>
                                           <span className="font-bold tabular-nums">
@@ -1550,9 +1556,9 @@ const MealPlanHistory: React.FC = () => {
                                         </div>
                                       )}
                                       <div
-                                        className={`flex items-center justify-between ${costDiff > 0.5 ? 'text-red-400' : costDiff < -0.5 ? 'text-emerald-500' : 'text-gray-400'}`}
+                                        className={`flex items-center justify-between ${costDiff > 0.5 ? 'text-red-400' : costDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
                                       >
-                                        <span className="text-gray-400">원가 {actualCostRatio.toFixed(1)}%</span>
+                                        <span className="text-stone-400">원가 {actualCostRatio.toFixed(1)}%</span>
                                         <span className="font-medium tabular-nums">
                                           가이드 {dInfo.targetCostRatio}%{' '}
                                           {costDiff > 0.5
@@ -1584,7 +1590,7 @@ const MealPlanHistory: React.FC = () => {
                           return (
                             <td
                               key={colIdx}
-                              className="px-2 py-2 border-r border-gray-100 text-center text-xs text-gray-300 align-top"
+                              className="px-2 py-2 border-r border-stone-100 text-center text-xs text-stone-300 align-top"
                             >
                               —
                             </td>
@@ -1597,7 +1603,7 @@ const MealPlanHistory: React.FC = () => {
                         const plusDiscKey = `${plan.date}-${plan.cycleType}-${col.group.plusTarget}`;
                         const plusDInfo = discountSummary.get(plusDiscKey);
                         return (
-                          <td key={colIdx} className="px-2 py-1.5 border-r border-gray-100 align-top">
+                          <td key={colIdx} className="px-2 py-1.5 border-r border-stone-100 align-top">
                             {(() => {
                               const renderDiscBadge = (dI: typeof baseDInfo, label?: string) => {
                                 if (!dI) return null;
@@ -1608,12 +1614,12 @@ const MealPlanHistory: React.FC = () => {
                                 if (pDiff === 0 && Math.abs(cDiff) < 0.5) return null;
                                 return (
                                   <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
-                                    {label && <span className="text-gray-400 text-[8px]">{label}</span>}
+                                    {label && <span className="text-stone-400 text-[8px]">{label}</span>}
                                     {pDiff !== 0 && (
                                       <div
                                         className={`flex items-center justify-between ${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
                                       >
-                                        <span className="text-gray-500">판매 {dI.targetPrice.toLocaleString()}</span>
+                                        <span className="text-stone-500">판매 {dI.targetPrice.toLocaleString()}</span>
                                         <span className="font-bold tabular-nums">
                                           {pDiff > 0 ? '초과' : '할인'} {pDiff > 0 ? '+' : ''}
                                           {pDiff.toLocaleString()}원 ({pRate.toFixed(0)}%)
@@ -1621,9 +1627,9 @@ const MealPlanHistory: React.FC = () => {
                                       </div>
                                     )}
                                     <div
-                                      className={`flex items-center justify-between ${cDiff > 0.5 ? 'text-red-400' : cDiff < -0.5 ? 'text-emerald-500' : 'text-gray-400'}`}
+                                      className={`flex items-center justify-between ${cDiff > 0.5 ? 'text-red-400' : cDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
                                     >
-                                      <span className="text-gray-400">원가 {aCR.toFixed(1)}%</span>
+                                      <span className="text-stone-400">원가 {aCR.toFixed(1)}%</span>
                                       <span className="font-medium tabular-nums">
                                         가이드 {dI.targetCostRatio}%{' '}
                                         {cDiff > 0.5

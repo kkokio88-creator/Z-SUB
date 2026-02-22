@@ -78,10 +78,10 @@ const PLANNER_INGREDIENT_COLORS: Record<
   },
 };
 const DEFAULT_INGREDIENT_COLOR = {
-  bg: 'bg-gray-50',
-  borderL: 'border-l-gray-300',
-  text: 'text-gray-600',
-  dot: 'bg-gray-300',
+  bg: 'bg-stone-50',
+  borderL: 'border-l-stone-300',
+  text: 'text-stone-600',
+  dot: 'bg-stone-300',
   label: '기타',
 };
 
@@ -505,15 +505,15 @@ const MealPlanner: React.FC = () => {
 
   // Render a Single Cycle Row
   const renderCycleRow = (cycleLabel: string, plan: MonthlyMealPlan, cycleKey: 'A' | 'B') => (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
-      <div className="bg-gray-50 border-b border-gray-200 p-3 flex justify-between items-center">
+    <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden mb-6">
+      <div className="bg-stone-50 border-b border-stone-200 p-3 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span
             className={`px-2.5 py-1 rounded text-xs font-bold ${cycleKey === 'A' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}
           >
             {cycleLabel}
           </span>
-          <span className="text-sm font-medium text-gray-500">{monthLabel} 식단표</span>
+          <span className="text-sm font-medium text-stone-500">{monthLabel} 식단표</span>
           {parentConfig && (
             <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
               옵션 ({currentConfig.parentTarget} 기반)
@@ -524,24 +524,24 @@ const MealPlanner: React.FC = () => {
           variant="outline"
           onClick={() => handleExpertReview(plan)}
           size="sm"
-          className="text-xs flex items-center gap-1 text-gray-600 hover:text-purple-600 font-bold px-2 py-1"
+          className="text-xs flex items-center gap-1 text-stone-600 hover:text-purple-600 font-bold px-2 py-1"
         >
           <BrainCircuit className="w-3 h-3" /> AI 검수
         </Button>
       </div>
 
       {/* 식재료 범례 */}
-      <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-gray-100 bg-white">
-        <span className="text-[11px] font-medium text-gray-400">주재료:</span>
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-stone-100 bg-white">
+        <span className="text-[11px] font-medium text-stone-400">주재료:</span>
         {Object.entries(PLANNER_INGREDIENT_COLORS).map(([key, val]) => (
           <div key={key} className="flex items-center gap-1">
             <span className={`w-2 h-2 rounded-full ${val.dot}`} />
-            <span className="text-[10px] text-gray-500">{val.label}</span>
+            <span className="text-[10px] text-stone-500">{val.label}</span>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-stone-100">
         {plan.weeks.map(week => {
           const costRatio = ((week.totalCost / targetPrice) * 100).toFixed(1);
           const isOverBudget = week.totalCost > currentBudgetCap;
@@ -552,12 +552,12 @@ const MealPlanner: React.FC = () => {
           return (
             <div key={week.weekIndex} className="p-3 flex flex-col group h-full">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-sm font-bold text-gray-800">{week.weekIndex}주차</span>
+                <span className="text-sm font-bold text-stone-800">{week.weekIndex}주차</span>
                 <div className="text-right">
-                  <div className={`text-xs font-bold ${isOverBudget ? 'text-red-600' : 'text-gray-600'}`}>
+                  <div className={`text-xs font-bold ${isOverBudget ? 'text-red-600' : 'text-stone-600'}`}>
                     {week.totalCost.toLocaleString()}원
                   </div>
-                  <div className="text-[10px] text-gray-400">({costRatio}%)</div>
+                  <div className="text-[10px] text-stone-400">({costRatio}%)</div>
                 </div>
               </div>
 
@@ -567,11 +567,11 @@ const MealPlanner: React.FC = () => {
                   isPriceCompliant ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
                 }`}
               >
-                <div className="flex justify-between text-gray-500">
+                <div className="flex justify-between text-stone-500">
                   <span>식단 판매가</span>
                   <span className="font-medium">{targetPrice.toLocaleString()}원</span>
                 </div>
-                <div className="flex justify-between text-gray-500 mt-0.5">
+                <div className="flex justify-between text-stone-500 mt-0.5">
                   <span>단품 합산가</span>
                   <span className="font-medium">{week.totalPrice.toLocaleString()}원</span>
                 </div>
@@ -605,7 +605,7 @@ const MealPlanner: React.FC = () => {
                       <div
                         onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
                         title={isCrossDup ? '다른 주기에도 사용됨' : undefined}
-                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${ingColor.bg} hover:ring-1 hover:ring-gray-300 ${
+                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${ingColor.bg} hover:ring-1 hover:ring-stone-300 ${
                           isExtra ? 'border border-amber-300 border-l-2' : ''
                         } ${isCrossDup ? 'ring-1 ring-orange-400' : ''}`}
                       >
@@ -622,14 +622,14 @@ const MealPlanner: React.FC = () => {
                           {item.name}
                           {historyDate && (
                             <span
-                              className="ml-1 text-[10px] text-gray-400 font-normal"
+                              className="ml-1 text-[10px] text-stone-400 font-normal"
                               title="이전 사용일 (갯수 보장)"
                             >
                               ({historyDate.slice(5)})
                             </span>
                           )}
                         </span>
-                        <span className="text-[10px] text-gray-400 shrink-0 ml-1">
+                        <span className="text-[10px] text-stone-400 shrink-0 ml-1">
                           {item.recommendedPrice.toLocaleString()}
                         </span>
                         {isExtra && (
@@ -655,7 +655,7 @@ const MealPlanner: React.FC = () => {
     isTotal,
     menuNames,
   }) => {
-    if (count === 0) return <span className="text-gray-300">-</span>;
+    if (count === 0) return <span className="text-stone-300">-</span>;
     let colorClass = 'bg-green-100 text-green-700';
     if (count >= 4) colorClass = 'bg-red-100 text-red-700 font-bold';
     else if (count >= 2) colorClass = 'bg-orange-100 text-orange-700 font-bold';
@@ -672,16 +672,16 @@ const MealPlanner: React.FC = () => {
   return (
     <div className="flex flex-col h-full gap-6 relative">
       {/* 1. Control Bar & Sync Center */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
+      <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm flex flex-col gap-4">
         {/* Top Row: Generation Controls */}
         <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex flex-col">
-              <Label className="text-xs font-bold text-gray-500 mb-1">식단 대상</Label>
+              <Label className="text-xs font-bold text-stone-500 mb-1">식단 대상</Label>
               <select
                 value={target}
                 onChange={e => setTarget(e.target.value as TargetType)}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-48 p-2.5"
+                className="bg-stone-50 border border-stone-300 text-stone-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-48 p-2.5"
               >
                 {Object.values(TargetType).map(t => (
                   <option key={t} value={t}>
@@ -692,11 +692,11 @@ const MealPlanner: React.FC = () => {
             </div>
 
             <div className="flex flex-col">
-              <Label className="text-xs font-bold text-gray-500 mb-1">연도</Label>
+              <Label className="text-xs font-bold text-stone-500 mb-1">연도</Label>
               <select
                 value={selectedYear}
                 onChange={e => setSelectedYear(Number(e.target.value))}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-24 p-2.5"
+                className="bg-stone-50 border border-stone-300 text-stone-900 text-sm rounded-lg block w-24 p-2.5"
               >
                 {[2024, 2025, 2026, 2027].map(y => (
                   <option key={y} value={y}>
@@ -707,11 +707,11 @@ const MealPlanner: React.FC = () => {
             </div>
 
             <div className="flex flex-col">
-              <Label className="text-xs font-bold text-gray-500 mb-1">월</Label>
+              <Label className="text-xs font-bold text-stone-500 mb-1">월</Label>
               <select
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(Number(e.target.value))}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-20 p-2.5"
+                className="bg-stone-50 border border-stone-300 text-stone-900 text-sm rounded-lg block w-20 p-2.5"
               >
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
                   <option key={m} value={m}>
@@ -729,8 +729,8 @@ const MealPlanner: React.FC = () => {
                   onChange={e => setCheckDupes(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
-                <span className="ms-2 text-sm font-medium text-gray-600">60일 중복 제외</span>
+                <div className="relative w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                <span className="ms-2 text-sm font-medium text-stone-600">60일 중복 제외</span>
               </Label>
             </div>
           </div>
@@ -741,13 +741,13 @@ const MealPlanner: React.FC = () => {
               onClick={handleOpenHistory}
               className="flex items-center gap-2 px-4 py-3 rounded-xl font-bold shadow-sm"
             >
-              <History className="w-5 h-5 text-gray-500" />
+              <History className="w-5 h-5 text-stone-500" />
               히스토리
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={isGenerating}
-              className={`flex items-center gap-2 px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-xl font-bold shadow-lg transition-all active:scale-95 ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
+              className={`flex items-center gap-2 px-6 py-3 bg-stone-900 hover:bg-black text-white rounded-xl font-bold shadow-lg transition-all active:scale-95 ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
             >
               {isGenerating ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
               {isGenerating ? '식단 생성 중...' : '통합 식단(화수목/금토월) 자동 생성'}
@@ -757,8 +757,8 @@ const MealPlanner: React.FC = () => {
 
         {/* Bottom Row: Integration Actions (Visible only when plans exist) */}
         {plans.A && (
-          <div className="border-t border-gray-100 pt-3 flex justify-end items-center gap-3">
-            <div className="text-xs text-gray-400 mr-2 flex items-center gap-1">
+          <div className="border-t border-stone-100 pt-3 flex justify-end items-center gap-3">
+            <div className="text-xs text-stone-400 mr-2 flex items-center gap-1">
               <Server className="w-3 h-3" /> 시스템 연동 센터
             </div>
 
@@ -771,7 +771,7 @@ const MealPlanner: React.FC = () => {
               히스토리에 등록
             </Button>
 
-            <div className="w-px h-6 bg-gray-200 mx-1" />
+            <div className="w-px h-6 bg-stone-200 mx-1" />
 
             {/* MIS Button */}
             <Button
@@ -800,7 +800,7 @@ const MealPlanner: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2 text-xs font-bold ${
                 unsavedChangesCount > 0
                   ? 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse hover:bg-orange-100'
-                  : 'bg-gray-50 text-gray-300 border-gray-200'
+                  : 'bg-stone-50 text-stone-300 border-stone-200'
               }`}
             >
               {zppsSyncStatus === 'syncing' ? (
@@ -811,7 +811,7 @@ const MealPlanner: React.FC = () => {
               ZPPS 변경 연동 {unsavedChangesCount > 0 && `(${unsavedChangesCount}건)`}
             </Button>
 
-            <div className="w-px h-6 bg-gray-200 mx-1" />
+            <div className="w-px h-6 bg-stone-200 mx-1" />
 
             {/* Save */}
             <Button
@@ -864,12 +864,12 @@ const MealPlanner: React.FC = () => {
 
       {/* 2. Main Workspace */}
       {!plans.A ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl border border-gray-200 border-dashed p-10 text-center">
-          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
-            <Layers className="w-10 h-10 text-gray-400" />
+        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl border border-stone-200 border-dashed p-10 text-center">
+          <div className="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center mb-6">
+            <Layers className="w-10 h-10 text-stone-400" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">통합 식단 생성 (이중 주기)</h3>
-          <p className="text-gray-500 max-w-md">
+          <h3 className="text-xl font-bold text-stone-800 mb-2">통합 식단 생성 (이중 주기)</h3>
+          <p className="text-stone-500 max-w-md">
             화수목 및 금토월 식단을 동시에 생성하고,
             <br />두 식단 간의 식재료 중복을 체크하여 다양성을 확보합니다.
           </p>
@@ -884,13 +884,13 @@ const MealPlanner: React.FC = () => {
             {plans.B && renderCycleRow('금토월', plans.B, 'B')}
 
             {/* Ingredient Matrix - Per Week Table */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
               <div className="flex justify-between items-center mb-4">
-                <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4 text-gray-500" />
+                <h4 className="text-sm font-bold text-stone-800 flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-stone-500" />
                   주차별 식재료 활용 분포
                 </h4>
-                <div className="flex gap-2 text-[10px] font-medium text-gray-500">
+                <div className="flex gap-2 text-[10px] font-medium text-stone-500">
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-green-100 border border-green-300"></span>1회
                   </span>
@@ -907,8 +907,8 @@ const MealPlanner: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-2 py-2 text-left font-semibold text-gray-600 sticky left-0 bg-white min-w-[60px]">
+                      <tr className="border-b border-stone-200">
+                        <th className="px-2 py-2 text-left font-semibold text-stone-600 sticky left-0 bg-white min-w-[60px]">
                           재료
                         </th>
                         {[1, 2, 3, 4].map(w => (
@@ -916,7 +916,7 @@ const MealPlanner: React.FC = () => {
                             화{w}주
                           </th>
                         ))}
-                        <th className="px-1 py-2 w-px bg-gray-200"></th>
+                        <th className="px-1 py-2 w-px bg-stone-200"></th>
                         {[1, 2, 3, 4].map(w => (
                           <th
                             key={`B-${w}`}
@@ -925,15 +925,15 @@ const MealPlanner: React.FC = () => {
                             금{w}주
                           </th>
                         ))}
-                        <th className="px-1 py-2 w-px bg-gray-200"></th>
-                        <th className="px-2 py-2 text-center font-bold text-gray-800 min-w-[48px]">합계</th>
+                        <th className="px-1 py-2 w-px bg-stone-200"></th>
+                        <th className="px-2 py-2 text-center font-bold text-stone-800 min-w-[48px]">합계</th>
                       </tr>
                     </thead>
                     <tbody>
                       {trackedIngredients.map(ing => {
                         return (
-                          <tr key={ing.key} className="border-b border-gray-100 hover:bg-gray-50/50">
-                            <td className="px-2 py-1.5 font-medium text-gray-700 sticky left-0 bg-white">
+                          <tr key={ing.key} className="border-b border-stone-100 hover:bg-emerald-50/40">
+                            <td className="px-2 py-1.5 font-medium text-stone-700 sticky left-0 bg-white">
                               {ing.label}
                             </td>
                             {[1, 2, 3, 4].map(w => {
@@ -944,7 +944,7 @@ const MealPlanner: React.FC = () => {
                                 </td>
                               );
                             })}
-                            <td className="px-0 py-1.5 bg-gray-100"></td>
+                            <td className="px-0 py-1.5 bg-stone-100"></td>
                             {[1, 2, 3, 4].map(w => {
                               const data = ingredientCountsByWeek[`B-${w}`]?.[ing.key];
                               return (
@@ -953,7 +953,7 @@ const MealPlanner: React.FC = () => {
                                 </td>
                               );
                             })}
-                            <td className="px-0 py-1.5 bg-gray-100"></td>
+                            <td className="px-0 py-1.5 bg-stone-100"></td>
                             <td className="px-2 py-1.5 text-center">
                               <IngredientCell
                                 count={ingredientCountsByWeek['total']?.[ing.key]?.count || 0}
@@ -968,7 +968,7 @@ const MealPlanner: React.FC = () => {
                   </table>
                 </div>
               )}
-              <p className="text-xs text-gray-400 mt-2 text-center">
+              <p className="text-xs text-stone-400 mt-2 text-center">
                 * 화수목과 금토월을 모두 구독하는 고객을 위해 주차별 재료 분포를 확인하세요.
               </p>
             </div>
@@ -982,9 +982,9 @@ const MealPlanner: React.FC = () => {
       {swapTarget && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+            <div className="p-5 border-b border-stone-100 flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg text-gray-800">
+                <h3 className="font-bold text-lg text-stone-800">
                   {swapTarget.item.category === MenuCategory.SOUP
                     ? '🍲 국/찌개'
                     : swapTarget.item.category === MenuCategory.MAIN
@@ -992,19 +992,19 @@ const MealPlanner: React.FC = () => {
                       : '🥗 밑반찬'}{' '}
                   교체하기 ({swapTarget.cycle === 'A' ? '화수목' : '금토월'})
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-stone-500">
                   현재 메뉴: <span className="font-bold text-blue-600">{swapTarget.item.name}</span>
-                  <span className="ml-2 text-gray-400">({swapCandidates.length}개 사용 가능)</span>
+                  <span className="ml-2 text-stone-400">({swapCandidates.length}개 사용 가능)</span>
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSwapTarget(null)} className="p-2 rounded-full">
-                <X className="w-5 h-5 text-gray-600" />
+                <X className="w-5 h-5 text-stone-600" />
               </Button>
             </div>
 
-            <div className="p-2 overflow-y-auto flex-1 bg-gray-50">
+            <div className="p-2 overflow-y-auto flex-1 bg-stone-50">
               {swapCandidates.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+                <div className="flex flex-col items-center justify-center h-48 text-stone-400">
                   <AlertTriangle className="w-8 h-8 mb-2 opacity-50" />
                   <p>조건에 맞는 교체 가능한 메뉴가 없습니다.</p>
                 </div>
@@ -1019,7 +1019,7 @@ const MealPlanner: React.FC = () => {
                           key={candidate.id}
                           variant="outline"
                           onClick={() => performSwap(candidate)}
-                          className="w-full bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group h-auto"
+                          className="w-full bg-white p-4 rounded-xl border border-stone-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group h-auto"
                         >
                           <div className="flex items-center gap-3">
                             <div
@@ -1032,14 +1032,14 @@ const MealPlanner: React.FC = () => {
                                   : '🥗'}
                             </div>
                             <div>
-                              <div className="font-bold text-gray-800">{candidate.name}</div>
-                              <div className="text-xs text-gray-500 flex gap-1 mt-0.5">
-                                <span className="bg-gray-100 px-1.5 py-0.5 rounded">{candidate.mainIngredient}</span>
+                              <div className="font-bold text-stone-800">{candidate.name}</div>
+                              <div className="text-xs text-stone-500 flex gap-1 mt-0.5">
+                                <span className="bg-stone-100 px-1.5 py-0.5 rounded">{candidate.mainIngredient}</span>
                                 {candidate.isSpicy && (
                                   <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded">🌶️</span>
                                 )}
                                 {candidate.tags.map(t => (
-                                  <span key={t} className="bg-gray-100 px-1.5 py-0.5 rounded">
+                                  <span key={t} className="bg-stone-100 px-1.5 py-0.5 rounded">
                                     #{t}
                                   </span>
                                 ))}
@@ -1047,11 +1047,11 @@ const MealPlanner: React.FC = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-bold text-gray-900">
+                            <div className="font-bold text-stone-900">
                               {candidate.recommendedPrice.toLocaleString()}원
                             </div>
                             <div
-                              className={`text-xs font-medium ${priceDiff > 0 ? 'text-green-600' : priceDiff < 0 ? 'text-red-500' : 'text-gray-400'}`}
+                              className={`text-xs font-medium ${priceDiff > 0 ? 'text-green-600' : priceDiff < 0 ? 'text-red-500' : 'text-stone-400'}`}
                             >
                               {priceDiff > 0 ? `+${priceDiff.toLocaleString()}` : priceDiff.toLocaleString()}원
                             </div>
@@ -1070,19 +1070,19 @@ const MealPlanner: React.FC = () => {
       {showReviewModal && reviewResult && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white">
+            <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white">
               <h3 className="text-xl font-bold text-purple-900 flex items-center gap-2">
                 <BrainCircuit className="w-6 h-6" />
                 AI 전문가 검수 리포트
               </h3>
               <Button variant="ghost" size="sm" onClick={() => setShowReviewModal(false)} className="p-2 rounded-full">
-                <X className="w-6 h-6 text-gray-500" />
+                <X className="w-6 h-6 text-stone-500" />
               </Button>
             </div>
 
             <div className="p-8 overflow-y-auto space-y-8">
               {/* Score Section */}
-              <div className="flex items-center gap-6 p-6 bg-gray-50 rounded-2xl border border-gray-100">
+              <div className="flex items-center gap-6 p-6 bg-stone-50 rounded-2xl border border-stone-100">
                 <div className="relative w-24 h-24 flex items-center justify-center">
                   <svg className="w-full h-full transform -rotate-90">
                     <circle
@@ -1092,7 +1092,7 @@ const MealPlanner: React.FC = () => {
                       stroke="currentColor"
                       strokeWidth="8"
                       fill="transparent"
-                      className="text-gray-200"
+                      className="text-stone-200"
                     />
                     <circle
                       cx="48"
@@ -1106,11 +1106,11 @@ const MealPlanner: React.FC = () => {
                       strokeDashoffset={251.2 - (251.2 * reviewResult.overallScore) / 100}
                     />
                   </svg>
-                  <span className="absolute text-2xl font-bold text-gray-800">{reviewResult.overallScore}</span>
+                  <span className="absolute text-2xl font-bold text-stone-800">{reviewResult.overallScore}</span>
                 </div>
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900">종합 평가 점수</h4>
-                  <p className="text-gray-600 text-sm mt-1">
+                  <h4 className="text-lg font-bold text-stone-900">종합 평가 점수</h4>
+                  <p className="text-stone-600 text-sm mt-1">
                     {reviewResult.overallScore > 80
                       ? '아주 훌륭한 식단입니다! 영양과 원가 균형이 잘 잡혀있습니다.'
                       : '몇 가지 개선이 필요합니다. 아래 전문가 의견을 참고하세요.'}
@@ -1124,22 +1124,22 @@ const MealPlanner: React.FC = () => {
                   <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-4 text-2xl">
                     🥗
                   </div>
-                  <h4 className="font-bold text-gray-900 mb-2">영양사 분석</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">{reviewResult.nutritionistComment}</p>
+                  <h4 className="font-bold text-stone-900 mb-2">영양사 분석</h4>
+                  <p className="text-sm text-stone-600 leading-relaxed">{reviewResult.nutritionistComment}</p>
                 </div>
                 <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-2xl">
                     🏭
                   </div>
-                  <h4 className="font-bold text-gray-900 mb-2">공정 효율성</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">{reviewResult.processExpertComment}</p>
+                  <h4 className="font-bold text-stone-900 mb-2">공정 효율성</h4>
+                  <p className="text-sm text-stone-600 leading-relaxed">{reviewResult.processExpertComment}</p>
                 </div>
                 <div className="bg-white p-6 rounded-xl border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mb-4 text-2xl">
                     💰
                   </div>
-                  <h4 className="font-bold text-gray-900 mb-2">원가/구매 분석</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">{reviewResult.costExpertComment}</p>
+                  <h4 className="font-bold text-stone-900 mb-2">원가/구매 분석</h4>
+                  <p className="text-sm text-stone-600 leading-relaxed">{reviewResult.costExpertComment}</p>
                 </div>
               </div>
 

@@ -172,7 +172,7 @@ const MenuDatabase: React.FC = () => {
     className,
   }) => (
     <th
-      className={`px-3 py-2 text-xs font-semibold text-gray-500 cursor-pointer select-none hover:bg-gray-100 transition-colors ${className || ''}`}
+      className={`px-3 py-2 text-xs font-semibold text-stone-500 cursor-pointer select-none hover:bg-stone-100 transition-colors ${className || ''}`}
       onClick={() => handleSort(field)}
     >
       <span className="inline-flex items-center gap-1">
@@ -433,13 +433,13 @@ const MenuDatabase: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
       {/* Top Action Bar */}
-      <div className="p-4 border-b border-gray-100 space-y-3 bg-gray-50/50">
+      <div className="p-4 border-b border-stone-100 space-y-3 bg-stone-50/50">
         <div className="flex justify-between items-center">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Database className="w-4 h-4 text-gray-500" /> 반찬 리스트
-            <span className="text-xs font-normal text-gray-400 ml-1">({filteredItems.length.toLocaleString()}개)</span>
+          <h3 className="font-bold text-stone-800 flex items-center gap-2">
+            <Database className="w-4 h-4 text-stone-500" /> 반찬 리스트
+            <span className="text-xs font-normal text-stone-400 ml-1">({filteredItems.length.toLocaleString()}개)</span>
           </h3>
           <div className="flex gap-1.5">
             <Button
@@ -497,19 +497,19 @@ const MenuDatabase: React.FC = () => {
         </div>
 
         {/* Stats Summary */}
-        <div className="flex gap-3 text-[11px] text-gray-500">
+        <div className="flex gap-3 text-[11px] text-stone-500">
           <span>
-            전체 <strong className="text-gray-700">{stats.total}</strong>개
+            전체 <strong className="text-stone-700">{stats.total}</strong>개
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <span>
             사용 <strong className="text-green-600">{stats.active}</strong>개
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <span>
-            미사용 <strong className="text-gray-400">{stats.unused}</strong>개
+            미사용 <strong className="text-stone-400">{stats.unused}</strong>개
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           {Object.entries(stats.byCat).map(([cat, count]) => (
             <span key={cat}>
               {cat} <strong>{count}</strong>
@@ -520,7 +520,7 @@ const MenuDatabase: React.FC = () => {
         {/* Filters Row */}
         <div className="flex gap-2 items-center flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
             <Input
               type="text"
               placeholder="\uBA54\uB274\uBA85, \uCF54\uB4DC \uAC80\uC0C9..."
@@ -534,7 +534,7 @@ const MenuDatabase: React.FC = () => {
               variant={filterCategory === 'ALL' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilterCategory('ALL')}
-              className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full ${filterCategory === 'ALL' ? 'bg-gray-800 text-white border-gray-800' : ''}`}
+              className={`whitespace-nowrap px-2.5 py-1 text-xs rounded-full ${filterCategory === 'ALL' ? 'bg-stone-800 text-white border-stone-800' : ''}`}
             >
               전체
             </Button>
@@ -553,7 +553,7 @@ const MenuDatabase: React.FC = () => {
           <select
             value={filterUsage}
             onChange={e => setFilterUsage(e.target.value as 'ALL' | 'active' | 'unused')}
-            className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-primary-500"
+            className="text-xs bg-white border border-stone-200 rounded-lg px-2 py-1.5 focus:ring-primary-500"
           >
             <option value="ALL">상태: 전체</option>
             <option value="active">사용</option>
@@ -591,33 +591,33 @@ const MenuDatabase: React.FC = () => {
       {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 sticky top-0 z-10">
-            <tr className="border-b border-gray-200">
+          <thead className="bg-stone-50 sticky top-0 z-10">
+            <tr className="border-b border-stone-200">
               <th className="w-10 px-3 py-2">
                 <Input
                   type="checkbox"
                   checked={pageItems.length > 0 && selectedIds.size === pageItems.length}
                   onChange={toggleSelectAll}
-                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 shadow-none"
+                  className="w-3.5 h-3.5 rounded border-stone-300 text-primary-600 focus:ring-primary-500 shadow-none"
                 />
               </th>
               <SortHeader field="category" label="구분" className="text-left w-24" />
               <SortHeader field="name" label="메뉴명" className="text-left w-36" />
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-24">품목코드</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-stone-500 w-24">품목코드</th>
               <SortHeader field="season" label="계절성" className="text-center w-20" />
               <SortHeader field="mainIngredient" label="주재료" className="text-center w-20" />
-              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-28">맛속성</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-28">맛속성</th>
               <SortHeader field="weight" label="용량" className="text-right w-16" />
               <SortHeader field="recommendedPrice" label="가격" className="text-right w-20" />
               <SortHeader field="cost" label="원가" className="text-right w-20" />
-              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-20">사용여부</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-12">맵</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-20">사용여부</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-12">맵</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-stone-100">
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={12} className="text-center py-12 text-gray-400 text-sm">
+                <td colSpan={12} className="text-center py-12 text-stone-400 text-sm">
                   검색 결과가 없습니다.
                 </td>
               </tr>
@@ -625,7 +625,7 @@ const MenuDatabase: React.FC = () => {
               pageItems.map(item => (
                 <tr
                   key={item.id}
-                  className="hover:bg-blue-50/50 cursor-pointer transition-colors"
+                  className="hover:bg-emerald-50/40 cursor-pointer transition-colors"
                   onClick={() => setModalItem(item)}
                 >
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
@@ -633,7 +633,7 @@ const MenuDatabase: React.FC = () => {
                       type="checkbox"
                       checked={selectedIds.has(item.id)}
                       onChange={() => toggleSelectItem(item.id)}
-                      className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 shadow-none"
+                      className="w-3.5 h-3.5 rounded border-stone-300 text-primary-600 focus:ring-primary-500 shadow-none"
                     />
                   </td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
@@ -651,19 +651,19 @@ const MenuDatabase: React.FC = () => {
                   </td>
                   <td className="px-3 py-2">
                     <span
-                      className={`text-sm font-medium ${item.isUnused ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+                      className={`text-sm font-medium ${item.isUnused ? 'text-stone-400 line-through' : 'text-stone-800'}`}
                     >
                       {item.name}
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <span className="font-mono text-xs text-gray-500">{item.code || '\u2014'}</span>
+                    <span className="font-mono text-xs text-stone-500">{item.code || '\u2014'}</span>
                   </td>
                   <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                     <select
                       value={item.season}
                       onChange={e => handleUpdateItem(item.id, 'season', e.target.value as Season)}
-                      className="text-[11px] bg-transparent border border-transparent hover:border-gray-200 rounded px-1 py-0.5 focus:ring-primary-500 cursor-pointer"
+                      className="text-[11px] bg-transparent border border-transparent hover:border-stone-200 rounded px-1 py-0.5 focus:ring-primary-500 cursor-pointer"
                     >
                       {Object.values(Season).map(s => (
                         <option key={s} value={s}>
@@ -676,7 +676,7 @@ const MenuDatabase: React.FC = () => {
                     <select
                       value={item.mainIngredient}
                       onChange={e => handleUpdateItem(item.id, 'mainIngredient', e.target.value)}
-                      className="text-[11px] bg-transparent border border-transparent hover:border-gray-200 rounded px-1 py-0.5 focus:ring-primary-500 cursor-pointer"
+                      className="text-[11px] bg-transparent border border-transparent hover:border-stone-200 rounded px-1 py-0.5 focus:ring-primary-500 cursor-pointer"
                     >
                       {Object.entries(INGREDIENT_LABELS).map(([key, label]) => (
                         <option key={key} value={key}>
@@ -701,7 +701,7 @@ const MenuDatabase: React.FC = () => {
                           className={`px-1 py-0.5 h-auto text-[9px] rounded border transition-colors ${
                             item.tastes.includes(taste)
                               ? 'bg-primary-100 text-primary-700 border-primary-200 font-bold'
-                              : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'
+                              : 'bg-stone-50 text-stone-400 border-stone-100 hover:bg-stone-100'
                           }`}
                         >
                           {taste.replace('맛', '').replace('함', '')}
@@ -710,13 +710,13 @@ const MenuDatabase: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <span className="text-xs text-gray-600">{item.weight ? `${item.weight}g` : '\u2014'}</span>
+                    <span className="text-xs text-stone-600">{item.weight ? `${item.weight}g` : '\u2014'}</span>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <span className="text-xs text-gray-700">{item.recommendedPrice.toLocaleString()}</span>
+                    <span className="text-xs text-stone-700">{item.recommendedPrice.toLocaleString()}</span>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <span className="text-xs font-medium text-gray-700">{item.cost.toLocaleString()}</span>
+                    <span className="text-xs font-medium text-stone-700">{item.cost.toLocaleString()}</span>
                   </td>
                   <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
                     <Button
@@ -724,7 +724,7 @@ const MenuDatabase: React.FC = () => {
                       size="sm"
                       onClick={() => handleUpdateItem(item.id, 'isUnused', !item.isUnused)}
                       className={`px-2 py-0.5 h-auto text-[11px] font-medium rounded-full transition-colors ${
-                        item.isUnused ? 'bg-gray-200 text-gray-500' : 'bg-green-100 text-green-700'
+                        item.isUnused ? 'bg-stone-200 text-stone-500' : 'bg-green-100 text-green-700'
                       }`}
                     >
                       {item.isUnused ? '미사용' : '사용'}
@@ -741,13 +741,13 @@ const MenuDatabase: React.FC = () => {
       </div>
 
       {/* Footer: Pagination */}
-      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-        <div className="text-xs text-gray-500 flex items-center gap-3">
+      <div className="px-4 py-2.5 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
+        <div className="text-xs text-stone-500 flex items-center gap-3">
           <span>
             {sortedItems.length.toLocaleString()}개 중 {(safePage * PAGE_SIZE + 1).toLocaleString()}-
             {Math.min((safePage + 1) * PAGE_SIZE, sortedItems.length).toLocaleString()}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <span className="flex items-center gap-1 cursor-pointer hover:text-green-600" onClick={handleRefresh}>
             <RefreshCw className="w-3 h-3" /> {lastSynced}
           </span>
@@ -762,7 +762,7 @@ const MenuDatabase: React.FC = () => {
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="text-xs text-gray-600 min-w-[60px] text-center">
+          <span className="text-xs text-stone-600 min-w-[60px] text-center">
             {safePage + 1} / {totalPages}
           </span>
           <Button

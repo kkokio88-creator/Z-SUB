@@ -148,65 +148,65 @@ const SystemSettings: React.FC = () => {
       case 'error':
         return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <div className="w-2 h-2 rounded-full bg-gray-300"></div>;
+        return <div className="w-2 h-2 rounded-full bg-stone-300"></div>;
     }
   };
 
   return (
     <div className="flex h-full gap-6">
       {/* Sidebar Navigation */}
-      <div className="w-64 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
-        <div className="p-5 border-b border-gray-100 bg-gray-50">
-          <h3 className="font-bold text-gray-800">시스템 설정</h3>
-          <p className="text-xs text-gray-500 mt-1">AI 튜닝 및 외부 시스템 연동</p>
+      <div className="w-64 bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="p-5 border-b border-stone-100 bg-stone-50">
+          <h3 className="font-bold text-stone-800">시스템 설정</h3>
+          <p className="text-xs text-stone-500 mt-1">AI 튜닝 및 외부 시스템 연동</p>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           <Button
             variant="ghost"
             onClick={() => setActiveSection('algorithm')}
-            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'algorithm' ? 'bg-purple-50 text-purple-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'algorithm' ? 'bg-purple-50 text-purple-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
           >
             <BrainCircuit className="w-4 h-4" /> AI 구성 매뉴얼
           </Button>
           <Button
             variant="ghost"
             onClick={() => setActiveSection('integration')}
-            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'integration' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'integration' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
           >
             <Server className="w-4 h-4" /> 시스템 연동 (API)
           </Button>
           <Button
             variant="ghost"
             onClick={() => setActiveSection('policy')}
-            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'policy' ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'policy' ? 'bg-green-50 text-green-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
           >
             <Settings className="w-4 h-4" /> 식단 정책
           </Button>
           <Button
             variant="ghost"
             onClick={() => setActiveSection('shipment')}
-            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'shipment' ? 'bg-orange-50 text-orange-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'shipment' ? 'bg-orange-50 text-orange-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
           >
             <BarChart3 className="w-4 h-4" /> 출고량 설정
           </Button>
         </nav>
-        <div className="p-4 border-t border-gray-100 text-center">
-          <div className="text-[10px] text-gray-400">Z-SUB System v2.5.0</div>
-          <div className="text-[10px] text-gray-300 mt-1">설정값 유지됨</div>
+        <div className="p-4 border-t border-stone-100 text-center">
+          <div className="text-[10px] text-stone-400">Z-SUB System v2.5.0</div>
+          <div className="text-[10px] text-stone-300 mt-1">설정값 유지됨</div>
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
+      <div className="flex-1 bg-white rounded-xl border border-stone-200 shadow-sm flex flex-col">
+        <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-stone-50/30">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">
+            <h2 className="text-xl font-bold text-stone-800">
               {activeSection === 'algorithm' && 'AI 식단 구성 매뉴얼'}
               {activeSection === 'integration' && '외부 시스템 및 데이터 연동'}
               {activeSection === 'policy' && '식단 정책 및 구성 설정'}
               {activeSection === 'shipment' && '출고량 시뮬레이션 설정'}
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-stone-500 mt-1">
               {activeSection === 'algorithm' && 'AI가 식단을 생성할 때 반드시 준수해야 할 자연어 규칙을 설정합니다.'}
               {activeSection === 'integration' && 'MIS, ZPPS 및 구글 시트와의 실시간 데이터 동기화 상태를 관리합니다.'}
               {activeSection === 'policy' &&
@@ -241,10 +241,10 @@ const SystemSettings: React.FC = () => {
                 <textarea
                   value={aiManual}
                   onChange={e => setAiManual(e.target.value)}
-                  className="flex-1 w-full p-4 text-sm border-gray-300 rounded-xl focus:ring-purple-500 focus:border-purple-500 font-mono leading-relaxed resize-none bg-gray-50 focus:bg-white transition-colors"
+                  className="flex-1 w-full p-4 text-sm border-stone-300 rounded-xl focus:ring-purple-500 focus:border-purple-500 font-mono leading-relaxed resize-none bg-stone-50 focus:bg-white transition-colors"
                   placeholder="예: 아이 식단에는 매운 재료(고춧가루, 청양고추)를 절대 사용하지 마세요..."
                 />
-                <p className="text-right text-xs text-gray-400 mt-2">{aiManual.length} 자</p>
+                <p className="text-right text-xs text-stone-400 mt-2">{aiManual.length} 자</p>
               </div>
             </div>
           )}
@@ -264,15 +264,15 @@ const SystemSettings: React.FC = () => {
                         <BrainCircuit className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-800">Google Gemini API</h4>
-                        <div className="text-xs text-gray-500">지능형 식단 생성 및 검수 엔진</div>
+                        <h4 className="font-bold text-stone-800">Google Gemini API</h4>
+                        <div className="text-xs text-stone-500">지능형 식단 생성 및 검수 엔진</div>
                       </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => runConnectionTest('gemini')} className="text-xs">
                       {getStatusIcon(testStatus.gemini)} 연결 테스트
                     </Button>
                   </div>
-                  <div className="bg-gray-50 p-3 rounded text-xs font-mono text-gray-600 flex justify-between">
+                  <div className="bg-stone-50 p-3 rounded text-xs font-mono text-stone-600 flex justify-between">
                     <span>API_KEY: ************************** (환경변수)</span>
                     <span className="text-green-600 font-bold">활성</span>
                   </div>
@@ -288,8 +288,8 @@ const SystemSettings: React.FC = () => {
                         <FileSpreadsheet className="w-5 h-5 text-green-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-800">구글 시트 (Google Sheets) 연동</h4>
-                        <div className="text-xs text-gray-500">식단 데이터 백업 및 실시간 공유</div>
+                        <h4 className="font-bold text-stone-800">구글 시트 (Google Sheets) 연동</h4>
+                        <div className="text-xs text-stone-500">식단 데이터 백업 및 실시간 공유</div>
                       </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => runConnectionTest('sheets')} className="text-xs">
@@ -313,10 +313,10 @@ const SystemSettings: React.FC = () => {
                 <div className="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
                 <CardContent className="p-5">
                   <div className="mb-6">
-                    <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                    <h4 className="font-bold text-stone-800 flex items-center gap-2">
                       <Server className="w-5 h-5 text-orange-500" /> 기간계 시스템 연동 (Legacy)
                     </h4>
-                    <p className="text-xs text-gray-500 mt-1">MIS(경영정보) 및 ZPPS(생산관리) 시스템 연동 설정</p>
+                    <p className="text-xs text-stone-500 mt-1">MIS(경영정보) 및 ZPPS(생산관리) 시스템 연동 설정</p>
                   </div>
 
                   <div className="space-y-6">
@@ -334,7 +334,7 @@ const SystemSettings: React.FC = () => {
                         </Button>
                       </div>
                       <div className="flex gap-2">
-                        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-xs">
+                        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-stone-300 bg-stone-50 text-stone-500 text-xs">
                           POST
                         </span>
                         <Input
@@ -360,7 +360,7 @@ const SystemSettings: React.FC = () => {
                         </Button>
                       </div>
                       <div className="flex gap-2">
-                        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-xs">
+                        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-stone-300 bg-stone-50 text-stone-500 text-xs">
                           PUT
                         </span>
                         <Input
@@ -373,7 +373,7 @@ const SystemSettings: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-gray-100">
+                  <div className="mt-6 pt-4 border-t border-stone-100">
                     <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 p-2 rounded">
                       <Activity className="w-4 h-4" />
                       <span>ZPPS 연동은 메뉴 교체(Swap) 발생 시에만 트리거됩니다.</span>
@@ -397,19 +397,19 @@ const SystemSettings: React.FC = () => {
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="border border-stone-200 rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">식단 유형</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">화수목 (식)</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">금토월 (식)</th>
+                    <tr className="bg-stone-50 border-b border-stone-200">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600">식단 유형</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">화수목 (식)</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">금토월 (식)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-stone-100">
                     {Object.values(TargetType).map(target => (
-                      <tr key={target} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-2.5 text-xs font-medium text-gray-700">
+                      <tr key={target} className="hover:bg-emerald-50/40">
+                        <td className="px-4 py-2.5 text-xs font-medium text-stone-700">
                           {target.replace(/ 식단$/, '')}
                         </td>
                         <td className="px-4 py-2 text-center">
@@ -448,7 +448,7 @@ const SystemSettings: React.FC = () => {
                 </table>
               </div>
 
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-stone-400">
                 * 설정한 출고량은 히스토리 탭의 &quot;생산수량&quot; 열에서 메뉴별 예상 생산량 계산에 사용됩니다.
               </p>
             </div>

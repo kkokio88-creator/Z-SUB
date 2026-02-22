@@ -86,18 +86,18 @@ const DashboardMenuAnalysis: React.FC = () => {
   }, [tasteMatrix, tasteProfiles, tasteCategories]);
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-8">
+    <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm space-y-8">
       <div className="flex items-center gap-2">
-        <BarChart3 className="w-5 h-5 text-gray-500" />
-        <h3 className="text-lg font-bold text-gray-800">메뉴 분석</h3>
-        <span className="text-xs text-gray-400 ml-2">활성 메뉴 {activeMenus.length}개 기준</span>
+        <BarChart3 className="w-5 h-5 text-stone-500" />
+        <h3 className="text-lg font-bold text-stone-800">메뉴 분석</h3>
+        <span className="text-xs text-stone-400 ml-2">활성 메뉴 {activeMenus.length}개 기준</span>
       </div>
 
       {/* Section A: 주재료 분포 */}
       <div>
-        <h4 className="text-sm font-bold text-gray-700 mb-3">주재료 분포</h4>
+        <h4 className="text-sm font-bold text-stone-700 mb-3">주재료 분포</h4>
         {ingredientData.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-sm">주재료 데이터가 없습니다</div>
+          <div className="text-center py-6 text-stone-400 text-sm">주재료 데이터가 없습니다</div>
         ) : (
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -126,9 +126,9 @@ const DashboardMenuAnalysis: React.FC = () => {
 
       {/* Section B: 태그 분석 */}
       <div>
-        <h4 className="text-sm font-bold text-gray-700 mb-3">태그 분석</h4>
+        <h4 className="text-sm font-bold text-stone-700 mb-3">태그 분석</h4>
         {tagData.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-sm">태그 데이터가 없습니다</div>
+          <div className="text-center py-6 text-stone-400 text-sm">태그 데이터가 없습니다</div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {tagData.map(({ tag, count }) => {
@@ -157,29 +157,29 @@ const DashboardMenuAnalysis: React.FC = () => {
 
       {/* Section C: 맛 프로필 x 카테고리 매트릭스 */}
       <div>
-        <h4 className="text-sm font-bold text-gray-700 mb-3">맛 프로필 x 카테고리 매트릭스</h4>
+        <h4 className="text-sm font-bold text-stone-700 mb-3">맛 프로필 x 카테고리 매트릭스</h4>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="px-3 py-2 text-left text-[11px] font-semibold text-gray-500">맛</th>
+              <tr className="border-b border-stone-200">
+                <th className="px-3 py-2 text-left text-[11px] font-semibold text-stone-500">맛</th>
                 {tasteCategories.map(cat => (
-                  <th key={cat} className="px-3 py-2 text-center text-[11px] font-semibold text-gray-500">
+                  <th key={cat} className="px-3 py-2 text-center text-[11px] font-semibold text-stone-500">
                     {cat}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-stone-100">
               {tasteProfiles.map(taste => (
-                <tr key={taste} className="hover:bg-gray-50/30">
-                  <td className="px-3 py-2 text-xs font-medium text-gray-700 whitespace-nowrap">
+                <tr key={taste} className="hover:bg-stone-50/30">
+                  <td className="px-3 py-2 text-xs font-medium text-stone-700 whitespace-nowrap">
                     {TASTE_LABELS[taste] || taste}
                   </td>
                   {tasteCategories.map(cat => {
                     const value = tasteMatrix[taste][cat];
                     const ratio = value / maxMatrixValue;
-                    let cellClass = 'bg-gray-50 text-gray-400';
+                    let cellClass = 'bg-stone-50 text-stone-400';
                     if (value > 0) {
                       if (ratio > 0.7) cellClass = 'bg-blue-500 text-white font-bold';
                       else if (ratio > 0.4) cellClass = 'bg-blue-300 text-blue-900 font-semibold';

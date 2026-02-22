@@ -33,7 +33,7 @@ const ACTION_COLORS: Record<string, string> = {
   config: 'bg-amber-100 text-amber-700',
   swap: 'bg-orange-100 text-orange-700',
   sync: 'bg-green-100 text-green-700',
-  settings: 'bg-gray-100 text-gray-700',
+  settings: 'bg-stone-100 text-stone-700',
   auth: 'bg-red-100 text-red-700',
 };
 
@@ -65,7 +65,7 @@ const AuditLog: React.FC = () => {
 
   const getActionColor = (action: string) => {
     const prefix = action.split('.')[0];
-    return ACTION_COLORS[prefix] || 'bg-gray-100 text-gray-700';
+    return ACTION_COLORS[prefix] || 'bg-stone-100 text-stone-700';
   };
 
   const formatTime = (ts: string) => {
@@ -82,8 +82,8 @@ const AuditLog: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">감사 로그</h2>
-          <p className="text-sm text-gray-500 mt-1">시스템 변경 이력 {entries.length}건</p>
+          <h2 className="text-xl font-bold text-stone-800">감사 로그</h2>
+          <p className="text-sm text-stone-500 mt-1">시스템 변경 이력 {entries.length}건</p>
         </div>
         <Button variant="destructive" size="sm" onClick={handleClear}>
           <Trash2 className="w-4 h-4" /> 전체 삭제
@@ -93,7 +93,7 @@ const AuditLog: React.FC = () => {
       {/* Filters */}
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <Input
             type="text"
             value={searchQuery}
@@ -103,11 +103,11 @@ const AuditLog: React.FC = () => {
           />
         </div>
         <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <select
             value={filterAction}
             onChange={e => setFilterAction(e.target.value)}
-            className="pl-10 pr-8 py-2.5 text-sm border border-gray-200 rounded-lg appearance-none bg-white focus:ring-2 focus:ring-primary-500"
+            className="pl-10 pr-8 py-2.5 text-sm border border-stone-200 rounded-lg appearance-none bg-white focus:ring-2 focus:ring-primary-500"
           >
             <option value="">전체 동작</option>
             <option value="menu">메뉴 관련</option>
@@ -123,13 +123,13 @@ const AuditLog: React.FC = () => {
       {/* Log List */}
       <Card className="flex-1 overflow-y-auto">
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-64 text-stone-400">
             <FileText className="w-12 h-12 mb-3 opacity-50" />
             <p className="font-medium">감사 로그가 없습니다</p>
             <p className="text-sm mt-1">시스템 작업이 수행되면 자동으로 기록됩니다.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-stone-100">
             {entries.map(entry => (
               <Button
                 key={entry.id}
@@ -143,10 +143,10 @@ const AuditLog: React.FC = () => {
                   </Badge>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{entry.entityName}</p>
-                  <p className="text-xs text-gray-500">{entry.entityType}</p>
+                  <p className="text-sm font-medium text-stone-800 truncate">{entry.entityName}</p>
+                  <p className="text-xs text-stone-500">{entry.entityType}</p>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0 text-xs text-gray-400">
+                <div className="flex items-center gap-3 flex-shrink-0 text-xs text-stone-400">
                   <span className="flex items-center gap-1">
                     <User className="w-3 h-3" />
                     {entry.userName}

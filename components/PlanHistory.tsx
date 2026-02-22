@@ -46,9 +46,9 @@ const PlanHistory: React.FC<Props> = ({ planId, onRestore, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-gray-400" /> 식단 히스토리
+        <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-stone-400" /> 식단 히스토리
           </h3>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
@@ -57,7 +57,7 @@ const PlanHistory: React.FC<Props> = ({ planId, onRestore, onClose }) => {
 
         <div className="flex-1 overflow-y-auto p-4">
           {versions.length === 0 ? (
-            <div className="text-center text-gray-400 py-12">
+            <div className="text-center text-stone-400 py-12">
               <Clock className="w-10 h-10 mx-auto mb-3 opacity-50" />
               <p className="font-medium">저장된 버전이 없습니다</p>
             </div>
@@ -66,14 +66,14 @@ const PlanHistory: React.FC<Props> = ({ planId, onRestore, onClose }) => {
               {versions.map((v, i) => (
                 <div
                   key={v.id}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg hover:bg-stone-100 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold flex-shrink-0">
                     v{versions.length - i}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{v.label || `버전 ${versions.length - i}`}</p>
-                    <p className="text-xs text-gray-500">{new Date(v.savedAt).toLocaleString('ko-KR')}</p>
+                    <p className="text-sm font-medium text-stone-800">{v.label || `버전 ${versions.length - i}`}</p>
+                    <p className="text-xs text-stone-500">{new Date(v.savedAt).toLocaleString('ko-KR')}</p>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => handleRestore(v)} title="복원">

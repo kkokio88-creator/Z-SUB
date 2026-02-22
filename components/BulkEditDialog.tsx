@@ -38,10 +38,10 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-800">일괄 편집 ({selectedCount}개 선택)</h3>
+        <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-800">일괄 편집 ({selectedCount}개 선택)</h3>
           <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5 text-stone-400" />
           </Button>
         </div>
 
@@ -52,7 +52,7 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
             <select
               value={category}
               onChange={e => setCategory(e.target.value as MenuCategory | '')}
-              className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-primary-500"
+              className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:ring-primary-500"
             >
               <option value="">변경 안함</option>
               {Object.values(MenuCategory).map(c => (
@@ -139,7 +139,7 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
             <select
               value={isUnused}
               onChange={e => setIsUnused(e.target.value as '' | 'true' | 'false')}
-              className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-primary-500"
+              className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:ring-primary-500"
             >
               <option value="">변경 안함</option>
               <option value="false">사용</option>
@@ -148,7 +148,7 @@ const BulkEditDialog: React.FC<BulkEditDialogProps> = ({ selectedCount, onApply,
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-stone-200 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>

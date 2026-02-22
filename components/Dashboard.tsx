@@ -69,12 +69,12 @@ const BubbleTooltip = ({ active, payload }: any) => {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg text-xs">
-      <div className="font-bold text-gray-800 mb-1">{d.category}</div>
-      <div className="text-gray-600">판매가: {d.x.toLocaleString()}원</div>
-      <div className="text-gray-600">원가율: {d.y}%</div>
-      <div className="text-gray-600">메뉴 수: {d.z}개</div>
-      <div className="text-gray-400 mt-1 text-[10px]">클릭하면 메뉴 목록 표시</div>
+    <div className="bg-white border border-stone-200 rounded-lg px-3 py-2 shadow-lg text-xs">
+      <div className="font-bold text-stone-800 mb-1">{d.category}</div>
+      <div className="text-stone-600">판매가: {d.x.toLocaleString()}원</div>
+      <div className="text-stone-600">원가율: {d.y}%</div>
+      <div className="text-stone-600">메뉴 수: {d.z}개</div>
+      <div className="text-stone-400 mt-1 text-[10px]">클릭하면 메뉴 목록 표시</div>
     </div>
   );
 };
@@ -220,8 +220,8 @@ const Dashboard: React.FC = () => {
   if (menuLoading && menuItems.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
-        <span className="ml-2 text-gray-500">메뉴 데이터 로딩 중...</span>
+        <RefreshCw className="w-6 h-6 animate-spin text-stone-400" />
+        <span className="ml-2 text-stone-500">메뉴 데이터 로딩 중...</span>
       </div>
     );
   }
@@ -232,29 +232,29 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6 pb-10">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500 mb-1">활성 메뉴</p>
-          <h3 className="text-2xl font-bold text-gray-900">{activeCount}개</h3>
-          <p className="text-xs text-gray-400 mt-1">전체 {menuItems.length}개 중</p>
+        <Card className="p-4 border-l-4 border-l-emerald-500">
+          <p className="text-sm font-medium text-stone-500 mb-1">활성 메뉴</p>
+          <h3 className="text-2xl font-bold text-stone-900">{activeCount}개</h3>
+          <p className="text-xs text-stone-400 mt-1">전체 {menuItems.length}개 중</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500 mb-1">평균 원가</p>
-          <h3 className="text-2xl font-bold text-gray-900">
+        <Card className="p-4 border-l-4 border-l-blue-500">
+          <p className="text-sm font-medium text-stone-500 mb-1">평균 원가</p>
+          <h3 className="text-2xl font-bold text-stone-900">
             {activeCount > 0
               ? `${Math.round(menuItems.filter(m => !m.isUnused).reduce((s, m) => s + m.cost, 0) / activeCount).toLocaleString()}원`
               : '-'}
           </h3>
-          <p className="text-xs text-gray-400 mt-1">활성 메뉴 기준</p>
+          <p className="text-xs text-stone-400 mt-1">활성 메뉴 기준</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500 mb-1">식단 유형</p>
-          <h3 className="text-2xl font-bold text-gray-900">{Object.keys(TARGET_CONFIGS).length}개</h3>
-          <p className="text-xs text-gray-400 mt-1">구성 정책 설정됨</p>
+        <Card className="p-4 border-l-4 border-l-purple-500">
+          <p className="text-sm font-medium text-stone-500 mb-1">식단 유형</p>
+          <h3 className="text-2xl font-bold text-stone-900">{Object.keys(TARGET_CONFIGS).length}개</h3>
+          <p className="text-xs text-stone-400 mt-1">구성 정책 설정됨</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500 mb-1">히스토리</p>
-          <h3 className="text-2xl font-bold text-gray-900">{plans.length}일</h3>
-          <p className="text-xs text-gray-400 mt-1">{historyLoading ? '로딩 중...' : '식단 데이터 누적'}</p>
+        <Card className="p-4 border-l-4 border-l-amber-500">
+          <p className="text-sm font-medium text-stone-500 mb-1">히스토리</p>
+          <h3 className="text-2xl font-bold text-stone-900">{plans.length}일</h3>
+          <p className="text-xs text-stone-400 mt-1">{historyLoading ? '로딩 중...' : '식단 데이터 누적'}</p>
         </Card>
       </div>
 
@@ -262,10 +262,10 @@ const Dashboard: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <TrendingUp className="w-5 h-5 text-gray-500" />
+            <TrendingUp className="w-5 h-5 text-emerald-600" />
             메뉴 가격-원가 포트폴리오
           </CardTitle>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-stone-500">
             판매가격(X) x 원가율(Y) 기준 카테고리별 메뉴 분포 · 버블 크기 = 메뉴 수 · 클릭 시 메뉴 목록 표시
           </p>
         </CardHeader>
@@ -327,28 +327,31 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             {selectedBubble && (
-              <div className="w-64 shrink-0 border border-gray-200 rounded-lg p-4 bg-gray-50 overflow-y-auto max-h-[380px]">
+              <div className="w-64 shrink-0 border border-stone-200 rounded-lg p-4 bg-stone-50 overflow-y-auto max-h-[380px]">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-gray-800">{selectedBubble.category}</h4>
+                  <h4 className="text-sm font-bold text-stone-800">{selectedBubble.category}</h4>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedBubble(null)}
-                    className="h-auto p-0 text-gray-400 hover:text-gray-600"
+                    className="h-auto p-0 text-stone-400 hover:text-stone-600"
                   >
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                <div className="text-xs text-gray-500 mb-3 space-y-0.5">
+                <div className="text-xs text-stone-500 mb-3 space-y-0.5">
                   <div>평균 판매가: {selectedBubble.avgPrice.toLocaleString()}원</div>
                   <div>평균 원가율: {selectedBubble.avgRatio}%</div>
                   <div>메뉴 수: {selectedBubble.menus.length}개</div>
                 </div>
-                <div className="border-t border-gray-200 pt-2">
-                  <p className="text-[11px] font-semibold text-gray-600 mb-1.5">메뉴 목록</p>
+                <div className="border-t border-stone-200 pt-2">
+                  <p className="text-[11px] font-semibold text-stone-600 mb-1.5">메뉴 목록</p>
                   <div className="space-y-1">
                     {selectedBubble.menus.map((name, i) => (
-                      <div key={i} className="text-xs text-gray-700 bg-white px-2 py-1 rounded border border-gray-100">
+                      <div
+                        key={i}
+                        className="text-xs text-stone-700 bg-white px-2 py-1 rounded border border-stone-100"
+                      >
                         {name}
                       </div>
                     ))}
@@ -366,10 +369,10 @@ const Dashboard: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <BarChart3 className="w-5 h-5 text-gray-500" />
+              <BarChart3 className="w-5 h-5 text-emerald-600" />
               전체 식단 메뉴 충분도
             </CardTitle>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-stone-500">
               8주(16회) 비반복 기준 · 보유/필요 · 색상: 초록(100%+) / 노랑(50%+) / 빨강(50% 미만)
             </p>
           </CardHeader>
@@ -377,24 +380,26 @@ const Dashboard: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-500 w-24">식단</th>
+                  <tr className="border-b border-stone-200">
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-stone-500 w-24">식단</th>
                     {compositionCategories.map(cat => (
-                      <th key={cat} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-500">
+                      <th key={cat} className="px-2 py-2 text-center text-[11px] font-semibold text-stone-500">
                         {cat}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-stone-100">
                   {compositionData.map(d => (
-                    <tr key={d.targetType} className="hover:bg-gray-50/30">
-                      <td className="px-2 py-1.5 text-[11px] font-medium text-gray-700 whitespace-nowrap">{d.label}</td>
+                    <tr key={d.targetType} className="hover:bg-stone-50/30">
+                      <td className="px-2 py-1.5 text-[11px] font-medium text-stone-700 whitespace-nowrap">
+                        {d.label}
+                      </td>
                       {compositionCategories.map(cat => {
                         const c = d.categories.find(cc => cc.category === cat);
                         if (!c)
                           return (
-                            <td key={cat} className="px-2 py-1.5 text-center text-gray-300">
+                            <td key={cat} className="px-2 py-1.5 text-center text-stone-300">
                               -
                             </td>
                           );
@@ -428,13 +433,13 @@ const Dashboard: React.FC = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Target className="w-5 h-5 text-gray-500" />
+                <Target className="w-5 h-5 text-emerald-600" />
                 식단 상세 분석
               </CardTitle>
               <select
                 value={selectedTarget}
                 onChange={e => setSelectedTarget(e.target.value as TargetType)}
-                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white"
+                className="text-sm border border-stone-300 rounded-lg px-3 py-1.5 bg-white"
               >
                 {compositionData.map(d => (
                   <option key={d.targetType} value={d.targetType}>
@@ -443,7 +448,7 @@ const Dashboard: React.FC = () => {
                 ))}
               </select>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-stone-500">
               {TARGET_LABELS[selectedTarget] || selectedTarget} 식단의 카테고리별 필요 vs 보유 메뉴 수
             </p>
           </CardHeader>
@@ -496,7 +501,7 @@ const Dashboard: React.FC = () => {
                         key={c.category}
                         className="flex items-center justify-between text-sm px-3 py-1.5 bg-red-50 rounded-lg"
                       >
-                        <span className="text-gray-700 font-medium">{c.category}</span>
+                        <span className="text-stone-700 font-medium">{c.category}</span>
                         <span className="text-red-600 font-bold">
                           {c.shortage}개 부족
                           <span className="text-red-400 font-normal text-xs ml-1">
@@ -528,25 +533,25 @@ const Dashboard: React.FC = () => {
                         <X className="w-3.5 h-3.5" />
                       </Button>
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto divide-y divide-gray-100">
+                    <div className="max-h-[200px] overflow-y-auto divide-y divide-stone-100">
                       {categoryMenus.map(m => (
                         <div
                           key={m.id}
-                          className="px-3 py-1.5 flex items-center justify-between text-xs hover:bg-gray-50"
+                          className="px-3 py-1.5 flex items-center justify-between text-xs hover:bg-stone-50"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-medium text-gray-800 truncate">{m.name}</span>
+                            <span className="font-medium text-stone-800 truncate">{m.name}</span>
                             <div className="flex gap-1 flex-shrink-0">
                               {m.tags.slice(0, 3).map(t => (
-                                <span key={t} className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">
+                                <span key={t} className="px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded text-[10px]">
                                   {t}
                                 </span>
                               ))}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-                            <span className="text-gray-500">{m.recommendedPrice.toLocaleString()}원</span>
-                            <span className="text-gray-400">원가 {m.cost.toLocaleString()}원</span>
+                            <span className="text-stone-500">{m.recommendedPrice.toLocaleString()}원</span>
+                            <span className="text-stone-400">원가 {m.cost.toLocaleString()}원</span>
                           </div>
                         </div>
                       ))}
@@ -555,7 +560,7 @@ const Dashboard: React.FC = () => {
                 )}
               </>
             ) : (
-              <div className="text-center py-8 text-gray-400 text-sm">식단을 선택하세요</div>
+              <div className="text-center py-8 text-stone-400 text-sm">식단을 선택하세요</div>
             )}
           </CardContent>
         </Card>
@@ -568,14 +573,14 @@ const Dashboard: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <AlertTriangle className="w-5 h-5 text-gray-500" />
+            <AlertTriangle className="w-5 h-5 text-emerald-600" />
             중복 위험 분석
           </CardTitle>
-          <p className="text-xs text-gray-500">최근 30일 가장 많이 반복된 메뉴 Top 15</p>
+          <p className="text-xs text-stone-500">최근 30일 가장 많이 반복된 메뉴 Top 15</p>
         </CardHeader>
         <CardContent>
           {duplicationData.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">
+            <div className="text-center py-8 text-stone-400 text-sm">
               {historyLoading ? '히스토리 로딩 중...' : '최근 30일 식단 데이터가 없습니다'}
             </div>
           ) : (

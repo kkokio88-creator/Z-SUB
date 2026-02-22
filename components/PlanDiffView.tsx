@@ -13,8 +13,8 @@ const PlanDiffView: React.FC<Props> = ({ before, after, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">버전 비교</h3>
+        <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">버전 비교</h3>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
@@ -27,7 +27,7 @@ const PlanDiffView: React.FC<Props> = ({ before, after, onClose }) => {
 
             return (
               <div key={wi} className="mb-6">
-                <h4 className="text-sm font-bold text-gray-700 mb-3">{wi + 1}주차</h4>
+                <h4 className="text-sm font-bold text-stone-700 mb-3">{wi + 1}주차</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <div className="text-xs font-bold text-red-500 mb-1">이전</div>
@@ -36,7 +36,7 @@ const PlanDiffView: React.FC<Props> = ({ before, after, onClose }) => {
                       return (
                         <div
                           key={item.id + ii}
-                          className={`px-3 py-1.5 rounded text-xs ${changed ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-600'}`}
+                          className={`px-3 py-1.5 rounded text-xs ${changed ? 'bg-red-50 text-red-700 font-medium' : 'text-stone-600'}`}
                         >
                           {item.name} ({item.category})
                         </div>
@@ -53,7 +53,7 @@ const PlanDiffView: React.FC<Props> = ({ before, after, onClose }) => {
                       return (
                         <div
                           key={item.id + ii}
-                          className={`px-3 py-1.5 rounded text-xs ${changed ? 'bg-green-50 text-green-700 font-medium' : 'text-gray-600'}`}
+                          className={`px-3 py-1.5 rounded text-xs ${changed ? 'bg-green-50 text-green-700 font-medium' : 'text-stone-600'}`}
                         >
                           {item.name} ({item.category})
                         </div>

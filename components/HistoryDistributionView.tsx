@@ -47,10 +47,10 @@ const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) =>
         return (
           <div
             key={`${plan.date}-${plan.cycleType}`}
-            className="bg-white border border-gray-300 rounded-lg overflow-hidden print:break-inside-avoid print:rounded-none print:border-black"
+            className="bg-white border border-stone-300 rounded-lg overflow-hidden print:break-inside-avoid print:rounded-none print:border-black"
           >
             {/* 헤더 */}
-            <div className="bg-gray-800 text-white px-5 py-3 flex items-center justify-between print:bg-black">
+            <div className="bg-stone-800 text-white px-5 py-3 flex items-center justify-between print:bg-black">
               <div className="flex items-center gap-3">
                 <span className="font-bold text-base">{formatDate(plan.date)}</span>
                 <span className="text-sm bg-white/20 px-2.5 py-0.5 rounded">{plan.cycleType}</span>
@@ -61,8 +61,8 @@ const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) =>
             {/* 타겟별 메뉴 테이블 */}
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-100 print:bg-gray-200">
-                  <th className="px-2 py-2 text-center text-xs font-bold text-gray-400 border-b border-r border-gray-200 w-8">
+                <tr className="bg-stone-100 print:bg-stone-200">
+                  <th className="px-2 py-2 text-center text-xs font-bold text-stone-400 border-b border-r border-stone-200 w-8">
                     #
                   </th>
                   {allTargets.map(t => {
@@ -70,11 +70,11 @@ const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) =>
                     return (
                       <th
                         key={t}
-                        className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-gray-200 ${target ? 'text-gray-700' : 'text-gray-300'}`}
+                        className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-stone-200 ${target ? 'text-stone-700' : 'text-stone-300'}`}
                       >
                         {TARGET_LABELS[t] || t}
                         {target && (
-                          <span className="block text-[9px] text-gray-400 font-normal">{target.itemCount}품</span>
+                          <span className="block text-[9px] text-stone-400 font-normal">{target.itemCount}품</span>
                         )}
                       </th>
                     );
@@ -83,28 +83,28 @@ const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) =>
               </thead>
               <tbody>
                 {Array.from({ length: maxItems }, (_, rowIdx) => (
-                  <tr key={rowIdx} className="border-b border-gray-100 print:border-gray-300">
-                    <td className="px-2 py-1.5 text-center text-xs text-gray-400 border-r border-gray-200 font-medium">
+                  <tr key={rowIdx} className="border-b border-stone-100 print:border-stone-300">
+                    <td className="px-2 py-1.5 text-center text-xs text-stone-400 border-r border-stone-200 font-medium">
                       {rowIdx + 1}
                     </td>
                     {allTargets.map(t => {
                       const target = targetMap.get(t);
                       if (!target)
                         return (
-                          <td key={t} className="px-2 py-1.5 text-center border-r border-gray-100 text-gray-200">
+                          <td key={t} className="px-2 py-1.5 text-center border-r border-stone-100 text-stone-200">
                             —
                           </td>
                         );
                       const validItems = target.items.filter(i => i.name && i.name.trim());
                       const item = validItems[rowIdx];
                       return (
-                        <td key={t} className="px-2 py-1.5 text-center border-r border-gray-100 text-sm">
+                        <td key={t} className="px-2 py-1.5 text-center border-r border-stone-100 text-sm">
                           {item ? (
-                            <span className="text-gray-800">
+                            <span className="text-stone-800">
                               {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
                             </span>
                           ) : (
-                            <span className="text-gray-200">—</span>
+                            <span className="text-stone-200">—</span>
                           )}
                         </td>
                       );

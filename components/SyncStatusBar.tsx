@@ -10,7 +10,7 @@ const SyncStatusBar: React.FC = () => {
 
   if (!isConfigured) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-gray-400">
+      <div className="flex items-center gap-1.5 text-xs text-stone-400">
         <CloudOff className="w-3.5 h-3.5" />
         <span>Sheets 미연결</span>
       </div>

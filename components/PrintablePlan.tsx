@@ -12,13 +12,13 @@ const PrintablePlan: React.FC<Props> = ({ plan }) => {
     <div className="flex items-center gap-2">
       <button
         onClick={() => printMealPlan(plan)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
       >
         <Printer className="w-3.5 h-3.5" /> 인쇄
       </button>
       <button
         onClick={() => exportToCSV(plan)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
       >
         <Download className="w-3.5 h-3.5" /> CSV
       </button>

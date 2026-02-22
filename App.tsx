@@ -20,8 +20,8 @@ const MealPlanHistory = lazy(() => import('./components/MealPlanHistory'));
 const TabFallback = () => (
   <div className="flex items-center justify-center h-full">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-8 h-8 border-3 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
-      <span className="text-sm text-gray-500">로딩 중...</span>
+      <div className="w-8 h-8 border-3 border-stone-300 border-t-stone-700 rounded-full animate-spin" />
+      <span className="text-sm text-stone-500">로딩 중...</span>
     </div>
   </div>
 );
@@ -45,9 +45,9 @@ const App: React.FC = () => {
         return <MealPlanHistory />;
       default:
         return (
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex items-center justify-center h-full text-stone-400">
             <div className="text-center">
-              <h3 className="text-lg font-medium text-gray-600">Module Not Found</h3>
+              <h3 className="text-lg font-medium text-stone-600">Module Not Found</h3>
               <p>Requested module "{activeTab}" does not exist.</p>
             </div>
           </div>
