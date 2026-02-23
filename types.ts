@@ -62,6 +62,7 @@ export interface MenuItem {
   weight?: number; // 용량 (g)
   isUnused?: boolean; // 미사용 여부
   imageUrl?: string;
+  launchDate?: string; // 출시월 (YYYY-MM) - 신제품 판별용
 }
 
 // 식단 구성 규칙
@@ -87,6 +88,7 @@ export interface WeeklyCyclePlan {
   isValid: boolean;
   warnings: string[];
   usedHistory?: Record<string, string>; // 메뉴명 → YYYY-MM-DD (갯수 보장으로 선택된 히스토리 메뉴)
+  fallbackItems?: string[]; // 2차 필터(30일)로 채워진 메뉴명 목록
 }
 
 // 월간 식단 (4주치)
@@ -190,4 +192,60 @@ export interface ReviewComment {
   comment: string;
   status: 'comment' | 'issue' | 'resolved';
   createdAt: string;
+}
+
+// ── 주재료 컬러링 설정 ──
+export interface IngredientColorConfig {
+  key: string; // e.g. 'beef', 'pork'
+  label: string;
+  color: string; // tailwind color name e.g. 'red', 'pink'
+  priority: number; // 낮을수록 우선
+  enabled: boolean;
+}
+
+// ── 생산 한도 설정 ──
+export interface ProductionLimitConfig {
+  category: string; // e.g. '냉장국', '반조리'
+  dailyLimit: number;
+  enabled: boolean;
+}
+
+// ── 식단별 제품 태그 설정 ──
+export interface TargetTagConfig {
+  targetType: TargetType;
+  allowedTags: string[];
+  blockedTags: string[];
+  blockedProducts: string[]; // 특정 제품명 제외
+}
+
+// ── 통합 생산 수량 아이템 ──
+export interface ConsolidatedProductionItem {
+  menuName: string;
+  code?: string;
+  process?: number;
+  totalQuantity: number;
+  byTarget: Record<string, number>; // targetType → quantity
+  byCycle: Record<string, number>; // cycleType → quantity
+}
+
+// ── 수정 이력 ──
+export interface ChangeHistoryEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  before?: string;
+  after?: string;
+}
+
+// ── 필터 단계 ──
+export type DuplicationFilterLevel = '60일' | '30일' | '전체';
+
+// ── 2단계 생성 결과에서 fallback 정보 ──
+export interface FallbackInfo {
+  menuName: string;
+  filterLevel: DuplicationFilterLevel; // 어떤 단계에서 선택되었는지
+  lastUsedDate?: string;
 }

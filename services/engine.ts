@@ -98,58 +98,103 @@ const generateWeeklyCycle = (
   prevWeekIngredients: Set<string>,
   enableDuplicationCheck: boolean,
   prevWeekMenuNames: string[] = [],
-  historyContext?: { excludedNames: Set<string>; menuLastUsed: Map<string, string> }
+  historyContext?: {
+    excludedNames: Set<string>;
+    menuLastUsed: Map<string, string>;
+    excludedNames30?: Set<string>;
+  },
+  otherCycleIngredients?: Map<number, string[]>,
+  otherTargetIngredients?: Map<number, string[]>
 ): WeeklyCyclePlan => {
   const excludedNames = historyContext?.excludedNames;
+  const excludedNames30 = historyContext?.excludedNames30;
   const config = TARGET_CONFIGS[target];
   const warnings: string[] = [];
   let selectedItems: MenuItem[] = [];
   const ingredientCount: Record<string, number> = {};
   const usedHistory: Record<string, string> = {};
+  const fallbackItems: string[] = [];
 
-  // Filter valid items
-  const availableMenu = menuDB.filter(item => {
-    // 60-day duplication check
+  // 다른 주기에서 사용된 주재료 (같은 weekIndex)
+  const otherIngredients = otherCycleIngredients?.get(weekIndex) || [];
+  const otherIngredientsSet = new Set(otherIngredients);
+
+  // 다른 타겟에서 사용된 주재료 (같은 weekIndex, 같은 날)
+  const otherTargetIngs = otherTargetIngredients?.get(weekIndex) || [];
+  const otherTargetIngsSet = new Set(otherTargetIngs);
+
+  // 기본 필터 (60일 제외 + bannedTags + requiredTags + spicy)
+  const baseFilter = (item: MenuItem, skipHistoryExclude: boolean = false): boolean => {
     if (enableDuplicationCheck && usedItemIds.has(item.id)) return false;
-
-    // 히스토리 60일 중복 제외
-    if (excludedNames && excludedNames.has(normalizeMenuName(item.name))) return false;
-
-    // Ban tags
+    if (!skipHistoryExclude && excludedNames && excludedNames.has(normalizeMenuName(item.name))) return false;
     if (config.bannedTags.length > 0) {
       const hasBannedTag = item.tags.some(tag => config.bannedTags.includes(tag));
       if (hasBannedTag) return false;
     }
-
-    // Spicy filter for kids targets (uses config bannedTags already, but double-check isSpicy flag)
     if ((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && item.isSpicy) return false;
-
-    // Required tags filter (e.g., 아이선호 for kids, 시니어 for senior)
     if (config.requiredTags.length > 0) {
       if (!item.tags.some(tag => config.requiredTags.includes(tag))) return false;
     }
-
     return true;
-  });
+  };
 
-  // Select items by category
-  Object.entries(config.composition).forEach(([cat, count]) => {
-    const category = cat as MenuCategory;
-    const itemsInCategory = availableMenu.filter(m => m.category === category);
+  // 1차: 60일 제외 필터
+  const availableMenu60 = menuDB.filter(item => baseFilter(item, false));
+
+  // 2차: 30일 제외 필터 (60일 제외에서 걸러진 것 중 30일은 통과하는 아이템)
+  const availableMenu30 = excludedNames30
+    ? menuDB.filter(item => {
+        if (enableDuplicationCheck && usedItemIds.has(item.id)) return false;
+        // 30일 제외 목록에 있으면 제외
+        if (excludedNames30.has(normalizeMenuName(item.name))) return false;
+        if (config.bannedTags.length > 0) {
+          const hasBannedTag = item.tags.some(tag => config.bannedTags.includes(tag));
+          if (hasBannedTag) return false;
+        }
+        if ((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && item.isSpicy) return false;
+        if (config.requiredTags.length > 0) {
+          if (!item.tags.some(tag => config.requiredTags.includes(tag))) return false;
+        }
+        return true;
+      })
+    : null;
+
+  // 카테고리별 선택 공통 로직
+  const selectFromPool = (
+    pool: MenuItem[],
+    category: MenuCategory,
+    count: number,
+    alreadySelected: MenuItem[]
+  ): MenuItem[] => {
+    const itemsInCategory = pool.filter(m => m.category === category);
+    // 이미 선택된 아이템 ID 제외
+    const alreadyIds = new Set(alreadySelected.map(s => s.id));
+    const remaining = itemsInCategory.filter(m => !alreadyIds.has(m.id));
 
     // Sort logic:
     // 1. Deprioritize items with main ingredients used last week
     // 2. Prioritize required tags
-    const prioritized = itemsInCategory.sort((a, b) => {
-      // Penalty for repeated ingredients
+    // 3. Deprioritize items with main ingredients used in other cycle (배송 그룹 간 분배)
+    const prioritized = remaining.sort((a, b) => {
+      // Penalty for repeated ingredients from previous week
       const aRepeats = prevWeekIngredients.has(a.mainIngredient) ? 1 : 0;
       const bRepeats = prevWeekIngredients.has(b.mainIngredient) ? 1 : 0;
-      if (aRepeats !== bRepeats) return aRepeats - bRepeats; // Less repeats first
+      if (aRepeats !== bRepeats) return aRepeats - bRepeats;
+
+      // Penalty for ingredients used in other delivery cycle (50:50 분배)
+      const aOtherCycle = otherIngredientsSet.has(a.mainIngredient) ? 1 : 0;
+      const bOtherCycle = otherIngredientsSet.has(b.mainIngredient) ? 1 : 0;
+      if (aOtherCycle !== bOtherCycle) return aOtherCycle - bOtherCycle;
+
+      // Penalty for ingredients used in other target (같은 날 다른 식단 간 식재료 분배)
+      const aOtherTarget = otherTargetIngsSet.has(a.mainIngredient) ? 1 : 0;
+      const bOtherTarget = otherTargetIngsSet.has(b.mainIngredient) ? 1 : 0;
+      if (aOtherTarget !== bOtherTarget) return aOtherTarget - bOtherTarget;
 
       // Bonus for required tags
       const aMatch = a.tags.some(t => config.requiredTags.includes(t)) ? 1 : 0;
       const bMatch = b.tags.some(t => config.requiredTags.includes(t)) ? 1 : 0;
-      return bMatch - aMatch; // More matches first
+      return bMatch - aMatch;
     });
 
     // Filter out items similar to previous week's menus
@@ -159,34 +204,50 @@ const generateWeeklyCycle = (
 
     // Also filter by non-repeating ingredients
     const nonRepeatingCandidates = nonSimilarCandidates.filter(i => !prevWeekIngredients.has(i.mainIngredient));
-    const fallbackPool = nonSimilarCandidates.length >= (count as number) ? nonSimilarCandidates : prioritized;
-    const finalPool = nonRepeatingCandidates.length >= (count as number) ? nonRepeatingCandidates : fallbackPool;
+    const fallbackPoolLocal = nonSimilarCandidates.length >= count ? nonSimilarCandidates : prioritized;
+    const finalPool = nonRepeatingCandidates.length >= count ? nonRepeatingCandidates : fallbackPoolLocal;
 
     // 동일 식재료 2개 초과 방지 (채소 제외)
     const ingredientCapped = finalPool.filter(
       item => item.mainIngredient === 'vegetable' || (ingredientCount[item.mainIngredient] || 0) < 2
     );
-    const pickPool = ingredientCapped.length >= (count as number) ? ingredientCapped : finalPool;
+    const pickPool = ingredientCapped.length >= count ? ingredientCapped : finalPool;
 
     // 같은 주 내 이미 선택된 메뉴와 유사한 것 제거
-    const nonSimilarToSelected = pickPool.filter(
-      item => !selectedItems.some(sel => isSimilarMenu(item.name, sel.name))
-    );
-    const safePool = nonSimilarToSelected.length >= (count as number) ? nonSimilarToSelected : pickPool;
+    const allSelected = [...selectedItems, ...alreadySelected];
+    const nonSimilarToSelected = pickPool.filter(item => !allSelected.some(sel => isSimilarMenu(item.name, sel.name)));
+    const safePool = nonSimilarToSelected.length >= count ? nonSimilarToSelected : pickPool;
 
     // 가격 우선 선택: 고가 아이템 상위 풀에서 랜덤 (다양성 + 가격 보장)
     const priceSorted = [...safePool].sort((a, b) => b.recommendedPrice - a.recommendedPrice);
-    const topPool = priceSorted.slice(
-      0,
-      Math.max((count as number) + 2, Math.min(pickPool.length, (count as number) + 4))
-    );
-    let selected = shuffle(topPool).slice(0, count as number);
+    const topPool = priceSorted.slice(0, Math.max(count + 2, Math.min(safePool.length, count + 4)));
+    return shuffle(topPool).slice(0, count);
+  };
 
-    // 갯수 보장 폴백: excludedNames 제외 해제하여 재시도
-    if (selected.length < (count as number) && excludedNames && excludedNames.size > 0) {
-      const deficit = (count as number) - selected.length;
+  // Select items by category (2단계: 60일 → 30일 fallback)
+  Object.entries(config.composition).forEach(([cat, count]) => {
+    const category = cat as MenuCategory;
+    const needed = count as number;
+
+    // 1차: 60일 제외 풀에서 선택
+    let selected = selectFromPool(availableMenu60, category, needed, []);
+
+    // 2차: 부족하면 30일 제외 풀에서 나머지 채우기
+    if (selected.length < needed && availableMenu30) {
+      const deficit = needed - selected.length;
+      const extras30 = selectFromPool(availableMenu30, category, deficit, selected);
+      // fallbackItems에 2차로 추가된 메뉴명 기록
+      extras30.forEach(item => {
+        fallbackItems.push(normalizeMenuName(item.name));
+      });
+      selected = [...selected, ...extras30];
+    }
+
+    // 3차 갯수 보장 폴백: excludedNames 전체 해제하여 재시도
+    if (selected.length < needed && excludedNames && excludedNames.size > 0) {
+      const deficit = needed - selected.length;
       const selectedIds = new Set(selected.map(s => s.id));
-      const fallbackPool = menuDB.filter(m => {
+      const fallbackPoolFull = menuDB.filter(m => {
         if (m.category !== category) return false;
         if (selectedIds.has(m.id)) return false;
         if (enableDuplicationCheck && usedItemIds.has(m.id)) return false;
@@ -195,7 +256,7 @@ const generateWeeklyCycle = (
         if (config.requiredTags.length > 0 && !m.tags.some(tag => config.requiredTags.includes(tag))) return false;
         return true;
       });
-      const extras = shuffle(fallbackPool).slice(0, deficit);
+      const extras = shuffle(fallbackPoolFull).slice(0, deficit);
       // 히스토리 메뉴 사용 기록
       if (historyContext?.menuLastUsed) {
         extras.forEach(item => {
@@ -210,7 +271,7 @@ const generateWeeklyCycle = (
     }
 
     // 갯수 미달 경고
-    if (selected.length < (count as number)) {
+    if (selected.length < needed) {
       warnings.push(`갯수 미달: ${category} ${count}개 필요, ${selected.length}개만 선택됨`);
     }
 
@@ -248,6 +309,7 @@ const generateWeeklyCycle = (
     isValid: warnings.length === 0,
     warnings,
     usedHistory: Object.keys(usedHistory).length > 0 ? usedHistory : undefined,
+    fallbackItems: fallbackItems.length > 0 ? fallbackItems : undefined,
   };
 };
 
@@ -380,7 +442,10 @@ export const generateMonthlyMealPlan = (
   enableDuplicationCheck: boolean,
   menuDB: MenuItem[],
   excludedNames?: Set<string>,
-  menuLastUsed?: Map<string, string>
+  menuLastUsed?: Map<string, string>,
+  excludedNames30?: Set<string>,
+  otherCycleIngredients?: Map<number, string[]>,
+  otherTargetIngredients?: Map<number, string[]>
 ): MonthlyMealPlan => {
   const config = TARGET_CONFIGS[target];
 
@@ -393,7 +458,10 @@ export const generateMonthlyMealPlan = (
       enableDuplicationCheck,
       menuDB,
       excludedNames,
-      menuLastUsed
+      menuLastUsed,
+      excludedNames30,
+      otherCycleIngredients,
+      otherTargetIngredients
     );
     return createSubsetPlan(parentPlan, target);
   }
@@ -405,8 +473,12 @@ export const generateMonthlyMealPlan = (
   let prevWeekMenuNames: string[] = [];
 
   const historyCtx =
-    excludedNames || menuLastUsed
-      ? { excludedNames: excludedNames || new Set<string>(), menuLastUsed: menuLastUsed || new Map<string, string>() }
+    excludedNames || menuLastUsed || excludedNames30
+      ? {
+          excludedNames: excludedNames || new Set<string>(),
+          menuLastUsed: menuLastUsed || new Map<string, string>(),
+          excludedNames30,
+        }
       : undefined;
 
   for (let i = 1; i <= 4; i++) {
@@ -418,7 +490,9 @@ export const generateMonthlyMealPlan = (
       prevWeekIngredients,
       enableDuplicationCheck,
       prevWeekMenuNames,
-      historyCtx
+      historyCtx,
+      otherCycleIngredients,
+      otherTargetIngredients
     );
 
     // 가격 미달 시 boostWeekPrice로 보정
@@ -448,7 +522,9 @@ export const getSwapCandidates = (
   itemToSwap: MenuItem,
   targetWeekIndex: number,
   menuDB: MenuItem[],
-  excludedNames?: Set<string>
+  excludedNames?: Set<string>,
+  filterLevel?: '60일' | '30일' | '전체',
+  nextMonthMenuNames?: Set<string>
 ): MenuItem[] => {
   const allUsedIds = new Set<string>();
   currentPlan.weeks.forEach(w => w.items.forEach(i => allUsedIds.add(i.id)));
@@ -461,10 +537,12 @@ export const getSwapCandidates = (
   return menuDB.filter(item => {
     if (item.id === itemToSwap.id) return false; // self
     if (item.category !== itemToSwap.category) return false; // same category
-    if (allUsedIds.has(item.id)) return false; // 60 day rule
+    if (allUsedIds.has(item.id)) return false; // 현재 식단 내 중복 방지
 
-    // 60일 동요일 히스토리 제외
-    if (excludedNames && excludedNames.has(normalizeMenuName(item.name))) return false;
+    // filterLevel에 따른 히스토리 제외 처리
+    if (filterLevel !== '전체' && excludedNames) {
+      if (excludedNames.has(normalizeMenuName(item.name))) return false;
+    }
 
     // Banned tags
     if (config.bannedTags.some(t => item.tags.includes(t))) return false;

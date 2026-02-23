@@ -93,11 +93,11 @@ export async function exportToPDF(plan: MonthlyMealPlan): Promise<void> {
 }
 
 export function exportToCSV(plan: MonthlyMealPlan): void {
-  const header = '주차,메뉴명,분류,원가,판매가,주재료,태그';
+  const header = '주차,제품코드,메뉴명,분류,원가,판매가,주재료,태그';
   const rows = plan.weeks.flatMap(week =>
     week.items.map(
       item =>
-        `${week.weekIndex},"${item.name}","${item.category}",${item.cost},${item.recommendedPrice},"${item.mainIngredient}","${item.tags.join(',')}"`
+        `${week.weekIndex},"${item.code ?? ''}","${item.name}","${item.category}",${item.cost},${item.recommendedPrice},"${item.mainIngredient}","${item.tags.join(',')}"`
     )
   );
 
@@ -107,6 +107,41 @@ export function exportToCSV(plan: MonthlyMealPlan): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `${plan.monthLabel}_${plan.target}_식단표.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportGodomallCSV(plan: MonthlyMealPlan): void {
+  const header = '식단코드,제품코드,메뉴명,판매가';
+  const rows = plan.weeks.flatMap(week =>
+    week.items.map(item => `"${plan.id}","${item.code ?? ''}","${item.name}",${item.recommendedPrice}`)
+  );
+
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${plan.monthLabel}_${plan.target}_고도몰.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportMISCSV(plan: MonthlyMealPlan): void {
+  const header = '제품코드,메뉴명,주차,주기,원가,판매가';
+  const rows = plan.weeks.flatMap(week =>
+    week.items.map(
+      item =>
+        `"${item.code ?? ''}","${item.name}",${week.weekIndex},"${plan.cycleType}",${item.cost},${item.recommendedPrice}`
+    )
+  );
+
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${plan.monthLabel}_${plan.target}_MIS.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

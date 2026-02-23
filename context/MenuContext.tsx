@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, typ
 import { MenuItem } from '../types';
 import { pullMenuDB } from '../services/syncManager';
 import { detectMainIngredient } from '../services/sheetsSerializer';
+import { SPICY_KEYWORDS, AUTO_TAG_RULES } from '../constants';
 
 const STORAGE_KEY = 'zsub_menu_db';
 
@@ -11,12 +12,37 @@ const redetectIngredients = (items: MenuItem[]): MenuItem[] =>
     item.mainIngredient === 'vegetable' ? { ...item, mainIngredient: detectMainIngredient(item.name) } : item
   );
 
+// 자동 태그 분류: 제품명 기반 태그 자동 부여 + 매운맛 자동 판별
+const applyAutoTags = (items: MenuItem[]): MenuItem[] =>
+  items.map(item => {
+    const newTags = new Set(item.tags);
+    let isSpicy = item.isSpicy;
+
+    // AUTO_TAG_RULES: 제품명에 키워드가 포함되면 태그 자동 부여
+    for (const rule of AUTO_TAG_RULES) {
+      if (item.name.includes(rule.keyword)) {
+        newTags.add(rule.tag);
+      }
+    }
+
+    // SPICY_KEYWORDS: 매운맛 자동 판별
+    if (!isSpicy && SPICY_KEYWORDS.some(kw => item.name.includes(kw))) {
+      isSpicy = true;
+    }
+
+    const tagsArray = [...newTags];
+    if (tagsArray.length !== item.tags.length || isSpicy !== item.isSpicy) {
+      return { ...item, tags: tagsArray, isSpicy };
+    }
+    return item;
+  });
+
 const loadMenuFromStorage = (): MenuItem[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const items: MenuItem[] = JSON.parse(stored);
-      return redetectIngredients(items.filter(item => item.name && item.name.trim()));
+      return applyAutoTags(redetectIngredients(items.filter(item => item.name && item.name.trim())));
     }
   } catch {
     // ignore parse errors
@@ -47,7 +73,7 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const result = await pullMenuDB();
       if (result.success && result.items.length > 0) {
-        const filtered = result.items.filter(item => item.name && item.name.trim());
+        const filtered = applyAutoTags(result.items.filter(item => item.name && item.name.trim()));
         setMenuItems(filtered);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
       }

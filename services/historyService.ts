@@ -9,6 +9,8 @@ export interface PlanVersion {
   status: 'draft' | 'review_requested' | 'approved' | 'finalized';
   planA: MonthlyMealPlan;
   planB: MonthlyMealPlan;
+  memo?: string; // 버전 메모 (예: "품질팀 피드백 반영")
+  savedWeeks?: number[]; // 저장된 주차 목록 (예: [1,3] = 1,3주차만)
 }
 
 export interface PlanDiffItem {
@@ -50,6 +52,29 @@ export const saveVersion = (version: Omit<PlanVersion, 'id' | 'savedAt'>): PlanV
 export const deleteVersion = (planId: string, versionId: string): void => {
   const history = loadHistory().filter(v => !(v.planId === planId && v.id === versionId));
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+};
+
+export const restoreWeeks = (
+  currentPlanA: MonthlyMealPlan,
+  currentPlanB: MonthlyMealPlan,
+  version: PlanVersion,
+  weekIndices: number[]
+): { planA: MonthlyMealPlan; planB: MonthlyMealPlan } => {
+  const mergeWeeks = (current: MonthlyMealPlan, saved: MonthlyMealPlan): MonthlyMealPlan => ({
+    ...current,
+    weeks: current.weeks.map(week => {
+      if (weekIndices.includes(week.weekIndex)) {
+        const savedWeek = saved.weeks.find(w => w.weekIndex === week.weekIndex);
+        return savedWeek ?? week;
+      }
+      return week;
+    }),
+  });
+
+  return {
+    planA: mergeWeeks(currentPlanA, version.planA),
+    planB: mergeWeeks(currentPlanB, version.planB),
+  };
 };
 
 export const diffPlans = (planA: MonthlyMealPlan, planB: MonthlyMealPlan): PlanDiffItem[] => {

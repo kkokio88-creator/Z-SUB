@@ -14,6 +14,7 @@ import {
   Send,
   Download,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -261,6 +262,21 @@ function detectProcess(name: string): string {
   return '기타';
 }
 
+// ── 주재료 하이라이트 배경색 ──
+
+const INGREDIENT_HIGHLIGHT_BG: Record<string, string> = {
+  beef: 'bg-red-100',
+  pork: 'bg-rose-100',
+  chicken: 'bg-amber-100',
+  fish: 'bg-sky-100',
+  tofu: 'bg-yellow-100',
+  egg: 'bg-orange-100',
+  potato: 'bg-stone-200',
+  seaweed: 'bg-teal-100',
+  mushroom: 'bg-violet-100',
+  vegetable: 'bg-green-100',
+};
+
 // ── 주재료 범례 ──
 
 const IngredientLegend: React.FC = () => (
@@ -290,6 +306,7 @@ const MenuItemRow: React.FC<{
   plusBadge?: string;
   commentCount: number;
   recentComments?: ReviewComment[];
+  highlightedIngredient?: string | null;
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
 }> = ({
   item,
@@ -302,17 +319,21 @@ const MenuItemRow: React.FC<{
   plusBadge,
   commentCount,
   recentComments,
+  highlightedIngredient,
   onAction,
 }) => {
   const ingredient = detectIngredient(item.name);
   const colors = INGREDIENT_COLORS[ingredient];
   const { cleanName, quantity } = parseMenuItem(item.name);
   const hasUnresolvedComment = !isEdited && recentComments?.some(c => c.status === 'comment' || c.status === 'issue');
+  const isHighlighted = highlightedIngredient != null && ingredient === highlightedIngredient;
 
   return (
     <div
       onClick={() => onAction(targetType, idx, item.name)}
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-stone-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${
+        isHighlighted ? `${INGREDIENT_HIGHLIGHT_BG[ingredient] || 'bg-yellow-100'} ring-2 ring-current` : colors.bg
+      } hover:ring-1 hover:ring-stone-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
       title={isEdited && originalName ? `변경: ${originalName} → ${cleanName}` : item.name}
     >
       <span className={`${colors.text} truncate flex-1`}>{cleanName}</span>
@@ -386,6 +407,7 @@ const MergedTableCell: React.FC<{
   originalNames: Map<string, string>;
   commentCounts: Map<string, number>;
   allComments: ReviewComment[];
+  highlightedIngredient?: string | null;
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
 }> = ({
   baseItems,
@@ -398,6 +420,7 @@ const MergedTableCell: React.FC<{
   originalNames,
   commentCounts,
   allComments,
+  highlightedIngredient,
   onAction,
 }) => {
   const baseNameSet = new Set(baseItems.filter(i => isValidMenuItem(i.name)).map(i => parseMenuItem(i.name).cleanName));
@@ -440,6 +463,7 @@ const MergedTableCell: React.FC<{
             plusBadge={plusBadge}
             commentCount={commentCounts.get(cKey) || 0}
             recentComments={scopeComments}
+            highlightedIngredient={highlightedIngredient}
             onAction={onAction}
           />
         );
@@ -458,8 +482,19 @@ const TableCell: React.FC<{
   originalNames: Map<string, string>;
   commentCounts: Map<string, number>;
   allComments: ReviewComment[];
+  highlightedIngredient?: string | null;
   onAction: (targetType: string, itemIndex: number, menuName: string) => void;
-}> = ({ items, date, targetType, editedKeys, originalNames, commentCounts, allComments, onAction }) => {
+}> = ({
+  items,
+  date,
+  targetType,
+  editedKeys,
+  originalNames,
+  commentCounts,
+  allComments,
+  highlightedIngredient,
+  onAction,
+}) => {
   const validItems = useMemo(
     () => items.map((item, idx) => ({ item, originalIdx: idx })).filter(({ item }) => isValidMenuItem(item.name)),
     [items]
@@ -486,6 +521,7 @@ const TableCell: React.FC<{
             originalName={origCleanName}
             commentCount={commentCounts.get(cKey) || 0}
             recentComments={scopeComments}
+            highlightedIngredient={highlightedIngredient}
             onAction={(tt, ii, name) => onAction(tt, ii, name)}
           />
         );
@@ -995,8 +1031,79 @@ const MealPlanHistory: React.FC = () => {
     setViewMonth(now.getMonth());
   }, []);
 
-  const [viewMode, setViewMode] = useState<'plan' | 'ingredient' | 'distribution'>('plan');
+  const [viewMode, setViewMode] = useState<'plan' | 'ingredient' | 'distribution' | 'production'>('plan');
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // 주재료 하이라이트 상태
+  const [highlightedIngredient, setHighlightedIngredient] = useState<string | null>(null);
+
+  // 통합 생산 수량 (메뉴별 합산)
+  const consolidatedProduction = useMemo(() => {
+    const result = new Map<
+      string,
+      { menuName: string; code?: string; process: string; totalQty: number; byTarget: Record<string, number> }
+    >();
+    for (const plan of monthPlans) {
+      for (const target of plan.targets) {
+        const volume = shipmentConfig[target.targetType]?.[plan.cycleType] || 0;
+        if (volume === 0) continue;
+        for (const item of target.items) {
+          if (!isValidMenuItem(item.name)) continue;
+          const { cleanName } = parseMenuItem(item.name);
+          const existing = result.get(cleanName);
+          if (existing) {
+            existing.totalQty += volume;
+            existing.byTarget[target.targetType] = (existing.byTarget[target.targetType] || 0) + volume;
+          } else {
+            result.set(cleanName, {
+              menuName: cleanName,
+              code: item.code,
+              process: detectProcess(item.name),
+              totalQty: volume,
+              byTarget: { [target.targetType]: volume },
+            });
+          }
+        }
+      }
+    }
+    return [...result.values()].sort((a, b) => b.totalQty - a.totalQty);
+  }, [monthPlans, shipmentConfig]);
+
+  // 생산 한도 설정 로드
+  const productionLimits = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('zsub_production_limits');
+      if (saved) return JSON.parse(saved) as { category: string; dailyLimit: number; enabled: boolean }[];
+    } catch {
+      /* ignore */
+    }
+    return [
+      { category: '냉장국', dailyLimit: 500, enabled: true },
+      { category: '반조리', dailyLimit: 300, enabled: true },
+    ];
+  }, []);
+
+  // 일일 생산 한도 초과 경고
+  const productionWarnings = useMemo(() => {
+    const warnings: { date: string; cycleType: string; category: string; total: number; limit: number }[] = [];
+    for (const plan of monthPlans) {
+      const key = `${plan.date}-${plan.cycleType}`;
+      const groups = productionSummary.get(key) || [];
+      for (const g of groups) {
+        const limitConfig = productionLimits.find(l => l.enabled && l.category === g.process);
+        if (limitConfig && g.totalQty > limitConfig.dailyLimit) {
+          warnings.push({
+            date: plan.date,
+            cycleType: plan.cycleType,
+            category: g.process,
+            total: g.totalQty,
+            limit: limitConfig.dailyLimit,
+          });
+        }
+      }
+    }
+    return warnings;
+  }, [monthPlans, productionSummary, productionLimits]);
 
   const exportToHistoryCSV = useCallback(() => {
     if (monthPlans.length === 0) return;
@@ -1280,6 +1387,7 @@ const MealPlanHistory: React.FC = () => {
             { key: 'plan' as const, label: '식단표' },
             { key: 'ingredient' as const, label: '재료검토' },
             { key: 'distribution' as const, label: '현장배포' },
+            { key: 'production' as const, label: '생산통합' },
           ].map(v => (
             <Button
               key={v.key}
@@ -1314,7 +1422,38 @@ const MealPlanHistory: React.FC = () => {
         </div>
       </div>
 
-      {viewMode === 'plan' && <IngredientLegend />}
+      {viewMode === 'plan' && (
+        <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
+          <span className="text-[11px] font-medium text-stone-500">주재료 필터:</span>
+          {Object.entries(INGREDIENT_COLORS)
+            .filter(([k]) => k !== 'other')
+            .map(([key, val]) => {
+              const isActive = highlightedIngredient === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setHighlightedIngredient(isActive ? null : key)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
+                    isActive
+                      ? `${INGREDIENT_HIGHLIGHT_BG[key] || 'bg-yellow-100'} ${val.text} ring-2 ring-offset-1 ring-current shadow-sm`
+                      : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full ${val.dot}`} />
+                  {val.label}
+                </button>
+              );
+            })}
+          {highlightedIngredient && (
+            <button
+              onClick={() => setHighlightedIngredient(null)}
+              className="text-[10px] text-stone-400 hover:text-stone-600 underline ml-1"
+            >
+              초기화
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 콘텐츠 */}
       <div ref={contentRef} className="flex-1 flex flex-col min-h-0">
@@ -1327,196 +1466,364 @@ const MealPlanHistory: React.FC = () => {
           <HistoryIngredientView monthPlans={monthPlans} formatDate={formatDate} />
         ) : viewMode === 'distribution' ? (
           <HistoryDistributionView monthPlans={monthPlans} formatDate={formatDate} />
-        ) : (
-          <div className="flex-1 overflow-auto border border-stone-200 rounded-xl">
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-20">
-                <tr className="bg-stone-50">
-                  <th className="sticky left-0 z-30 bg-stone-50 px-2 py-2.5 text-left text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[72px]">
-                    날짜
-                  </th>
-                  <th className="sticky left-[72px] z-30 bg-stone-50 px-1.5 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[56px]">
-                    주기
-                  </th>
-                  <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[80px]">
-                    검토상태
-                  </th>
-                  <th className="px-2 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[220px]">
-                    생산수량
-                  </th>
-                  {columns.map((col, idx) => (
-                    <th
-                      key={idx}
-                      className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-stone-200"
-                      style={{ minWidth: columnWidths[idx] }}
-                    >
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${getColumnColor(col)}`}
-                      >
-                        {getColumnLabel(col)}
-                      </span>
+        ) : viewMode === 'production' ? (
+          <div className="flex-1 overflow-auto">
+            {/* Production warnings */}
+            {productionWarnings.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {productionWarnings.map((w, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"
+                  >
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      <strong>{w.date}</strong> ({w.cycleType}) - {w.category}: {w.total}개 &gt; 한도 {w.limit}개
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Consolidated production table */}
+            <div className="border border-stone-200 rounded-xl overflow-hidden">
+              <table className="w-full border-collapse text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-stone-50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-stone-500 border-b border-stone-200">
+                      메뉴명
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {monthPlans.map(plan => {
-                  const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
-                  const rowRKey = makeReviewKey(plan.date, plan.cycleType);
-                  const rowRecord = reviewStatusMap.get(rowRKey);
-                  const rowCat = rowRecord ? getFilterStatus(rowRecord.status) : 'pending';
-                  const isCompleted = rowCat === 'completed';
-                  return (
-                    <tr
-                      key={`${plan.date}-${plan.cycleType}`}
-                      className={`border-b border-stone-100 hover:bg-emerald-50/40 ${isCompleted ? 'opacity-60 bg-stone-50/50' : ''}`}
-                    >
-                      <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-stone-200 text-xs font-medium text-stone-700 whitespace-nowrap align-top">
-                        {formatDate(plan.date)}
-                      </td>
-                      <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-stone-200 text-center align-top">
-                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
-                          {plan.cycleType}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-stone-500 border-b border-stone-200">
+                      제품코드
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-stone-500 border-b border-stone-200">
+                      공정
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-stone-500 border-b border-stone-200">
+                      총 생산수량
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {consolidatedProduction.map((item, idx) => {
+                    const pc = PROCESS_COLORS[item.process] || PROCESS_COLORS['기타'];
+                    const limitConfig = productionLimits.find(l => l.enabled && l.category === item.process);
+                    const isOverLimit = limitConfig && item.totalQty > limitConfig.dailyLimit;
+                    return (
+                      <tr
+                        key={idx}
+                        className={`border-b border-stone-100 hover:bg-stone-50 ${isOverLimit ? 'bg-red-50' : ''}`}
+                      >
+                        <td className="px-4 py-2.5 font-medium text-stone-800">{item.menuName}</td>
+                        <td className="px-4 py-2.5 text-stone-500 font-mono text-xs">{item.code || '-'}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${pc.badge}`}>
+                            {item.process}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className={`font-bold tabular-nums ${isOverLimit ? 'text-red-600' : 'text-stone-800'}`}>
+                            {item.totalQty.toLocaleString()}
+                          </span>
+                          {isOverLimit && limitConfig && (
+                            <span className="ml-2 text-[10px] text-red-500">(한도: {limitConfig.dailyLimit})</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-stone-50 border-t border-stone-200">
+                    <td colSpan={3} className="px-4 py-3 text-xs font-bold text-stone-600">
+                      합계
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-stone-800">
+                      {consolidatedProduction.reduce((s, i) => s + i.totalQty, 0).toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            {/* Production warnings in plan view */}
+            {productionWarnings.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {productionWarnings.map((w, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-700"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>
+                      {w.date} ({w.cycleType}) {w.category}: {w.total}개 초과 (한도 {w.limit})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex-1 overflow-auto border border-stone-200 rounded-xl">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 z-20">
+                  <tr className="bg-stone-50">
+                    <th className="sticky left-0 z-30 bg-stone-50 px-2 py-2.5 text-left text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[72px]">
+                      날짜
+                    </th>
+                    <th className="sticky left-[72px] z-30 bg-stone-50 px-1.5 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[56px]">
+                      주기
+                    </th>
+                    <th className="px-1.5 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[80px]">
+                      검토상태
+                    </th>
+                    <th className="px-2 py-2.5 text-center text-xs font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[220px]">
+                      생산수량
+                    </th>
+                    {columns.map((col, idx) => (
+                      <th
+                        key={idx}
+                        className="px-2 py-2.5 text-center text-xs font-semibold border-b border-r border-stone-200"
+                        style={{ minWidth: columnWidths[idx] }}
+                      >
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${getColumnColor(col)}`}
+                        >
+                          {getColumnLabel(col)}
                         </span>
-                      </td>
-                      <td className="px-1.5 py-2 border-r border-stone-200 text-center align-top">
-                        {(() => {
-                          const rKey = makeReviewKey(plan.date, plan.cycleType);
-                          const record = reviewStatusMap.get(rKey);
-                          const cat = record ? getFilterStatus(record.status) : 'pending';
-                          const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
-                            pending: {
-                              cls: 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100',
-                              label: '대기',
-                              icon: Clock,
-                            },
-                            in_progress: {
-                              cls: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',
-                              label: '검토중',
-                              icon: Shield,
-                            },
-                            completed: {
-                              cls: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100',
-                              label: '완료',
-                              icon: CheckCircle,
-                            },
-                          };
-                          const s = styles[cat];
-                          const StatusIcon = s.icon;
-                          const DEPT_LABELS: Record<string, string> = {
-                            quality: '품질',
-                            development: '개발',
-                            process: '공정',
-                          };
-                          return (
-                            <div className="flex flex-col items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSelectedReview(plan)}
-                                className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full whitespace-nowrap ${s.cls}`}
-                              >
-                                <StatusIcon className="w-3 h-3" />
-                                {s.label}
-                              </Button>
-                              {record && record.departments && record.departments.length > 0 && (
-                                <div className="flex flex-col gap-0.5 mt-0.5">
-                                  {record.departments.map(dept => (
-                                    <div
-                                      key={dept.department}
-                                      className="flex items-center gap-1 text-[9px] text-stone-500"
-                                    >
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full ${
-                                          dept.status === 'approved'
-                                            ? 'bg-green-500'
-                                            : dept.status === 'rejected'
-                                              ? 'bg-red-500'
-                                              : 'bg-stone-300'
-                                        }`}
-                                      />
-                                      <span>{DEPT_LABELS[dept.department] || dept.department}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      {/* 생산수량 (2열 배치) */}
-                      <td className="px-1.5 py-2 border-r border-stone-200 align-top">
-                        {(() => {
-                          const sumKey = `${plan.date}-${plan.cycleType}`;
-                          const groups = productionSummary.get(sumKey) || [];
-                          if (groups.length === 0) {
-                            return <span className="text-[10px] text-stone-300 whitespace-nowrap">설정 필요</span>;
-                          }
-                          const leftCol: typeof groups = [];
-                          const rightCol: typeof groups = [];
-                          let leftH = 0;
-                          let rightH = 0;
-                          for (const g of groups) {
-                            const h = g.items.length + 1;
-                            if (leftH <= rightH) {
-                              leftCol.push(g);
-                              leftH += h;
-                            } else {
-                              rightCol.push(g);
-                              rightH += h;
-                            }
-                          }
-                          const renderGroup = (group: (typeof groups)[0]) => {
-                            const pc = PROCESS_COLORS[group.process] || PROCESS_COLORS['기타'];
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthPlans.map(plan => {
+                    const targetMap = new Map<string, HistoricalTargetPlan>(plan.targets.map(t => [t.targetType, t]));
+                    const rowRKey = makeReviewKey(plan.date, plan.cycleType);
+                    const rowRecord = reviewStatusMap.get(rowRKey);
+                    const rowCat = rowRecord ? getFilterStatus(rowRecord.status) : 'pending';
+                    const isCompleted = rowCat === 'completed';
+                    return (
+                      <tr
+                        key={`${plan.date}-${plan.cycleType}`}
+                        className={`border-b border-stone-100 hover:bg-emerald-50/40 ${isCompleted ? 'opacity-60 bg-stone-50/50' : ''}`}
+                      >
+                        <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-stone-200 text-xs font-medium text-stone-700 whitespace-nowrap align-top">
+                          {formatDate(plan.date)}
+                        </td>
+                        <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-stone-200 text-center align-top">
+                          <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
+                            {plan.cycleType}
+                          </span>
+                        </td>
+                        <td className="px-1.5 py-2 border-r border-stone-200 text-center align-top">
+                          {(() => {
+                            const rKey = makeReviewKey(plan.date, plan.cycleType);
+                            const record = reviewStatusMap.get(rKey);
+                            const cat = record ? getFilterStatus(record.status) : 'pending';
+                            const styles: Record<string, { cls: string; label: string; icon: typeof Clock }> = {
+                              pending: {
+                                cls: 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100',
+                                label: '대기',
+                                icon: Clock,
+                              },
+                              in_progress: {
+                                cls: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',
+                                label: '검토중',
+                                icon: Shield,
+                              },
+                              completed: {
+                                cls: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100',
+                                label: '완료',
+                                icon: CheckCircle,
+                              },
+                            };
+                            const s = styles[cat];
+                            const StatusIcon = s.icon;
+                            const DEPT_LABELS: Record<string, string> = {
+                              quality: '품질',
+                              development: '개발',
+                              process: '공정',
+                            };
                             return (
-                              <div key={group.process}>
-                                <div className={`text-[9px] font-bold px-1 py-0.5 rounded ${pc.badge} mb-0.5`}>
-                                  {group.process} ({group.totalQty})
-                                </div>
-                                {group.items.map(item => {
-                                  const prodScopePrefix = `PROD|${item.name}`;
-                                  const prodCommentCount = Array.from(commentCounts.entries())
-                                    .filter(([k]) => k.endsWith(`-${item.name}`))
-                                    .reduce((s, [, v]) => s + v, 0);
-                                  return (
-                                    <div
-                                      key={item.name}
-                                      onClick={() => {
-                                        const pk = makeReviewKey(plan.date, plan.cycleType);
-                                        setCommentTarget({
-                                          planKey: pk,
-                                          scopeKey: `PROD|${item.name}`,
-                                          menuName: item.name,
-                                        });
-                                      }}
-                                      className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1 cursor-pointer hover:bg-stone-100 rounded px-0.5 -mx-0.5"
-                                    >
-                                      <span className="text-stone-600 truncate">{item.name}</span>
-                                      <span className="text-stone-800 font-bold shrink-0">{item.qty}</span>
-                                      {prodCommentCount > 0 && (
-                                        <span className="text-[8px] text-blue-500 shrink-0">
-                                          <MessageSquare className="w-2.5 h-2.5 inline" />
-                                          {prodCommentCount}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                              <div className="flex flex-col items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedReview(plan)}
+                                  className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full whitespace-nowrap ${s.cls}`}
+                                >
+                                  <StatusIcon className="w-3 h-3" />
+                                  {s.label}
+                                </Button>
+                                {record && record.departments && record.departments.length > 0 && (
+                                  <div className="flex flex-col gap-0.5 mt-0.5">
+                                    {record.departments.map(dept => (
+                                      <div
+                                        key={dept.department}
+                                        className="flex items-center gap-1 text-[9px] text-stone-500"
+                                      >
+                                        <span
+                                          className={`w-1.5 h-1.5 rounded-full ${
+                                            dept.status === 'approved'
+                                              ? 'bg-green-500'
+                                              : dept.status === 'rejected'
+                                                ? 'bg-red-500'
+                                                : 'bg-stone-300'
+                                          }`}
+                                        />
+                                        <span>{DEPT_LABELS[dept.department] || dept.department}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
-                          };
-                          return (
-                            <div className="grid grid-cols-2 gap-x-2">
-                              <div className="space-y-1">{leftCol.map(renderGroup)}</div>
-                              <div className="space-y-1">{rightCol.map(renderGroup)}</div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      {columns.map((col, colIdx) => {
-                        if (col.type === 'standalone') {
-                          const target = targetMap.get(col.target);
-                          if (!target)
+                          })()}
+                        </td>
+                        {/* 생산수량 (2열 배치) */}
+                        <td className="px-1.5 py-2 border-r border-stone-200 align-top">
+                          {(() => {
+                            const sumKey = `${plan.date}-${plan.cycleType}`;
+                            const groups = productionSummary.get(sumKey) || [];
+                            if (groups.length === 0) {
+                              return <span className="text-[10px] text-stone-300 whitespace-nowrap">설정 필요</span>;
+                            }
+                            const leftCol: typeof groups = [];
+                            const rightCol: typeof groups = [];
+                            let leftH = 0;
+                            let rightH = 0;
+                            for (const g of groups) {
+                              const h = g.items.length + 1;
+                              if (leftH <= rightH) {
+                                leftCol.push(g);
+                                leftH += h;
+                              } else {
+                                rightCol.push(g);
+                                rightH += h;
+                              }
+                            }
+                            const renderGroup = (group: (typeof groups)[0]) => {
+                              const pc = PROCESS_COLORS[group.process] || PROCESS_COLORS['기타'];
+                              return (
+                                <div key={group.process}>
+                                  <div className={`text-[9px] font-bold px-1 py-0.5 rounded ${pc.badge} mb-0.5`}>
+                                    {group.process} ({group.totalQty})
+                                  </div>
+                                  {group.items.map(item => {
+                                    const prodScopePrefix = `PROD|${item.name}`;
+                                    const prodCommentCount = Array.from(commentCounts.entries())
+                                      .filter(([k]) => k.endsWith(`-${item.name}`))
+                                      .reduce((s, [, v]) => s + v, 0);
+                                    return (
+                                      <div
+                                        key={item.name}
+                                        onClick={() => {
+                                          const pk = makeReviewKey(plan.date, plan.cycleType);
+                                          setCommentTarget({
+                                            planKey: pk,
+                                            scopeKey: `PROD|${item.name}`,
+                                            menuName: item.name,
+                                          });
+                                        }}
+                                        className="flex items-center gap-1 text-[10px] leading-tight whitespace-nowrap pl-1 cursor-pointer hover:bg-stone-100 rounded px-0.5 -mx-0.5"
+                                      >
+                                        <span className="text-stone-600 truncate">{item.name}</span>
+                                        <span className="text-stone-800 font-bold shrink-0">{item.qty}</span>
+                                        {prodCommentCount > 0 && (
+                                          <span className="text-[8px] text-blue-500 shrink-0">
+                                            <MessageSquare className="w-2.5 h-2.5 inline" />
+                                            {prodCommentCount}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            };
+                            return (
+                              <div className="grid grid-cols-2 gap-x-2">
+                                <div className="space-y-1">{leftCol.map(renderGroup)}</div>
+                                <div className="space-y-1">{rightCol.map(renderGroup)}</div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        {columns.map((col, colIdx) => {
+                          if (col.type === 'standalone') {
+                            const target = targetMap.get(col.target);
+                            if (!target)
+                              return (
+                                <td
+                                  key={colIdx}
+                                  className="px-2 py-2 border-r border-stone-100 text-center text-xs text-stone-300 align-top"
+                                >
+                                  —
+                                </td>
+                              );
+                            const items = getItems(plan.date, col.target, target.items);
+                            const planKey = makeReviewKey(plan.date, plan.cycleType);
+                            const discKey = `${plan.date}-${plan.cycleType}-${col.target}`;
+                            const dInfo = discountSummary.get(discKey);
+                            return (
+                              <td key={colIdx} className="px-2 py-1.5 border-r border-stone-100 align-top">
+                                {dInfo &&
+                                  (() => {
+                                    const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
+                                    const priceRate =
+                                      dInfo.sumRecPrice > 0 ? (Math.abs(priceDiff) / dInfo.sumRecPrice) * 100 : 0;
+                                    const actualCostRatio =
+                                      dInfo.targetPrice > 0 ? (dInfo.totalCost / dInfo.targetPrice) * 100 : 0;
+                                    const costDiff = actualCostRatio - dInfo.targetCostRatio;
+                                    if (priceDiff === 0 && Math.abs(costDiff) < 0.5) return null;
+                                    return (
+                                      <div className="mb-1 px-1 py-0.5 rounded text-[9px] space-y-0.5">
+                                        {priceDiff !== 0 && (
+                                          <div
+                                            className={`flex items-center justify-between ${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
+                                          >
+                                            <span className="text-stone-500">
+                                              판매 {dInfo.targetPrice.toLocaleString()}
+                                            </span>
+                                            <span className="font-bold tabular-nums">
+                                              {priceDiff > 0 ? '초과' : '할인'} {priceDiff > 0 ? '+' : ''}
+                                              {priceDiff.toLocaleString()}원 ({priceRate.toFixed(0)}%)
+                                            </span>
+                                          </div>
+                                        )}
+                                        <div
+                                          className={`flex items-center justify-between ${costDiff > 0.5 ? 'text-red-400' : costDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
+                                        >
+                                          <span className="text-stone-400">원가 {actualCostRatio.toFixed(1)}%</span>
+                                          <span className="font-medium tabular-nums">
+                                            가이드 {dInfo.targetCostRatio}%{' '}
+                                            {costDiff > 0.5
+                                              ? `+${costDiff.toFixed(1)}%p`
+                                              : costDiff < -0.5
+                                                ? `${costDiff.toFixed(1)}%p`
+                                                : '적정'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                <TableCell
+                                  items={items}
+                                  date={plan.date}
+                                  targetType={col.target}
+                                  editedKeys={editedKeys}
+                                  originalNames={originalNameMap}
+                                  commentCounts={commentCounts}
+                                  allComments={commentCache[planKey] || []}
+                                  highlightedIngredient={highlightedIngredient}
+                                  onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
+                                />
+                              </td>
+                            );
+                          }
+                          const baseData = targetMap.get(col.group.baseTarget);
+                          const plusData = targetMap.get(col.group.plusTarget);
+                          if (!baseData && !plusData)
                             return (
                               <td
                                 key={colIdx}
@@ -1525,154 +1832,86 @@ const MealPlanHistory: React.FC = () => {
                                 —
                               </td>
                             );
-                          const items = getItems(plan.date, col.target, target.items);
-                          const planKey = makeReviewKey(plan.date, plan.cycleType);
-                          const discKey = `${plan.date}-${plan.cycleType}-${col.target}`;
-                          const dInfo = discountSummary.get(discKey);
+                          const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
+                          const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
+                          const mergedPlanKey = makeReviewKey(plan.date, plan.cycleType);
+                          const baseDiscKey = `${plan.date}-${plan.cycleType}-${col.group.baseTarget}`;
+                          const baseDInfo = discountSummary.get(baseDiscKey);
+                          const plusDiscKey = `${plan.date}-${plan.cycleType}-${col.group.plusTarget}`;
+                          const plusDInfo = discountSummary.get(plusDiscKey);
                           return (
                             <td key={colIdx} className="px-2 py-1.5 border-r border-stone-100 align-top">
-                              {dInfo &&
-                                (() => {
-                                  const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
-                                  const priceRate =
-                                    dInfo.sumRecPrice > 0 ? (Math.abs(priceDiff) / dInfo.sumRecPrice) * 100 : 0;
-                                  const actualCostRatio =
-                                    dInfo.targetPrice > 0 ? (dInfo.totalCost / dInfo.targetPrice) * 100 : 0;
-                                  const costDiff = actualCostRatio - dInfo.targetCostRatio;
-                                  if (priceDiff === 0 && Math.abs(costDiff) < 0.5) return null;
+                              {(() => {
+                                const renderDiscBadge = (dI: typeof baseDInfo, label?: string) => {
+                                  if (!dI) return null;
+                                  const pDiff = dI.sumRecPrice - dI.targetPrice;
+                                  const pRate = dI.sumRecPrice > 0 ? (Math.abs(pDiff) / dI.sumRecPrice) * 100 : 0;
+                                  const aCR = dI.targetPrice > 0 ? (dI.totalCost / dI.targetPrice) * 100 : 0;
+                                  const cDiff = aCR - dI.targetCostRatio;
+                                  if (pDiff === 0 && Math.abs(cDiff) < 0.5) return null;
                                   return (
-                                    <div className="mb-1 px-1 py-0.5 rounded text-[9px] space-y-0.5">
-                                      {priceDiff !== 0 && (
+                                    <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
+                                      {label && <span className="text-stone-400 text-[8px]">{label}</span>}
+                                      {pDiff !== 0 && (
                                         <div
-                                          className={`flex items-center justify-between ${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
+                                          className={`flex items-center justify-between ${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
                                         >
-                                          <span className="text-stone-500">
-                                            판매 {dInfo.targetPrice.toLocaleString()}
-                                          </span>
+                                          <span className="text-stone-500">판매 {dI.targetPrice.toLocaleString()}</span>
                                           <span className="font-bold tabular-nums">
-                                            {priceDiff > 0 ? '초과' : '할인'} {priceDiff > 0 ? '+' : ''}
-                                            {priceDiff.toLocaleString()}원 ({priceRate.toFixed(0)}%)
+                                            {pDiff > 0 ? '초과' : '할인'} {pDiff > 0 ? '+' : ''}
+                                            {pDiff.toLocaleString()}원 ({pRate.toFixed(0)}%)
                                           </span>
                                         </div>
                                       )}
                                       <div
-                                        className={`flex items-center justify-between ${costDiff > 0.5 ? 'text-red-400' : costDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
+                                        className={`flex items-center justify-between ${cDiff > 0.5 ? 'text-red-400' : cDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
                                       >
-                                        <span className="text-stone-400">원가 {actualCostRatio.toFixed(1)}%</span>
+                                        <span className="text-stone-400">원가 {aCR.toFixed(1)}%</span>
                                         <span className="font-medium tabular-nums">
-                                          가이드 {dInfo.targetCostRatio}%{' '}
-                                          {costDiff > 0.5
-                                            ? `+${costDiff.toFixed(1)}%p`
-                                            : costDiff < -0.5
-                                              ? `${costDiff.toFixed(1)}%p`
+                                          가이드 {dI.targetCostRatio}%{' '}
+                                          {cDiff > 0.5
+                                            ? `+${cDiff.toFixed(1)}%p`
+                                            : cDiff < -0.5
+                                              ? `${cDiff.toFixed(1)}%p`
                                               : '적정'}
                                         </span>
                                       </div>
                                     </div>
                                   );
-                                })()}
-                              <TableCell
-                                items={items}
+                                };
+                                const baseEl = renderDiscBadge(baseDInfo);
+                                const plusEl = renderDiscBadge(plusDInfo, col.group.plusBadge);
+                                if (!baseEl && !plusEl) return null;
+                                return (
+                                  <div className="mb-1 space-y-0.5">
+                                    {baseEl}
+                                    {plusEl}
+                                  </div>
+                                );
+                              })()}
+                              <MergedTableCell
+                                baseItems={baseItems}
+                                plusItems={plusItems}
+                                plusBadge={col.group.plusBadge}
                                 date={plan.date}
-                                targetType={col.target}
+                                baseTarget={col.group.baseTarget}
+                                plusTarget={col.group.plusTarget}
                                 editedKeys={editedKeys}
                                 originalNames={originalNameMap}
                                 commentCounts={commentCounts}
-                                allComments={commentCache[planKey] || []}
+                                allComments={commentCache[mergedPlanKey] || []}
+                                highlightedIngredient={highlightedIngredient}
                                 onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
                               />
                             </td>
                           );
-                        }
-                        const baseData = targetMap.get(col.group.baseTarget);
-                        const plusData = targetMap.get(col.group.plusTarget);
-                        if (!baseData && !plusData)
-                          return (
-                            <td
-                              key={colIdx}
-                              className="px-2 py-2 border-r border-stone-100 text-center text-xs text-stone-300 align-top"
-                            >
-                              —
-                            </td>
-                          );
-                        const baseItems = baseData ? getItems(plan.date, col.group.baseTarget, baseData.items) : [];
-                        const plusItems = plusData ? getItems(plan.date, col.group.plusTarget, plusData.items) : [];
-                        const mergedPlanKey = makeReviewKey(plan.date, plan.cycleType);
-                        const baseDiscKey = `${plan.date}-${plan.cycleType}-${col.group.baseTarget}`;
-                        const baseDInfo = discountSummary.get(baseDiscKey);
-                        const plusDiscKey = `${plan.date}-${plan.cycleType}-${col.group.plusTarget}`;
-                        const plusDInfo = discountSummary.get(plusDiscKey);
-                        return (
-                          <td key={colIdx} className="px-2 py-1.5 border-r border-stone-100 align-top">
-                            {(() => {
-                              const renderDiscBadge = (dI: typeof baseDInfo, label?: string) => {
-                                if (!dI) return null;
-                                const pDiff = dI.sumRecPrice - dI.targetPrice;
-                                const pRate = dI.sumRecPrice > 0 ? (Math.abs(pDiff) / dI.sumRecPrice) * 100 : 0;
-                                const aCR = dI.targetPrice > 0 ? (dI.totalCost / dI.targetPrice) * 100 : 0;
-                                const cDiff = aCR - dI.targetCostRatio;
-                                if (pDiff === 0 && Math.abs(cDiff) < 0.5) return null;
-                                return (
-                                  <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
-                                    {label && <span className="text-stone-400 text-[8px]">{label}</span>}
-                                    {pDiff !== 0 && (
-                                      <div
-                                        className={`flex items-center justify-between ${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
-                                      >
-                                        <span className="text-stone-500">판매 {dI.targetPrice.toLocaleString()}</span>
-                                        <span className="font-bold tabular-nums">
-                                          {pDiff > 0 ? '초과' : '할인'} {pDiff > 0 ? '+' : ''}
-                                          {pDiff.toLocaleString()}원 ({pRate.toFixed(0)}%)
-                                        </span>
-                                      </div>
-                                    )}
-                                    <div
-                                      className={`flex items-center justify-between ${cDiff > 0.5 ? 'text-red-400' : cDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
-                                    >
-                                      <span className="text-stone-400">원가 {aCR.toFixed(1)}%</span>
-                                      <span className="font-medium tabular-nums">
-                                        가이드 {dI.targetCostRatio}%{' '}
-                                        {cDiff > 0.5
-                                          ? `+${cDiff.toFixed(1)}%p`
-                                          : cDiff < -0.5
-                                            ? `${cDiff.toFixed(1)}%p`
-                                            : '적정'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              };
-                              const baseEl = renderDiscBadge(baseDInfo);
-                              const plusEl = renderDiscBadge(plusDInfo, col.group.plusBadge);
-                              if (!baseEl && !plusEl) return null;
-                              return (
-                                <div className="mb-1 space-y-0.5">
-                                  {baseEl}
-                                  {plusEl}
-                                </div>
-                              );
-                            })()}
-                            <MergedTableCell
-                              baseItems={baseItems}
-                              plusItems={plusItems}
-                              plusBadge={col.group.plusBadge}
-                              date={plan.date}
-                              baseTarget={col.group.baseTarget}
-                              plusTarget={col.group.plusTarget}
-                              editedKeys={editedKeys}
-                              originalNames={originalNameMap}
-                              commentCounts={commentCounts}
-                              allComments={commentCache[mergedPlanKey] || []}
-                              onAction={(tt, ii, name) => handleMenuAction(plan.date, plan.cycleType, tt, ii, name)}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

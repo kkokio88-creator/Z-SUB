@@ -149,6 +149,61 @@ export const pullHistoricalPlans = async (): Promise<{
   }
 };
 
+// ── 식단 내보내기 (양방향 동기화 - 덮어쓰기) ──
+
+export const exportMealPlanToSheet = async (
+  planA: MonthlyMealPlan,
+  planB: MonthlyMealPlan,
+  monthLabel: string,
+  target: string
+): Promise<SyncResult> => {
+  try {
+    const headers = ['월', '대상', '주기', '주차', '제품코드', '메뉴명', '분류', '원가', '판매가', '주재료', '태그'];
+    const rows: string[][] = [];
+
+    const addPlanRows = (plan: MonthlyMealPlan) => {
+      plan.weeks.forEach(week => {
+        week.items.forEach(item => {
+          rows.push([
+            monthLabel,
+            target,
+            plan.cycleType,
+            String(week.weekIndex),
+            item.code || '',
+            item.name,
+            item.category,
+            String(item.cost),
+            String(item.recommendedPrice),
+            item.mainIngredient,
+            item.tags.join(','),
+          ]);
+        });
+      });
+    };
+
+    addPlanRows(planA);
+    addPlanRows(planB);
+
+    const result = await pushSheetData('식단_내보내기', [headers, ...rows]);
+    await logSync('push', '식단_내보내기', rows.length, 'success');
+    addSyncRecord({
+      target: 'SHEETS',
+      result: 'success',
+      itemCount: rows.length,
+    });
+    return { success: result.success, rowCount: rows.length };
+  } catch (err) {
+    await logSync('push', '식단_내보내기', 0, 'error', String(err));
+    addSyncRecord({
+      target: 'SHEETS',
+      result: 'error',
+      itemCount: 0,
+      errorMessage: String(err),
+    });
+    return { success: false, rowCount: 0, error: String(err) };
+  }
+};
+
 // ── 동기화 로그 ──
 
 export const logSync = async (

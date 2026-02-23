@@ -17,6 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   isOfflineMode: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -145,6 +146,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     [isOfflineMode]
   );
 
+  const loginWithGoogle = useCallback(async () => {
+    if (isOfflineMode) {
+      setUser(DEFAULT_USER);
+      return { success: true };
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { success: false, error: 'Supabase가 설정되지 않았습니다' };
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  }, [isOfflineMode]);
+
   const logout = useCallback(async () => {
     const supabase = getSupabase();
     if (supabase) {
@@ -154,7 +178,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, isOfflineMode, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated: !!user, isLoading, isOfflineMode, login, loginWithGoogle, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

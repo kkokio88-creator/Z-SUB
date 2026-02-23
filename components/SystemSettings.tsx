@@ -10,13 +10,26 @@ import {
   Activity,
   Settings,
   BarChart3,
+  Palette,
+  Factory,
+  Tags,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import PlanManagement from './PlanManagement';
-import { TargetType } from '../types';
+import { TargetType, IngredientColorConfig, ProductionLimitConfig, TargetTagConfig } from '../types';
 import { useToast } from '../context/ToastContext';
 import { checkSheetsConnection } from '../services/sheetsService';
 import { checkMISHealth } from '../services/misService';
 import { checkZPPSHealth } from '../services/zppsService';
+import {
+  DEFAULT_INGREDIENT_COLORS,
+  INGREDIENT_COLOR_MAP,
+  DEFAULT_PRODUCTION_LIMITS,
+  DEFAULT_TARGET_TAGS,
+} from '../constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +37,9 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const SystemSettings: React.FC = () => {
   const { addToast } = useToast();
-  const [activeSection, setActiveSection] = useState<'algorithm' | 'integration' | 'policy' | 'shipment'>('algorithm');
+  const [activeSection, setActiveSection] = useState<
+    'algorithm' | 'integration' | 'policy' | 'shipment' | 'ingredient' | 'production' | 'tags'
+  >('algorithm');
 
   // AI Algorithm State
   const [aiManual, setAiManual] = useState('');
@@ -36,6 +51,21 @@ const SystemSettings: React.FC = () => {
 
   // Shipment volume config
   const [shipmentConfig, setShipmentConfig] = useState<Record<string, { 화수목: number; 금토월: number }>>({});
+
+  // Ingredient color config
+  const [ingredientColors, setIngredientColors] = useState<IngredientColorConfig[]>([]);
+
+  // Production limit config
+  const [productionLimits, setProductionLimits] = useState<ProductionLimitConfig[]>([]);
+  const [newProdCategory, setNewProdCategory] = useState('');
+  const [newProdLimit, setNewProdLimit] = useState(100);
+
+  // Target tag config
+  const [targetTags, setTargetTags] = useState<TargetTagConfig[]>([]);
+  const [selectedTagTarget, setSelectedTagTarget] = useState<TargetType>(TargetType.KIDS);
+  const [newAllowedTag, setNewAllowedTag] = useState('');
+  const [newBlockedTag, setNewBlockedTag] = useState('');
+  const [newBlockedProduct, setNewBlockedProduct] = useState('');
 
   // Connection Test States
   const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({
@@ -73,6 +103,39 @@ const SystemSettings: React.FC = () => {
         /* ignore */
       }
     }
+
+    const savedIngredientColors = localStorage.getItem('zsub_ingredient_colors');
+    if (savedIngredientColors) {
+      try {
+        setIngredientColors(JSON.parse(savedIngredientColors));
+      } catch {
+        setIngredientColors([...DEFAULT_INGREDIENT_COLORS]);
+      }
+    } else {
+      setIngredientColors([...DEFAULT_INGREDIENT_COLORS]);
+    }
+
+    const savedProdLimits = localStorage.getItem('zsub_production_limits');
+    if (savedProdLimits) {
+      try {
+        setProductionLimits(JSON.parse(savedProdLimits));
+      } catch {
+        setProductionLimits([...DEFAULT_PRODUCTION_LIMITS]);
+      }
+    } else {
+      setProductionLimits([...DEFAULT_PRODUCTION_LIMITS]);
+    }
+
+    const savedTargetTags = localStorage.getItem('zsub_target_tags');
+    if (savedTargetTags) {
+      try {
+        setTargetTags(JSON.parse(savedTargetTags));
+      } catch {
+        setTargetTags([...DEFAULT_TARGET_TAGS]);
+      }
+    } else {
+      setTargetTags([...DEFAULT_TARGET_TAGS]);
+    }
   }, []);
 
   const handleSave = () => {
@@ -81,12 +144,122 @@ const SystemSettings: React.FC = () => {
     localStorage.setItem('zsub_mis_url', misApiUrl);
     localStorage.setItem('zsub_zpps_url', zppsApiUrl);
     localStorage.setItem('zsub_shipment_config', JSON.stringify(shipmentConfig));
+    localStorage.setItem('zsub_ingredient_colors', JSON.stringify(ingredientColors));
+    localStorage.setItem('zsub_production_limits', JSON.stringify(productionLimits));
+    localStorage.setItem('zsub_target_tags', JSON.stringify(targetTags));
 
     addToast({
       type: 'success',
       title: '설정 저장 완료',
       message: '시스템 설정이 저장되었습니다. 모든 설정은 로그아웃 후에도 유지됩니다.',
     });
+  };
+
+  // ── Ingredient color helpers ──
+  const COLOR_OPTIONS = ['red', 'pink', 'amber', 'blue', 'yellow', 'orange', 'lime', 'teal', 'violet', 'green'];
+
+  const moveIngredient = (index: number, direction: 'up' | 'down') => {
+    const newList = [...ingredientColors];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= newList.length) return;
+    [newList[index], newList[swapIndex]] = [newList[swapIndex], newList[index]];
+    // 우선순위 재계산
+    newList.forEach((item, i) => (item.priority = i + 1));
+    setIngredientColors(newList);
+  };
+
+  const updateIngredientColor = (
+    index: number,
+    field: keyof IngredientColorConfig,
+    value: string | number | boolean
+  ) => {
+    setIngredientColors(prev => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  // ── Production limit helpers ──
+  const addProductionCategory = () => {
+    const trimmed = newProdCategory.trim();
+    if (!trimmed) return;
+    if (productionLimits.some(p => p.category === trimmed)) {
+      addToast({ type: 'error', title: '중복', message: '이미 존재하는 카테고리입니다.' });
+      return;
+    }
+    setProductionLimits(prev => [...prev, { category: trimmed, dailyLimit: newProdLimit, enabled: true }]);
+    setNewProdCategory('');
+    setNewProdLimit(100);
+  };
+
+  const removeProductionCategory = (index: number) => {
+    setProductionLimits(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateProductionLimit = (
+    index: number,
+    field: keyof ProductionLimitConfig,
+    value: string | number | boolean
+  ) => {
+    setProductionLimits(prev => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  // ── Tag management helpers ──
+  const getTagConfigForTarget = (target: TargetType): TargetTagConfig => {
+    return (
+      targetTags.find(t => t.targetType === target) || {
+        targetType: target,
+        allowedTags: [],
+        blockedTags: [],
+        blockedProducts: [],
+      }
+    );
+  };
+
+  const updateTagConfig = (target: TargetType, updater: (cfg: TargetTagConfig) => TargetTagConfig) => {
+    setTargetTags(prev => {
+      const exists = prev.find(t => t.targetType === target);
+      if (exists) {
+        return prev.map(t => (t.targetType === target ? updater(t) : t));
+      }
+      return [...prev, updater({ targetType: target, allowedTags: [], blockedTags: [], blockedProducts: [] })];
+    });
+  };
+
+  const addAllowedTag = () => {
+    const trimmed = newAllowedTag.trim();
+    if (!trimmed) return;
+    const cfg = getTagConfigForTarget(selectedTagTarget);
+    if (cfg.allowedTags.includes(trimmed)) return;
+    updateTagConfig(selectedTagTarget, c => ({ ...c, allowedTags: [...c.allowedTags, trimmed] }));
+    setNewAllowedTag('');
+  };
+
+  const removeAllowedTag = (tag: string) => {
+    updateTagConfig(selectedTagTarget, c => ({ ...c, allowedTags: c.allowedTags.filter(t => t !== tag) }));
+  };
+
+  const addBlockedTag = () => {
+    const trimmed = newBlockedTag.trim();
+    if (!trimmed) return;
+    const cfg = getTagConfigForTarget(selectedTagTarget);
+    if (cfg.blockedTags.includes(trimmed)) return;
+    updateTagConfig(selectedTagTarget, c => ({ ...c, blockedTags: [...c.blockedTags, trimmed] }));
+    setNewBlockedTag('');
+  };
+
+  const removeBlockedTag = (tag: string) => {
+    updateTagConfig(selectedTagTarget, c => ({ ...c, blockedTags: c.blockedTags.filter(t => t !== tag) }));
+  };
+
+  const addBlockedProduct = () => {
+    const trimmed = newBlockedProduct.trim();
+    if (!trimmed) return;
+    const cfg = getTagConfigForTarget(selectedTagTarget);
+    if (cfg.blockedProducts.includes(trimmed)) return;
+    updateTagConfig(selectedTagTarget, c => ({ ...c, blockedProducts: [...c.blockedProducts, trimmed] }));
+    setNewBlockedProduct('');
+  };
+
+  const removeBlockedProduct = (product: string) => {
+    updateTagConfig(selectedTagTarget, c => ({ ...c, blockedProducts: c.blockedProducts.filter(p => p !== product) }));
   };
 
   const runConnectionTest = async (target: string) => {
@@ -189,6 +362,27 @@ const SystemSettings: React.FC = () => {
           >
             <BarChart3 className="w-4 h-4" /> 출고량 설정
           </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setActiveSection('ingredient')}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'ingredient' ? 'bg-rose-50 text-rose-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
+          >
+            <Palette className="w-4 h-4" /> 주재료 컬러링
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setActiveSection('production')}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'production' ? 'bg-cyan-50 text-cyan-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
+          >
+            <Factory className="w-4 h-4" /> 생산 한도
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setActiveSection('tags')}
+            className={`w-full justify-start px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeSection === 'tags' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}
+          >
+            <Tags className="w-4 h-4" /> 태그 관리
+          </Button>
         </nav>
         <div className="p-4 border-t border-stone-100 text-center">
           <div className="text-[10px] text-stone-400">Z-SUB System v2.5.0</div>
@@ -205,6 +399,9 @@ const SystemSettings: React.FC = () => {
               {activeSection === 'integration' && '외부 시스템 및 데이터 연동'}
               {activeSection === 'policy' && '식단 정책 및 구성 설정'}
               {activeSection === 'shipment' && '출고량 시뮬레이션 설정'}
+              {activeSection === 'ingredient' && '주재료 컬러링 우선순위'}
+              {activeSection === 'production' && '생산 한도 설정'}
+              {activeSection === 'tags' && '식단별 태그 관리'}
             </h2>
             <p className="text-sm text-stone-500 mt-1">
               {activeSection === 'algorithm' && 'AI가 식단을 생성할 때 반드시 준수해야 할 자연어 규칙을 설정합니다.'}
@@ -212,6 +409,9 @@ const SystemSettings: React.FC = () => {
               {activeSection === 'policy' &&
                 '기본 식단과 파생된 옵션 상품을 그룹별로 관리하고, 원가율 정책을 수립합니다.'}
               {activeSection === 'shipment' && '식단 유형별 평균 출고량을 설정하여 생산수량 시뮬레이션에 활용합니다.'}
+              {activeSection === 'ingredient' && '주재료별 색상과 우선순위를 설정하여 식단표 시각화에 활용합니다.'}
+              {activeSection === 'production' && '카테고리별 일일 생산 한도를 설정하여 생산 계획에 반영합니다.'}
+              {activeSection === 'tags' && '식단 유형별 허용/차단 태그와 제품명을 관리합니다.'}
             </p>
           </div>
           {activeSection !== 'policy' && (
@@ -450,6 +650,357 @@ const SystemSettings: React.FC = () => {
 
               <p className="text-xs text-stone-400">
                 * 설정한 출고량은 히스토리 탭의 &quot;생산수량&quot; 열에서 메뉴별 예상 생산량 계산에 사용됩니다.
+              </p>
+            </div>
+          )}
+
+          {/* 5. Ingredient Color Section */}
+          {activeSection === 'ingredient' && (
+            <div className="space-y-6 max-w-3xl">
+              <div className="bg-rose-50 p-4 rounded-lg border border-rose-100 flex gap-3 items-start">
+                <Palette className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-rose-900 text-sm">주재료별 컬러 우선순위</h4>
+                  <p className="text-xs text-rose-700 mt-1">
+                    식단표에서 주재료에 따른 색상 표시 우선순위를 설정합니다. 위/아래 버튼으로 순서를 변경하세요.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border border-stone-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-stone-50 border-b border-stone-200">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 w-12">순서</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600">재료명</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">색상</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">우선순위</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">활성화</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 w-24">이동</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {ingredientColors.map((item, index) => {
+                      const colorStyle = INGREDIENT_COLOR_MAP[item.color];
+                      return (
+                        <tr key={item.key} className={`hover:bg-stone-50/60 ${!item.enabled ? 'opacity-50' : ''}`}>
+                          <td className="px-4 py-2.5 text-xs text-stone-500 font-mono">{index + 1}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {colorStyle && <div className={`w-3 h-3 rounded-full ${colorStyle.dot}`}></div>}
+                              <span className="text-sm font-medium text-stone-800">{item.label}</span>
+                              <span className="text-xs text-stone-400">({item.key})</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <select
+                              value={item.color}
+                              onChange={e => updateIngredientColor(index, 'color', e.target.value)}
+                              className="text-xs border border-stone-200 rounded-md px-2 py-1.5 bg-white focus:ring-1 focus:ring-rose-400"
+                            >
+                              {COLOR_OPTIONS.map(c => (
+                                <option key={c} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.priority}
+                              onChange={e => updateIngredientColor(index, 'priority', parseInt(e.target.value) || 1)}
+                              className="w-16 text-center"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              onClick={() => updateIngredientColor(index, 'enabled', !item.enabled)}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${item.enabled ? 'bg-rose-500' : 'bg-stone-300'}`}
+                            >
+                              <span
+                                className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${item.enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`}
+                              />
+                            </button>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <div className="flex gap-1 justify-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => moveIngredient(index, 'up')}
+                                disabled={index === 0}
+                                className="h-7 w-7 p-0"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => moveIngredient(index, 'down')}
+                                disabled={index === ingredientColors.length - 1}
+                                className="h-7 w-7 p-0"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-stone-400">
+                * 우선순위가 낮은 숫자일수록 식단표에서 먼저 적용됩니다. 비활성화된 재료는 컬러링에서 제외됩니다.
+              </p>
+            </div>
+          )}
+
+          {/* 6. Production Limit Section */}
+          {activeSection === 'production' && (
+            <div className="space-y-6 max-w-3xl">
+              <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-100 flex gap-3 items-start">
+                <Factory className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-cyan-900 text-sm">카테고리별 생산 한도</h4>
+                  <p className="text-xs text-cyan-700 mt-1">
+                    카테고리별 일일 생산 한도를 설정합니다. 한도를 초과하는 메뉴 배치 시 경고가 표시됩니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border border-stone-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-stone-50 border-b border-stone-200">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600">카테고리</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">일일 한도</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">활성화</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 w-16">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {productionLimits.map((item, index) => (
+                      <tr
+                        key={`${item.category}-${index}`}
+                        className={`hover:bg-stone-50/60 ${!item.enabled ? 'opacity-50' : ''}`}
+                      >
+                        <td className="px-4 py-2.5 text-sm font-medium text-stone-800">{item.category}</td>
+                        <td className="px-4 py-2 text-center">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.dailyLimit}
+                            onChange={e => updateProductionLimit(index, 'dailyLimit', parseInt(e.target.value) || 0)}
+                            className="w-24 text-center"
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            onClick={() => updateProductionLimit(index, 'enabled', !item.enabled)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${item.enabled ? 'bg-cyan-500' : 'bg-stone-300'}`}
+                          >
+                            <span
+                              className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${item.enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`}
+                            />
+                          </button>
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeProductionCategory(index)}
+                            className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 새 카테고리 추가 */}
+              <Card>
+                <CardContent className="p-4">
+                  <Label className="block mb-3 text-sm font-semibold text-stone-700">새 카테고리 추가</Label>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <Label className="text-xs text-stone-500 mb-1 block">카테고리명</Label>
+                      <Input
+                        type="text"
+                        value={newProdCategory}
+                        onChange={e => setNewProdCategory(e.target.value)}
+                        placeholder="예: 냉동, 상온"
+                        onKeyDown={e => e.key === 'Enter' && addProductionCategory()}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Label className="text-xs text-stone-500 mb-1 block">일일 한도</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={newProdLimit}
+                        onChange={e => setNewProdLimit(parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <Button onClick={addProductionCategory} className="shrink-0">
+                      <Plus className="w-4 h-4" /> 추가
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <p className="text-xs text-stone-400">
+                * 생산 한도는 식단 편성 시 카테고리별 총 생산량을 제한하는 데 사용됩니다.
+              </p>
+            </div>
+          )}
+
+          {/* 7. Tag Management Section */}
+          {activeSection === 'tags' && (
+            <div className="space-y-6 max-w-3xl">
+              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex gap-3 items-start">
+                <Tags className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-indigo-900 text-sm">식단별 태그 관리</h4>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    식단 유형별로 허용/차단 태그와 제외할 제품명을 설정합니다.
+                  </p>
+                </div>
+              </div>
+
+              {/* 식단 선택 드롭다운 */}
+              <div>
+                <Label className="block mb-2 text-sm font-semibold text-stone-700">식단 유형 선택</Label>
+                <select
+                  value={selectedTagTarget}
+                  onChange={e => setSelectedTagTarget(e.target.value as TargetType)}
+                  className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+                >
+                  {Object.values(TargetType).map(target => (
+                    <option key={target} value={target}>
+                      {target}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 허용 태그 */}
+              <Card>
+                <CardContent className="p-4">
+                  <Label className="block mb-3 text-sm font-semibold text-green-700">허용 태그</Label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {getTagConfigForTarget(selectedTagTarget).allowedTags.length === 0 && (
+                      <span className="text-xs text-stone-400">설정된 허용 태그가 없습니다.</span>
+                    )}
+                    {getTagConfigForTarget(selectedTagTarget).allowedTags.map(tag => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium"
+                      >
+                        {tag}
+                        <button onClick={() => removeAllowedTag(tag)} className="hover:text-green-900">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newAllowedTag}
+                      onChange={e => setNewAllowedTag(e.target.value)}
+                      placeholder="새 허용 태그 입력"
+                      className="flex-1"
+                      onKeyDown={e => e.key === 'Enter' && addAllowedTag()}
+                    />
+                    <Button variant="outline" size="sm" onClick={addAllowedTag} className="shrink-0">
+                      <Plus className="w-4 h-4" /> 추가
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 차단 태그 */}
+              <Card>
+                <CardContent className="p-4">
+                  <Label className="block mb-3 text-sm font-semibold text-red-700">차단 태그</Label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {getTagConfigForTarget(selectedTagTarget).blockedTags.length === 0 && (
+                      <span className="text-xs text-stone-400">설정된 차단 태그가 없습니다.</span>
+                    )}
+                    {getTagConfigForTarget(selectedTagTarget).blockedTags.map(tag => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium"
+                      >
+                        {tag}
+                        <button onClick={() => removeBlockedTag(tag)} className="hover:text-red-900">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newBlockedTag}
+                      onChange={e => setNewBlockedTag(e.target.value)}
+                      placeholder="새 차단 태그 입력"
+                      className="flex-1"
+                      onKeyDown={e => e.key === 'Enter' && addBlockedTag()}
+                    />
+                    <Button variant="outline" size="sm" onClick={addBlockedTag} className="shrink-0">
+                      <Plus className="w-4 h-4" /> 추가
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 차단 제품명 */}
+              <Card>
+                <CardContent className="p-4">
+                  <Label className="block mb-3 text-sm font-semibold text-orange-700">차단 제품명</Label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {getTagConfigForTarget(selectedTagTarget).blockedProducts.length === 0 && (
+                      <span className="text-xs text-stone-400">설정된 차단 제품명이 없습니다.</span>
+                    )}
+                    {getTagConfigForTarget(selectedTagTarget).blockedProducts.map(product => (
+                      <span
+                        key={product}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-medium"
+                      >
+                        {product}
+                        <button onClick={() => removeBlockedProduct(product)} className="hover:text-orange-900">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newBlockedProduct}
+                      onChange={e => setNewBlockedProduct(e.target.value)}
+                      placeholder="예: 원더스푼"
+                      className="flex-1"
+                      onKeyDown={e => e.key === 'Enter' && addBlockedProduct()}
+                    />
+                    <Button variant="outline" size="sm" onClick={addBlockedProduct} className="shrink-0">
+                      <Plus className="w-4 h-4" /> 추가
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <p className="text-xs text-stone-400">
+                * 태그 설정은 AI 식단 생성 시 메뉴 필터링에 반영됩니다. 차단 제품명에 포함된 키워드가 있는 메뉴는 해당
+                식단에서 제외됩니다.
               </p>
             </div>
           )}

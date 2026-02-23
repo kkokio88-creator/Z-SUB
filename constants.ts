@@ -1,4 +1,11 @@
-import { MealPlanConfig, MenuCategory, TargetType } from './types';
+import {
+  MealPlanConfig,
+  MenuCategory,
+  TargetType,
+  IngredientColorConfig,
+  ProductionLimitConfig,
+  TargetTagConfig,
+} from './types';
 
 export const MAJOR_INGREDIENTS = [
   { key: 'beef', label: '소고기' },
@@ -203,5 +210,165 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     bannedTags: ['매운맛'],
     requiredTags: [],
     parentTarget: TargetType.CHILD_PLUS, // CHILD는 CHILD_PLUS의 서브셋
+  },
+};
+
+// ── 주재료 컬러링 기본값 ──
+export const DEFAULT_INGREDIENT_COLORS: IngredientColorConfig[] = [
+  { key: 'beef', label: '소고기', color: 'red', priority: 1, enabled: true },
+  { key: 'pork', label: '한돈', color: 'pink', priority: 2, enabled: true },
+  { key: 'chicken', label: '닭', color: 'amber', priority: 3, enabled: true },
+  { key: 'fish', label: '생선', color: 'blue', priority: 4, enabled: true },
+  { key: 'tofu', label: '두부', color: 'yellow', priority: 5, enabled: true },
+  { key: 'egg', label: '달걀', color: 'orange', priority: 6, enabled: true },
+  { key: 'potato', label: '감자', color: 'lime', priority: 7, enabled: true },
+  { key: 'seaweed', label: '해조류', color: 'teal', priority: 8, enabled: true },
+  { key: 'mushroom', label: '버섯', color: 'violet', priority: 9, enabled: true },
+  { key: 'vegetable', label: '채소', color: 'green', priority: 10, enabled: true },
+];
+
+// ── 생산 한도 기본값 ──
+export const DEFAULT_PRODUCTION_LIMITS: ProductionLimitConfig[] = [
+  { category: '냉장국', dailyLimit: 500, enabled: true },
+  { category: '반조리', dailyLimit: 300, enabled: true },
+];
+
+// ── 식단별 기본 태그 설정 ──
+export const DEFAULT_TARGET_TAGS: TargetTagConfig[] = [
+  {
+    targetType: TargetType.KIDS,
+    allowedTags: ['아이선호'],
+    blockedTags: ['매운맛', '얼큰함'],
+    blockedProducts: [],
+  },
+  {
+    targetType: TargetType.SENIOR,
+    allowedTags: ['시니어'],
+    blockedTags: ['질김'],
+    blockedProducts: [],
+  },
+  {
+    targetType: TargetType.SENIOR_HEALTH,
+    allowedTags: ['시니어', '부드러움'],
+    blockedTags: ['질김', '딱딱함'],
+    blockedProducts: [],
+  },
+];
+
+// ── 매운맛 자동 판별 키워드 ──
+export const SPICY_KEYWORDS = [
+  '고추',
+  '매운',
+  '불닭',
+  '청양',
+  '매콤',
+  '떡볶이',
+  '짬뽕',
+  '낙볶',
+  '닭볶음',
+  '마라',
+  '칠리',
+  '핫',
+  '불',
+  '찜닭매운',
+  '카레매운',
+];
+
+// ── 태그 자동 분류 규칙 ──
+export const AUTO_TAG_RULES: { keyword: string; tag: string }[] = [
+  { keyword: '원더스푼', tag: '원더스푼' },
+  { keyword: '유기농', tag: '유기농' },
+  { keyword: '무항생제', tag: '무항생제' },
+  { keyword: '국내산', tag: '국내산' },
+];
+
+// ── 식단 통합 그룹 ──
+export const MEAL_PLAN_INTEGRATION_GROUPS = [
+  {
+    groupLabel: '시니어 통합',
+    baseTarget: TargetType.SENIOR,
+    plusTarget: TargetType.SENIOR_HEALTH,
+    description: '시니어 + 건강한 시니어 통합 편성',
+  },
+  {
+    groupLabel: '아이 통합',
+    baseTarget: TargetType.KIDS,
+    plusTarget: TargetType.KIDS_PLUS,
+    plusExtraCount: 3, // 든든아이 전용 메뉴 3개
+    description: '아이 + 든든아이 통합 편성',
+  },
+];
+
+// ── 셰이크/반복 메뉴 대상 식단 ──
+export const REPEAT_MENU_TARGETS = [TargetType.KIDS, TargetType.KIDS_PLUS];
+
+// ── 주재료별 Tailwind 컬러 매핑 ──
+export const INGREDIENT_COLOR_MAP: Record<
+  string,
+  { bg: string; borderL: string; text: string; dot: string; cellBg: string }
+> = {
+  red: { bg: 'bg-red-50', borderL: 'border-l-red-400', text: 'text-red-700', dot: 'bg-red-400', cellBg: 'bg-red-100' },
+  pink: {
+    bg: 'bg-pink-50',
+    borderL: 'border-l-pink-400',
+    text: 'text-pink-700',
+    dot: 'bg-pink-400',
+    cellBg: 'bg-pink-100',
+  },
+  amber: {
+    bg: 'bg-amber-50',
+    borderL: 'border-l-amber-400',
+    text: 'text-amber-700',
+    dot: 'bg-amber-400',
+    cellBg: 'bg-amber-100',
+  },
+  blue: {
+    bg: 'bg-blue-50',
+    borderL: 'border-l-blue-400',
+    text: 'text-blue-700',
+    dot: 'bg-blue-400',
+    cellBg: 'bg-blue-100',
+  },
+  yellow: {
+    bg: 'bg-yellow-50',
+    borderL: 'border-l-yellow-400',
+    text: 'text-yellow-700',
+    dot: 'bg-yellow-400',
+    cellBg: 'bg-yellow-100',
+  },
+  orange: {
+    bg: 'bg-orange-50',
+    borderL: 'border-l-orange-400',
+    text: 'text-orange-700',
+    dot: 'bg-orange-400',
+    cellBg: 'bg-orange-100',
+  },
+  lime: {
+    bg: 'bg-lime-50',
+    borderL: 'border-l-lime-400',
+    text: 'text-lime-700',
+    dot: 'bg-lime-400',
+    cellBg: 'bg-lime-100',
+  },
+  teal: {
+    bg: 'bg-teal-50',
+    borderL: 'border-l-teal-400',
+    text: 'text-teal-700',
+    dot: 'bg-teal-400',
+    cellBg: 'bg-teal-100',
+  },
+  violet: {
+    bg: 'bg-violet-50',
+    borderL: 'border-l-violet-400',
+    text: 'text-violet-700',
+    dot: 'bg-violet-400',
+    cellBg: 'bg-violet-100',
+  },
+  green: {
+    bg: 'bg-green-50',
+    borderL: 'border-l-green-400',
+    text: 'text-green-700',
+    dot: 'bg-green-400',
+    cellBg: 'bg-green-100',
   },
 };

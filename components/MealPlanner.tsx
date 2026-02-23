@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { TargetType, MonthlyMealPlan, MenuItem, MenuCategory, ExpertReview } from '../types';
+import React, { useState, useMemo, useCallback } from 'react';
+import { TargetType, MonthlyMealPlan, MenuItem, MenuCategory, ExpertReview, DuplicationFilterLevel } from '../types';
 import { generateMonthlyMealPlan, getSwapCandidates } from '../services/engine';
 import { getExpertReview } from '../services/geminiService';
 import {
@@ -7,7 +7,6 @@ import {
   RefreshCw,
   BrainCircuit,
   X,
-  LayoutGrid,
   AlertTriangle,
   ArrowRightLeft,
   Flame,
@@ -20,8 +19,10 @@ import {
   Download,
   FileText,
   Upload,
+  Search,
+  Filter,
 } from 'lucide-react';
-import { MAJOR_INGREDIENTS, TARGET_CONFIGS } from '../constants';
+import { MAJOR_INGREDIENTS, TARGET_CONFIGS, MEAL_PLAN_INTEGRATION_GROUPS } from '../constants';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { registerToMIS } from '../services/misService';
@@ -31,14 +32,13 @@ import { useAuth } from '../context/AuthContext';
 import { loadHistory, saveVersion, type PlanVersion } from '../services/historyService';
 import PlanHistory from './PlanHistory';
 import PlanDiffView from './PlanDiffView';
-import { printMealPlan, exportToCSV, exportToPDF } from '../services/exportService';
-import { pushMealPlan } from '../services/syncManager';
+import { printMealPlan, exportToCSV, exportToPDF, exportGodomallCSV, exportMISCSV } from '../services/exportService';
+import { pushMealPlan, exportMealPlanToSheet } from '../services/syncManager';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { addSyncRecord } from '../services/syncTracker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-// Card/CardContent available but not yet used in this component
 
 // ── 식재료별 컬러 맵 ──
 const PLANNER_INGREDIENT_COLORS: Record<
@@ -116,6 +116,19 @@ const MealPlanner: React.FC = () => {
   // Swap Modal State
   const [swapTarget, setSwapTarget] = useState<{ cycle: 'A' | 'B'; weekIndex: number; item: MenuItem } | null>(null);
   const [swapCandidates, setSwapCandidates] = useState<MenuItem[]>([]);
+  const [swapFilterLevel, setSwapFilterLevel] = useState<DuplicationFilterLevel>('60일');
+  const [swapSearchQuery, setSwapSearchQuery] = useState('');
+
+  // Save Modal State
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveMemo, setSaveMemo] = useState('');
+  const [saveWeekSelections, setSaveWeekSelections] = useState<number[]>([1, 2, 3, 4]);
+
+  // Ingredient highlight state
+  const [highlightedIngredient, setHighlightedIngredient] = useState<string | null>(null);
+
+  // Sheets export state
+  const [sheetsExportStatus, setSheetsExportStatus] = useState<'idle' | 'syncing' | 'done'>('idle');
 
   // Sync Status State
   const [misSyncStatus, setMisSyncStatus] = useState<'idle' | 'syncing' | 'done'>('idle');
@@ -130,6 +143,10 @@ const MealPlanner: React.FC = () => {
   // Track swap changes for ZPPS sync
   const [swapChanges, setSwapChanges] = useState<MenuChange[]>([]);
 
+  // 반복 메뉴(셰이크 등) 처리 방식:
+  // REPEAT_MENU_TARGETS(아이/든든아이)의 반복 메뉴는 parent-child 관계를 통해 처리됨.
+  // parentTarget이 지정된 타겟(예: KIDS → KIDS_PLUS)은 엔진에서 부모 식단을 먼저 생성한 뒤
+  // createSubsetPlan으로 서브셋을 추출하므로, 반복 메뉴가 자동으로 상속됨.
   const handleGenerate = () => {
     setIsGenerating(true);
     setReviewResult(null);
@@ -141,16 +158,64 @@ const MealPlanner: React.FC = () => {
     setTimeout(() => {
       const activeMenu = menuItems.filter(item => !item.isUnused);
 
-      // 60일 이내 히스토리 메뉴명 수집 → cycleType별 동요일 중복 방지
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 60);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
-      const recentPlans = historicalPlans.filter(p => p.date >= cutoffStr);
+      // 메뉴명 → 주재료 룩업 테이블 (cross-target 식재료 비교용)
+      const nameToIngredient = new Map<string, string>();
+      activeMenu.forEach(item => {
+        const clean = item.name
+          .replace(/_냉장|_반조리|_냉동/g, '')
+          .replace(/\s+\d+$/, '')
+          .trim();
+        if (clean && item.mainIngredient) nameToIngredient.set(clean, item.mainIngredient);
+      });
 
-      const buildExcludedForCycle = (cycleType: '화수목' | '금토월') => {
+      // Cross-target 식재료 수집: 같은 월의 다른 타겟에서 사용된 주재료
+      const monthPrefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      const buildOtherTargetIngredients = (cycleType: '화수목' | '금토월'): Map<number, string[]> => {
+        const map = new Map<number, string[]>();
+        const monthPlans = historicalPlans
+          .filter(p => p.date.startsWith(monthPrefix) && p.cycleType === cycleType)
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+        monthPlans.forEach((plan, idx) => {
+          const weekIndex = idx + 1;
+          if (weekIndex > 4) return;
+          const ingredients: string[] = [];
+          plan.targets
+            .filter(t => t.targetType !== target)
+            .forEach(t => {
+              t.items.forEach(item => {
+                const clean = item.name
+                  .replace(/_냉장|_반조리|_냉동/g, '')
+                  .replace(/\s+\d+$/, '')
+                  .trim();
+                const ing = nameToIngredient.get(clean);
+                if (ing && ing !== 'vegetable') ingredients.push(ing);
+              });
+            });
+          if (ingredients.length > 0) {
+            map.set(weekIndex, ingredients);
+          }
+        });
+        return map;
+      };
+      const otherTargetA = buildOtherTargetIngredients('화수목');
+      const otherTargetB = buildOtherTargetIngredients('금토월');
+
+      // 60일/30일 이내 히스토리 메뉴명 수집 → cycleType별 동요일 중복 방지
+      const cutoff60 = new Date();
+      cutoff60.setDate(cutoff60.getDate() - 60);
+      const cutoff60Str = cutoff60.toISOString().slice(0, 10);
+      const cutoff30 = new Date();
+      cutoff30.setDate(cutoff30.getDate() - 30);
+      const cutoff30Str = cutoff30.toISOString().slice(0, 10);
+
+      const recentPlans60 = historicalPlans.filter(p => p.date >= cutoff60Str);
+      const recentPlans30 = historicalPlans.filter(p => p.date >= cutoff30Str);
+
+      const buildExcludedForCycle = (cycleType: '화수목' | '금토월', plans: typeof historicalPlans) => {
         const excluded = new Set<string>();
         const lastUsed = new Map<string, string>();
-        recentPlans
+        plans
           .filter(p => p.cycleType === cycleType)
           .forEach(p =>
             p.targets.forEach(t =>
@@ -172,8 +237,10 @@ const MealPlanner: React.FC = () => {
         return { excluded, lastUsed };
       };
 
-      const ctxA = buildExcludedForCycle('화수목');
-      const ctxB = buildExcludedForCycle('금토월');
+      const ctxA60 = buildExcludedForCycle('화수목', recentPlans60);
+      const ctxB60 = buildExcludedForCycle('금토월', recentPlans60);
+      const ctxA30 = buildExcludedForCycle('화수목', recentPlans30);
+      const ctxB30 = buildExcludedForCycle('금토월', recentPlans30);
 
       const planA = generateMonthlyMealPlan(
         target,
@@ -181,17 +248,33 @@ const MealPlanner: React.FC = () => {
         '화수목',
         checkDupes,
         activeMenu,
-        ctxA.excluded,
-        ctxA.lastUsed
+        ctxA60.excluded,
+        ctxA60.lastUsed,
+        ctxA30.excluded,
+        undefined,
+        otherTargetA
       );
+
+      // B 생성 시 A의 주재료 정보 전달 (50:50 분배)
+      const aIngredientsByWeek = new Map<number, string[]>();
+      planA.weeks.forEach(w => {
+        aIngredientsByWeek.set(
+          w.weekIndex,
+          w.items.map(i => i.mainIngredient).filter(ing => ing !== 'vegetable')
+        );
+      });
+
       const planB = generateMonthlyMealPlan(
         target,
         monthLabel,
         '금토월',
         checkDupes,
         activeMenu,
-        ctxB.excluded,
-        ctxB.lastUsed
+        ctxB60.excluded,
+        ctxB60.lastUsed,
+        ctxB30.excluded,
+        aIngredientsByWeek,
+        otherTargetB
       );
       setPlans({ A: planA, B: planB });
       setIsGenerating(false);
@@ -216,8 +299,34 @@ const MealPlanner: React.FC = () => {
     setShowHistoryModal(false);
   };
 
+  const handleOpenSaveModal = () => {
+    if (!plans.A || !plans.B) return;
+    setSaveMemo('');
+    setSaveWeekSelections([1, 2, 3, 4]);
+    setShowSaveModal(true);
+  };
+
   const handleSaveVersion = () => {
     if (!plans.A || !plans.B) return;
+
+    // 든든아이 유효성 검사: 저녁 메뉴 3개가 선택되었는지 확인
+    if (target === TargetType.KIDS_PLUS || target === TargetType.KIDS) {
+      const kidsConfig = TARGET_CONFIGS[TargetType.KIDS_PLUS];
+      if (kidsConfig && plans.A) {
+        const hasAllWeeks = plans.A.weeks.every(w => {
+          const mainCount = w.items.filter(i => i.category === MenuCategory.MAIN).length;
+          return mainCount >= 3;
+        });
+        if (!hasAllWeeks) {
+          addToast({
+            type: 'warning',
+            title: '든든아이 확인 필요',
+            message: '든든아이 저녁 메뉴 3개가 각 주차에 포함되어 있는지 확인하세요.',
+          });
+        }
+      }
+    }
+
     saveVersion({
       planId: plans.A.id,
       label: `${monthLabel} ${target}`,
@@ -225,16 +334,42 @@ const MealPlanner: React.FC = () => {
       status: 'draft',
       planA: plans.A,
       planB: plans.B,
+      memo: saveMemo || undefined,
+      savedWeeks: saveWeekSelections.length < 4 ? saveWeekSelections : undefined,
     });
-    addToast({ type: 'success', title: '식단 저장 완료', message: '현재 식단이 히스토리에 저장되었습니다.' });
+    setShowSaveModal(false);
+    addToast({
+      type: 'success',
+      title: '식단 저장 완료',
+      message: saveMemo ? `"${saveMemo}" - 저장 완료` : '현재 식단이 히스토리에 저장되었습니다.',
+    });
     addAuditEntry({
       action: 'plan.save',
       userId: user?.id || '',
       userName: user?.displayName || '',
       entityType: 'meal_plan',
       entityId: plans.A.id,
-      entityName: `${monthLabel} ${target}`,
+      entityName: `${monthLabel} ${target}${saveMemo ? ` (${saveMemo})` : ''}`,
     });
+  };
+
+  // 구글 시트로 내보내기
+  const handleExportToSheets = async () => {
+    if (!plans.A || !plans.B) return;
+    setSheetsExportStatus('syncing');
+    try {
+      const result = await exportMealPlanToSheet(plans.A, plans.B, monthLabel, target);
+      if (result.success) {
+        addToast({ type: 'success', title: '시트 내보내기 완료', message: `${result.rowCount}건 내보내기 완료` });
+        setSheetsExportStatus('done');
+      } else {
+        addToast({ type: 'error', title: '시트 내보내기 실패', message: result.error || '오류 발생' });
+        setSheetsExportStatus('idle');
+      }
+    } catch {
+      addToast({ type: 'error', title: '시트 연결 실패', message: '구글 시트에 연결할 수 없습니다.' });
+      setSheetsExportStatus('idle');
+    }
   };
 
   const handleDiffWithPrevious = () => {
@@ -293,15 +428,118 @@ const MealPlanner: React.FC = () => {
     }
   };
 
+  // 다음달 식단 메뉴명 수집
+  const nextMonthMenuNames = useMemo(() => {
+    const names = new Set<string>();
+    // 현재 선택 월의 다음달 히스토리에서 메뉴명 수집
+    const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+    const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+    const nextMonthPrefix = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+    historicalPlans
+      .filter(p => p.date.startsWith(nextMonthPrefix))
+      .forEach(p =>
+        p.targets.forEach(t =>
+          t.items.forEach(item => {
+            const clean = item.name
+              .replace(/_냉장|_반조리|_냉동/g, '')
+              .replace(/\s+\d+$/, '')
+              .trim();
+            if (clean) names.add(clean);
+          })
+        )
+      );
+    return names;
+  }, [historicalPlans, selectedMonth, selectedYear]);
+
+  // 메뉴의 마지막 사용일 맵 (전체 히스토리)
+  const allMenuLastUsed = useMemo(() => {
+    const lastUsed = new Map<string, string>();
+    historicalPlans.forEach(p =>
+      p.targets.forEach(t =>
+        t.items.forEach(item => {
+          const clean = item.name
+            .replace(/_냉장|_반조리|_냉동/g, '')
+            .replace(/\s+\d+$/, '')
+            .trim();
+          if (clean) {
+            const existing = lastUsed.get(clean);
+            if (!existing || p.date > existing) lastUsed.set(clean, p.date);
+          }
+        })
+      )
+    );
+    return lastUsed;
+  }, [historicalPlans]);
+
+  // swap용 히스토리 기반 제외 목록 (60일/30일)
+  const swapExcludedNames = useMemo(() => {
+    const buildExcluded = (days: number, cycleType: '화수목' | '금토월') => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const excluded = new Set<string>();
+      historicalPlans
+        .filter(p => p.date >= cutoffStr && p.cycleType === cycleType)
+        .forEach(p =>
+          p.targets.forEach(t =>
+            t.items.forEach(item => {
+              const clean = item.name
+                .replace(/_냉장|_반조리|_냉동/g, '')
+                .replace(/\s+\d+$/, '')
+                .trim();
+              if (clean) excluded.add(clean);
+            })
+          )
+        );
+      return excluded;
+    };
+    return {
+      A60: buildExcluded(60, '화수목'),
+      A30: buildExcluded(30, '화수목'),
+      B60: buildExcluded(60, '금토월'),
+      B30: buildExcluded(30, '금토월'),
+    };
+  }, [historicalPlans]);
+
+  const getExcludedForSwap = useCallback(
+    (cycle: 'A' | 'B', level: DuplicationFilterLevel) => {
+      if (level === '전체') return undefined;
+      if (level === '30일') return cycle === 'A' ? swapExcludedNames.A30 : swapExcludedNames.B30;
+      return cycle === 'A' ? swapExcludedNames.A60 : swapExcludedNames.B60;
+    },
+    [swapExcludedNames]
+  );
+
   // 메뉴 클릭 시 직접 대체메뉴 모달 열기
-  const handleMenuItemClick = (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
-    const plan = plans[cycle];
-    if (!plan) return;
-    const activeMenu = menuItems.filter(m => !m.isUnused);
-    const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu);
-    setSwapTarget({ cycle, weekIndex, item });
-    setSwapCandidates(candidates);
-  };
+  const handleMenuItemClick = useCallback(
+    (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
+      const plan = plans[cycle];
+      if (!plan) return;
+      const activeMenu = menuItems.filter(m => !m.isUnused);
+      const excluded = getExcludedForSwap(cycle, '60일');
+      const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일');
+      setSwapTarget({ cycle, weekIndex, item });
+      setSwapCandidates(candidates);
+      setSwapFilterLevel('60일');
+      setSwapSearchQuery('');
+    },
+    [plans, menuItems, getExcludedForSwap]
+  );
+
+  // 필터 레벨 변경 시 후보 재계산
+  const handleSwapFilterChange = useCallback(
+    (level: DuplicationFilterLevel) => {
+      if (!swapTarget) return;
+      const plan = plans[swapTarget.cycle];
+      if (!plan) return;
+      const activeMenu = menuItems.filter(m => !m.isUnused);
+      const excluded = getExcludedForSwap(swapTarget.cycle, level);
+      const candidates = getSwapCandidates(plan, swapTarget.item, swapTarget.weekIndex, activeMenu, excluded, level);
+      setSwapCandidates(candidates);
+      setSwapFilterLevel(level);
+    },
+    [swapTarget, plans, menuItems, getExcludedForSwap]
+  );
 
   const performSwap = (newItem: MenuItem) => {
     if (!swapTarget) return;
@@ -599,15 +837,41 @@ const MealPlanner: React.FC = () => {
                     .trim();
                   const isCrossDup = crossDayDuplicates.has(cleanName);
                   const historyDate = week.usedHistory?.[cleanName];
+                  const isFallback = week.fallbackItems?.includes(cleanName);
+                  const isHighlighted = highlightedIngredient === item.mainIngredient;
+                  // 마지막 사용일 계산
+                  const lastUsed = allMenuLastUsed.get(cleanName);
+                  const lastUsedLabel = lastUsed
+                    ? (() => {
+                        const days = Math.floor((Date.now() - new Date(lastUsed).getTime()) / 86400000);
+                        return days < 7
+                          ? `${days}일 전`
+                          : days < 60
+                            ? `${Math.floor(days / 7)}주 전`
+                            : `${Math.floor(days / 30)}개월 전`;
+                      })()
+                    : null;
 
                   return (
                     <div key={item.id}>
                       <div
                         onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
-                        title={isCrossDup ? '다른 주기에도 사용됨' : undefined}
-                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${ingColor.bg} hover:ring-1 hover:ring-stone-300 ${
+                        title={
+                          [
+                            isCrossDup ? '다른 주기에도 사용됨' : '',
+                            isFallback ? '2차 필터(30일)로 선택됨' : '',
+                            lastUsed ? `마지막 사용: ${lastUsed}` : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' | ') || undefined
+                        }
+                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${
+                          isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : ingColor.bg
+                        } hover:ring-1 hover:ring-stone-300 ${
                           isExtra ? 'border border-amber-300 border-l-2' : ''
-                        } ${isCrossDup ? 'ring-1 ring-orange-400' : ''}`}
+                        } ${isCrossDup ? 'ring-1 ring-orange-400' : ''} ${
+                          isFallback ? 'border-r-2 border-r-yellow-400' : ''
+                        }`}
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -620,18 +884,22 @@ const MealPlanner: React.FC = () => {
                         ></span>
                         <span className={`font-medium truncate flex-1 ${ingColor.text}`}>
                           {item.name}
-                          {historyDate && (
-                            <span
-                              className="ml-1 text-[10px] text-stone-400 font-normal"
-                              title="이전 사용일 (갯수 보장)"
-                            >
-                              ({historyDate.slice(5)})
-                            </span>
+                          {lastUsedLabel && (
+                            <span className="ml-1 text-[10px] text-stone-400 font-normal">({lastUsedLabel})</span>
                           )}
                         </span>
-                        <span className="text-[10px] text-stone-400 shrink-0 ml-1">
-                          {item.recommendedPrice.toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[10px] text-stone-400">{item.cost.toLocaleString()}</span>
+                          <span className="text-[10px] text-stone-300">/</span>
+                          <span className="text-[10px] text-stone-500 font-medium">
+                            {item.recommendedPrice.toLocaleString()}
+                          </span>
+                        </div>
+                        {isFallback && (
+                          <span className="px-1 py-0.5 text-[9px] font-bold text-yellow-700 bg-yellow-100 rounded border border-yellow-300 flex-shrink-0">
+                            2차
+                          </span>
+                        )}
                         {isExtra && (
                           <span className="px-1.5 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 rounded border border-amber-200 flex-shrink-0">
                             추가
@@ -689,6 +957,12 @@ const MealPlanner: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {MEAL_PLAN_INTEGRATION_GROUPS.some(g => g.baseTarget === target || g.plusTarget === target) && (
+                <div className="text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 mt-1">
+                  {MEAL_PLAN_INTEGRATION_GROUPS.find(g => g.baseTarget === target || g.plusTarget === target)
+                    ?.groupLabel || '통합 식단'}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col">
@@ -813,10 +1087,30 @@ const MealPlanner: React.FC = () => {
 
             <div className="w-px h-6 bg-stone-200 mx-1" />
 
+            {/* 시트 내보내기 */}
+            <Button
+              onClick={handleExportToSheets}
+              disabled={sheetsExportStatus === 'syncing'}
+              variant="outline"
+              size="sm"
+              className={`flex items-center gap-1.5 text-xs font-bold ${
+                sheetsExportStatus === 'done' ? 'bg-green-50 text-green-700 border-green-200' : ''
+              }`}
+            >
+              {sheetsExportStatus === 'syncing' ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : (
+                <Upload className="w-3 h-3" />
+              )}
+              {sheetsExportStatus === 'done' ? '시트 완료' : '시트 내보내기'}
+            </Button>
+
+            <div className="w-px h-6 bg-stone-200 mx-1" />
+
             {/* Save */}
             <Button
               variant="outline"
-              onClick={handleSaveVersion}
+              onClick={handleOpenSaveModal}
               size="sm"
               className="flex items-center gap-1.5 text-xs font-bold"
             >
@@ -858,6 +1152,24 @@ const MealPlanner: React.FC = () => {
             >
               CSV
             </Button>
+            {/* MIS CSV */}
+            <Button
+              variant="outline"
+              onClick={() => plans.A && exportMISCSV(plans.A)}
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
+            >
+              MIS
+            </Button>
+            {/* 고도몰 CSV */}
+            <Button
+              variant="outline"
+              onClick={() => plans.A && exportGodomallCSV(plans.A)}
+              size="sm"
+              className="flex items-center gap-1.5 text-xs font-bold"
+            >
+              고도몰
+            </Button>
           </div>
         )}
       </div>
@@ -883,94 +1195,39 @@ const MealPlanner: React.FC = () => {
             {/* Cycle B Row */}
             {plans.B && renderCycleRow('금토월', plans.B, 'B')}
 
-            {/* Ingredient Matrix - Per Week Table */}
-            <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="text-sm font-bold text-stone-800 flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4 text-stone-500" />
-                  주차별 식재료 활용 분포
-                </h4>
-                <div className="flex gap-2 text-[10px] font-medium text-stone-500">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-100 border border-green-300"></span>1회
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-orange-100 border border-orange-300"></span>2~3회
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-100 border border-red-300"></span>4회+
-                  </span>
-                </div>
+            {/* 주재료 클릭 하이라이트 필터 */}
+            <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-bold text-stone-500">주재료 필터:</span>
+                {MAJOR_INGREDIENTS.filter(ing => ing.key !== 'vegetable').map(ing => {
+                  const isActive = highlightedIngredient === ing.key;
+                  const color = PLANNER_INGREDIENT_COLORS[ing.key] || DEFAULT_INGREDIENT_COLOR;
+                  const total = ingredientCountsByWeek?.['total']?.[ing.key]?.count || 0;
+                  return (
+                    <button
+                      key={ing.key}
+                      onClick={() => setHighlightedIngredient(isActive ? null : ing.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        isActive
+                          ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current shadow-sm`
+                          : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${color.dot}`} />
+                      {ing.label}
+                      {total > 0 && <span className="text-[10px] opacity-60">({total})</span>}
+                    </button>
+                  );
+                })}
+                {highlightedIngredient && (
+                  <button
+                    onClick={() => setHighlightedIngredient(null)}
+                    className="text-xs text-stone-400 hover:text-stone-600 underline ml-2"
+                  >
+                    초기화
+                  </button>
+                )}
               </div>
-
-              {ingredientCountsByWeek && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-stone-200">
-                        <th className="px-2 py-2 text-left font-semibold text-stone-600 sticky left-0 bg-white min-w-[60px]">
-                          재료
-                        </th>
-                        {[1, 2, 3, 4].map(w => (
-                          <th key={`A-${w}`} className="px-2 py-2 text-center font-semibold text-blue-600 min-w-[48px]">
-                            화{w}주
-                          </th>
-                        ))}
-                        <th className="px-1 py-2 w-px bg-stone-200"></th>
-                        {[1, 2, 3, 4].map(w => (
-                          <th
-                            key={`B-${w}`}
-                            className="px-2 py-2 text-center font-semibold text-purple-600 min-w-[48px]"
-                          >
-                            금{w}주
-                          </th>
-                        ))}
-                        <th className="px-1 py-2 w-px bg-stone-200"></th>
-                        <th className="px-2 py-2 text-center font-bold text-stone-800 min-w-[48px]">합계</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trackedIngredients.map(ing => {
-                        return (
-                          <tr key={ing.key} className="border-b border-stone-100 hover:bg-emerald-50/40">
-                            <td className="px-2 py-1.5 font-medium text-stone-700 sticky left-0 bg-white">
-                              {ing.label}
-                            </td>
-                            {[1, 2, 3, 4].map(w => {
-                              const data = ingredientCountsByWeek[`A-${w}`]?.[ing.key];
-                              return (
-                                <td key={`A-${w}`} className="px-2 py-1.5 text-center">
-                                  <IngredientCell count={data?.count || 0} menuNames={data?.names} />
-                                </td>
-                              );
-                            })}
-                            <td className="px-0 py-1.5 bg-stone-100"></td>
-                            {[1, 2, 3, 4].map(w => {
-                              const data = ingredientCountsByWeek[`B-${w}`]?.[ing.key];
-                              return (
-                                <td key={`B-${w}`} className="px-2 py-1.5 text-center">
-                                  <IngredientCell count={data?.count || 0} menuNames={data?.names} />
-                                </td>
-                              );
-                            })}
-                            <td className="px-0 py-1.5 bg-stone-100"></td>
-                            <td className="px-2 py-1.5 text-center">
-                              <IngredientCell
-                                count={ingredientCountsByWeek['total']?.[ing.key]?.count || 0}
-                                isTotal
-                                menuNames={ingredientCountsByWeek['total']?.[ing.key]?.names}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <p className="text-xs text-stone-400 mt-2 text-center">
-                * 화수목과 금토월을 모두 구독하는 고객을 위해 주차별 재료 분포를 확인하세요.
-              </p>
             </div>
           </div>
         </div>
@@ -979,92 +1236,188 @@ const MealPlanner: React.FC = () => {
       {/* --- Modals --- */}
 
       {/* 3. Swap Modal */}
-      {swapTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-stone-100 flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-lg text-stone-800">
-                  {swapTarget.item.category === MenuCategory.SOUP
-                    ? '🍲 국/찌개'
-                    : swapTarget.item.category === MenuCategory.MAIN
-                      ? '🍖 메인요리'
-                      : '🥗 밑반찬'}{' '}
-                  교체하기 ({swapTarget.cycle === 'A' ? '화수목' : '금토월'})
-                </h3>
-                <p className="text-xs text-stone-500">
-                  현재 메뉴: <span className="font-bold text-blue-600">{swapTarget.item.name}</span>
-                  <span className="ml-2 text-stone-400">({swapCandidates.length}개 사용 가능)</span>
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setSwapTarget(null)} className="p-2 rounded-full">
-                <X className="w-5 h-5 text-stone-600" />
-              </Button>
-            </div>
+      {swapTarget &&
+        (() => {
+          const filteredCandidates = swapSearchQuery
+            ? swapCandidates.filter(c => c.name.includes(swapSearchQuery) || c.mainIngredient.includes(swapSearchQuery))
+            : swapCandidates;
 
-            <div className="p-2 overflow-y-auto flex-1 bg-stone-50">
-              {swapCandidates.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-stone-400">
-                  <AlertTriangle className="w-8 h-8 mb-2 opacity-50" />
-                  <p>조건에 맞는 교체 가능한 메뉴가 없습니다.</p>
-                </div>
-              ) : (
-                <div className="space-y-2 p-2">
-                  {[...swapCandidates]
-                    .sort((a, b) => b.recommendedPrice - a.recommendedPrice)
-                    .map(candidate => {
-                      const priceDiff = candidate.recommendedPrice - swapTarget.item.recommendedPrice;
-                      return (
-                        <Button
-                          key={candidate.id}
-                          variant="outline"
-                          onClick={() => performSwap(candidate)}
-                          className="w-full bg-white p-4 rounded-xl border border-stone-200 shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group h-auto"
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
+                <div className="p-5 border-b border-stone-100">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-lg text-stone-800">
+                        {swapTarget.item.category === MenuCategory.SOUP
+                          ? '🍲 국/찌개'
+                          : swapTarget.item.category === MenuCategory.MAIN
+                            ? '🍖 메인요리'
+                            : '🥗 밑반찬'}{' '}
+                        교체하기 ({swapTarget.cycle === 'A' ? '화수목' : '금토월'})
+                      </h3>
+                      <p className="text-xs text-stone-500">
+                        현재 메뉴: <span className="font-bold text-blue-600">{swapTarget.item.name}</span>
+                        <span className="ml-2 text-stone-400">({filteredCandidates.length}개 사용 가능)</span>
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setSwapTarget(null)} className="p-2 rounded-full">
+                      <X className="w-5 h-5 text-stone-600" />
+                    </Button>
+                  </div>
+
+                  {/* 필터 레벨 + 검색 */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
+                      {(['60일', '30일', '전체'] as DuplicationFilterLevel[]).map(level => (
+                        <button
+                          key={level}
+                          onClick={() => handleSwapFilterChange(level)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                            swapFilterLevel === level
+                              ? 'bg-white text-stone-900 shadow-sm'
+                              : 'text-stone-500 hover:text-stone-700'
+                          }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${candidate.category === MenuCategory.SOUP ? 'bg-blue-100' : candidate.category === MenuCategory.MAIN ? 'bg-orange-100' : 'bg-green-100'}`}
-                            >
-                              {candidate.category === MenuCategory.SOUP
-                                ? '🍲'
-                                : candidate.category === MenuCategory.MAIN
-                                  ? '🍖'
-                                  : '🥗'}
-                            </div>
-                            <div>
-                              <div className="font-bold text-stone-800">{candidate.name}</div>
-                              <div className="text-xs text-stone-500 flex gap-1 mt-0.5">
-                                <span className="bg-stone-100 px-1.5 py-0.5 rounded">{candidate.mainIngredient}</span>
-                                {candidate.isSpicy && (
-                                  <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded">🌶️</span>
-                                )}
-                                {candidate.tags.map(t => (
-                                  <span key={t} className="bg-stone-100 px-1.5 py-0.5 rounded">
-                                    #{t}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-stone-900">
-                              {candidate.recommendedPrice.toLocaleString()}원
-                            </div>
-                            <div
-                              className={`text-xs font-medium ${priceDiff > 0 ? 'text-green-600' : priceDiff < 0 ? 'text-red-500' : 'text-stone-400'}`}
-                            >
-                              {priceDiff > 0 ? `+${priceDiff.toLocaleString()}` : priceDiff.toLocaleString()}원
-                            </div>
-                          </div>
-                        </Button>
-                      );
-                    })}
+                          <Filter className="w-3 h-3 inline mr-1" />
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex-1 relative">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                      <input
+                        type="text"
+                        value={swapSearchQuery}
+                        onChange={e => setSwapSearchQuery(e.target.value)}
+                        placeholder="메뉴 검색..."
+                        className="w-full pl-8 pr-3 py-1.5 text-xs border border-stone-200 rounded-lg focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+                      />
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <div className="p-2 overflow-y-auto flex-1 bg-stone-50">
+                  {filteredCandidates.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 text-stone-400">
+                      <AlertTriangle className="w-8 h-8 mb-2 opacity-50" />
+                      <p>조건에 맞는 교체 가능한 메뉴가 없습니다.</p>
+                      {swapFilterLevel !== '전체' && (
+                        <button
+                          onClick={() => handleSwapFilterChange('전체')}
+                          className="mt-2 text-xs text-blue-500 hover:underline"
+                        >
+                          전체 메뉴 보기
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-2">
+                      {[...filteredCandidates]
+                        .sort((a, b) => {
+                          // 신제품 우선 (최근 3개월 내 출시)
+                          const cutoffDate = new Date();
+                          cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+                          const recentCutoff = cutoffDate.toISOString().slice(0, 7);
+                          const aIsNew = !!(a.launchDate && a.launchDate >= recentCutoff);
+                          const bIsNew = !!(b.launchDate && b.launchDate >= recentCutoff);
+                          if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
+                          return b.recommendedPrice - a.recommendedPrice;
+                        })
+                        .map(candidate => {
+                          const priceDiff = candidate.recommendedPrice - swapTarget.item.recommendedPrice;
+                          const cleanCandidate = candidate.name
+                            .replace(/_냉장|_반조리|_냉동/g, '')
+                            .replace(/\s+\d+$/, '')
+                            .trim();
+                          const isNextMonthDup = nextMonthMenuNames.has(cleanCandidate);
+                          const lastUsed = allMenuLastUsed.get(cleanCandidate);
+                          const daysAgo = lastUsed
+                            ? Math.floor((Date.now() - new Date(lastUsed).getTime()) / 86400000)
+                            : null;
+                          const isNewProduct = (() => {
+                            if (!candidate.launchDate) return false;
+                            const cutoff = new Date();
+                            cutoff.setMonth(cutoff.getMonth() - 3);
+                            return candidate.launchDate >= cutoff.toISOString().slice(0, 7);
+                          })();
+
+                          return (
+                            <Button
+                              key={candidate.id}
+                              variant="outline"
+                              onClick={() => performSwap(candidate)}
+                              className={`w-full bg-white p-4 rounded-xl border shadow-sm hover:border-blue-400 hover:shadow-md hover:ring-1 hover:ring-blue-400 transition-all text-left flex items-center justify-between group h-auto ${
+                                isNextMonthDup ? 'border-orange-300 bg-orange-50/30' : 'border-stone-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${candidate.category === MenuCategory.SOUP ? 'bg-blue-100' : candidate.category === MenuCategory.MAIN ? 'bg-orange-100' : 'bg-green-100'}`}
+                                >
+                                  {candidate.category === MenuCategory.SOUP
+                                    ? '🍲'
+                                    : candidate.category === MenuCategory.MAIN
+                                      ? '🍖'
+                                      : '🥗'}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-stone-800 flex items-center gap-1.5">
+                                    {candidate.name}
+                                    {isNewProduct && (
+                                      <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-bold">
+                                        신제품
+                                      </span>
+                                    )}
+                                    {isNextMonthDup && (
+                                      <span className="text-[9px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">
+                                        다음달 겹침
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-stone-500 flex gap-1 mt-0.5 flex-wrap">
+                                    <span className="bg-stone-100 px-1.5 py-0.5 rounded">
+                                      {candidate.mainIngredient}
+                                    </span>
+                                    {candidate.isSpicy && (
+                                      <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded">🌶️</span>
+                                    )}
+                                    {daysAgo !== null && (
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded ${daysAgo < 30 ? 'bg-red-50 text-red-500' : daysAgo < 60 ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}
+                                      >
+                                        {daysAgo}일 전
+                                      </span>
+                                    )}
+                                    {candidate.tags.slice(0, 2).map(t => (
+                                      <span key={t} className="bg-stone-100 px-1.5 py-0.5 rounded">
+                                        #{t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[10px] text-stone-400">{candidate.cost.toLocaleString()}원</div>
+                                <div className="font-bold text-stone-900">
+                                  {candidate.recommendedPrice.toLocaleString()}원
+                                </div>
+                                <div
+                                  className={`text-xs font-medium ${priceDiff > 0 ? 'text-green-600' : priceDiff < 0 ? 'text-red-500' : 'text-stone-400'}`}
+                                >
+                                  {priceDiff > 0 ? `+${priceDiff.toLocaleString()}` : priceDiff.toLocaleString()}원
+                                </div>
+                              </div>
+                            </Button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
 
       {/* 4. Expert Review Modal */}
       {showReviewModal && reviewResult && (
@@ -1179,6 +1532,76 @@ const MealPlanner: React.FC = () => {
       {/* 6. Diff View Modal */}
       {showDiffView && diffBeforePlan && plans.A && (
         <PlanDiffView before={diffBeforePlan} after={plans.A} onClose={() => setShowDiffView(false)} />
+      )}
+
+      {/* 7. Save Modal with memo + week selection */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="font-bold text-lg text-stone-800 mb-4">식단 저장</h3>
+
+            {/* 버전 메모 */}
+            <div className="mb-4">
+              <Label className="text-xs font-bold text-stone-500 mb-1">버전 메모 (선택)</Label>
+              <Input
+                value={saveMemo}
+                onChange={e => setSaveMemo(e.target.value)}
+                placeholder="예: 품질팀 피드백 반영, 닭곰탕→어묵탕 교체"
+                className="text-sm"
+              />
+            </div>
+
+            {/* 주차 선택 */}
+            <div className="mb-4">
+              <Label className="text-xs font-bold text-stone-500 mb-2 block">저장할 주차 선택</Label>
+              <div className="flex gap-3">
+                {[1, 2, 3, 4].map(w => (
+                  <label key={w} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveWeekSelections.includes(w)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSaveWeekSelections(prev => [...prev, w].sort());
+                        } else {
+                          setSaveWeekSelections(prev => prev.filter(x => x !== w));
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-stone-300"
+                    />
+                    <span className="text-sm text-stone-700">{w}주차</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setSaveWeekSelections([1, 2, 3, 4])}
+                  className="text-xs text-blue-500 hover:underline"
+                >
+                  전체 선택
+                </button>
+                <button onClick={() => setSaveWeekSelections([])} className="text-xs text-stone-400 hover:underline">
+                  선택 해제
+                </button>
+              </div>
+            </div>
+
+            {/* 액션 */}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowSaveModal(false)} size="sm">
+                취소
+              </Button>
+              <Button
+                onClick={handleSaveVersion}
+                disabled={saveWeekSelections.length === 0}
+                size="sm"
+                className="bg-stone-900 text-white hover:bg-black"
+              >
+                {saveWeekSelections.length === 4 ? '전체 저장' : `${saveWeekSelections.join(',')}주차 저장`}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
