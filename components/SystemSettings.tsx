@@ -66,6 +66,8 @@ const SystemSettings: React.FC = () => {
   const [newAllowedTag, setNewAllowedTag] = useState('');
   const [newBlockedTag, setNewBlockedTag] = useState('');
   const [newBlockedProduct, setNewBlockedProduct] = useState('');
+  const [newIngKey, setNewIngKey] = useState('');
+  const [newIngLabel, setNewIngLabel] = useState('');
 
   // Connection Test States
   const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({
@@ -82,15 +84,102 @@ const SystemSettings: React.FC = () => {
 
     if (savedManual) setAiManual(savedManual);
     else {
-      setAiManual(`[기본 원칙]
-1. 제철 식재료를 최소 2회 이상 포함할 것.
-2. 튀김류는 주 1회를 초과하지 말 것.
-3. 붉은색(매운맛), 초록색(나물), 노란색(계란/튀김)의 색감 조화를 고려할 것.
+      setAiManual(`━━━ 제1장. 대원칙 (모든 식단 공통) ━━━
 
-[아이 식단 특이사항]
-- 생선 가시는 100% 제거된 순살만 사용.
-- 파, 마늘 입자는 최대한 작게 다져서 조리.
-- 매운맛은 전면 배제하되, 간장 베이스로 대체.`);
+[1-1. 영양 균형]
+- 한 주(1사이클) 내 단백질원은 최소 3종 이상 분산할 것. (예: 소고기, 생선, 두부)
+- 동일 주재료가 한 주에 2회를 초과하지 말 것. (채소류 제외)
+- 주간 4주 전체에서 소고기·한돈·닭·생선·두부의 출현 비율을 균등하게 유지할 것.
+
+[1-2. 제철·계절 반영]
+- 제철 식재료를 매주 최소 2개 이상 포함할 것.
+- 여름: 냉국/냉채 우선, 겨울: 탕/전골 우선으로 계절감을 반영할 것.
+- 봄(3~5월): 냉이, 달래, 두릅, 미나리 등 봄나물 적극 활용.
+- 여름(6~8월): 오이, 열무, 애호박, 옥수수 등 수분감 있는 식재료 활용.
+- 가을(9~11월): 버섯, 고구마, 밤, 배추 등 가을 수확물 활용.
+- 겨울(12~2월): 시래기, 무, 콩나물, 김장김치 등 활용.
+
+[1-3. 조리법 다양성]
+- 튀김류는 주 1회를 초과하지 말 것.
+- 한 주 내 동일 조리법(볶음, 조림, 무침 등)이 3회 이상 반복되지 않도록 할 것.
+- 국/찌개 내에서도 된장 베이스, 맑은 장국, 매운탕 등을 번갈아 배치할 것.
+
+[1-4. 색감·시각 조화]
+- 붉은색(고추장/매운양념), 초록색(나물/채소), 노란색(계란/튀김), 갈색(조림/볶음), 흰색(두부/생선)의 색감이 한 끼에 최소 3색 이상 조합될 것.
+- 전체가 갈색 계열로만 구성되는 "단색 식단"을 금지할 것.
+
+[1-5. 식재료 중복 방지]
+- 전주 사용된 주재료는 다음 주에 사용하지 않도록 우선 회피할 것.
+- 60일 내 사용된 메뉴는 1차 제외, 30일 내 사용 메뉴는 2차 제외 기준 적용.
+- 같은 배송 주기(화수목/금토월) 내에서 식재료 중복을 최소화할 것.
+- 서로 다른 식단 타겟 간에도 동일 주차에 같은 주재료가 집중되지 않도록 분산할 것.
+
+[1-6. 유사 메뉴 회피]
+- 이름이 유사한 메뉴(예: 된장찌개↔된장국)는 같은 주에 편성하지 말 것.
+- 같은 주재료 + 같은 조리법 조합은 같은 주에 배치 금지.
+
+━━━ 제2장. 타겟별 특이사항 ━━━
+
+[2-1. 아이/유아/어린이 식단]
+- 매운맛 전면 배제. 고추장, 청양고추, 고춧가루 일절 사용 금지.
+- 간장·소금·참기름 베이스의 순한 양념 위주로 구성.
+- 생선은 가시 100% 제거된 순살만 사용.
+- 파, 마늘은 입자가 보이지 않을 정도로 곱게 다져 조리.
+- 아이 선호 메뉴(돈까스, 함박, 계란말이, 떡갈비 등) 매주 1개 이상 포함.
+- 질긴 식감 재료(우엉, 오징어, 건어물 등) 사용 자제.
+
+[2-2. 시니어/건강한 시니어 식단]
+- 질긴 식감 재료 사용 자제. 부드러운 조리법(찜, 조림, 탕) 우선.
+- 건강한 시니어는 '부드러움' 태그 필수. 나트륨 과다 메뉴 주의.
+
+[2-3. 청소연구소 식단]
+- 젊은 층 선호 메뉴(볶음밥, 카레, 파스타, 덮밥 등) 적극 반영.
+- 매운맛 허용하되 극매운맛(마라, 불닭)은 주 1회 이내.
+
+[2-4. 가족 식단]
+- 전 연령대가 함께 먹을 수 있는 보편적 메뉴 위주.
+- 국/찌개 2종 + 메인 2종 구성이므로 맛 프로필이 겹치지 않도록 할 것.
+
+[2-5. 실속 식단]
+- 원가 효율 최우선. 고가 식재료 빈도 최소화, 계절 식재료 적극 활용.
+
+[2-6. 골고루 반찬 식단]
+- 국/찌개 없이 메인 1 + 밑반찬 5 구성. 반찬 간 조리법 모두 다르게 배치.
+
+[2-7. 첫만남 식단]
+- 호감도 높은 대중적 메뉴 위주. 매운맛 배제, 호불호 식재료 배제.
+
+━━━ 제3장. 원가·가격 정책 ━━━
+
+[3-1. 원가율 관리]
+- 모든 식단의 원가율은 30% 이내 목표.
+
+[3-2. 단품합산 가격 범위]
+- 단품합산 가격이 정책가의 100%~110% 범위 내에 있도록 할 것.
+
+[3-3. 4주 균등 배분]
+- 고가 메뉴가 특정 주에 몰리지 않도록 4주 균등 배분.
+
+━━━ 제4장. 생산·공정 고려사항 ━━━
+
+[4-1. 대량 조리 적합성]
+- 튀김류는 눅눅해짐, 생야채 샐러드는 시들음 등 대량 조리 품질 유지 주의.
+- 냉장 국물류 일 생산 한도 500개, 반조리 일 생산 한도 300개 이내.
+
+[4-2. 포장·배송 적합성]
+- 냉장·냉동·반조리 혼합 배송 시 보관 온도대 호환성 확인.
+
+━━━ 제5장. 맛 프로필 밸런스 ━━━
+
+[5-1. 주간 맛 조합]
+- 한 주 내 매운맛/느끼함/짭짤함/달콤함/담백함 중 최소 3가지 포함.
+- 짭짤한 메뉴 2개 이상 연속 금지.
+
+━━━ 제6장. 금지사항 ━━━
+
+- 미사용(isUnused) 처리된 메뉴 편성 금지.
+- bannedTags 해당 메뉴 편성 금지.
+- 호불호 극심한 식재료(간, 천엽, 번데기 등) 전 타겟 자제.`);
     }
 
     if (savedSheet) setGoogleSheetUrl(savedSheet);
@@ -677,6 +766,7 @@ const SystemSettings: React.FC = () => {
                       <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">우선순위</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600">활성화</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 w-24">이동</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 w-16">삭제</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
@@ -688,7 +778,12 @@ const SystemSettings: React.FC = () => {
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
                               {colorStyle && <div className={`w-3 h-3 rounded-full ${colorStyle.dot}`}></div>}
-                              <span className="text-sm font-medium text-stone-800">{item.label}</span>
+                              <input
+                                type="text"
+                                value={item.label}
+                                onChange={e => updateIngredientColor(index, 'label', e.target.value)}
+                                className="text-sm font-medium text-stone-800 bg-transparent border-none focus:ring-1 focus:ring-rose-400 rounded px-1 py-0.5 w-20"
+                              />
                               <span className="text-xs text-stone-400">({item.key})</span>
                             </div>
                           </td>
@@ -746,12 +841,70 @@ const SystemSettings: React.FC = () => {
                               </Button>
                             </div>
                           </td>
+                          <td className="px-4 py-2 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setIngredientColors(prev => prev.filter((_, i) => i !== index));
+                              }}
+                              className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
+
+              <Card>
+                <CardContent className="p-4">
+                  <Label className="block mb-3 text-sm font-semibold text-stone-700">새 주재료 추가</Label>
+                  <div className="flex gap-3 items-end">
+                    <div className="w-24">
+                      <Label className="text-xs text-stone-500 mb-1 block">키</Label>
+                      <Input
+                        type="text"
+                        value={newIngKey}
+                        onChange={e => setNewIngKey(e.target.value)}
+                        placeholder="예: shrimp"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-xs text-stone-500 mb-1 block">표시명</Label>
+                      <Input
+                        type="text"
+                        value={newIngLabel}
+                        onChange={e => setNewIngLabel(e.target.value)}
+                        placeholder="예: 새우"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => {
+                        const key = newIngKey.trim();
+                        const label = newIngLabel.trim();
+                        if (!key || !label) return;
+                        if (ingredientColors.some(c => c.key === key)) {
+                          addToast({ type: 'error', title: '중복', message: '이미 존재하는 키입니다.' });
+                          return;
+                        }
+                        setIngredientColors(prev => [
+                          ...prev,
+                          { key, label, color: 'green', priority: prev.length + 1, enabled: true },
+                        ]);
+                        setNewIngKey('');
+                        setNewIngLabel('');
+                      }}
+                      className="shrink-0"
+                    >
+                      <Plus className="w-4 h-4" /> 추가
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               <p className="text-xs text-stone-400">
                 * 우선순위가 낮은 숫자일수록 식단표에서 먼저 적용됩니다. 비활성화된 재료는 컬러링에서 제외됩니다.

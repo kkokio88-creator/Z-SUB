@@ -28,7 +28,7 @@ import { autoClassifyBatch } from '../services/autoClassifyService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 9999;
 
 const INGREDIENT_LABELS: Record<string, string> = {
   beef: '소고기',
@@ -61,7 +61,7 @@ const MenuDatabase: React.FC = () => {
   const { user } = useAuth();
   const [, setValidationErrors] = useState<ValidationError[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
-  const [filterUsage, setFilterUsage] = useState<'ALL' | 'active' | 'unused'>('ALL');
+  const [filterUsage, setFilterUsage] = useState<'ALL' | 'active' | 'unused'>('active');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [lastSynced, setLastSynced] = useState<string>('\u2014');
   const [showImportDialog, setShowImportDialog] = useState(false);

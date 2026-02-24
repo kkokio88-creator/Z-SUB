@@ -64,30 +64,47 @@ const PlanHistory: React.FC<Props> = ({ planId, onRestore, onClose }) => {
           ) : (
             <div className="space-y-2">
               {versions.map((v, i) => (
-                <div
-                  key={v.id}
-                  className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg hover:bg-stone-100 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold flex-shrink-0">
-                    v{versions.length - i}
+                <div key={v.id} className="p-3 bg-stone-50 rounded-lg hover:bg-stone-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold flex-shrink-0">
+                      v{versions.length - i}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-stone-800">{v.label || `버전 ${versions.length - i}`}</p>
+                      <p className="text-xs text-stone-500">{new Date(v.savedAt).toLocaleString('ko-KR')}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleRestore(v)} title="복원">
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(v.id)}
+                        title="삭제"
+                        className="text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-stone-800">{v.label || `버전 ${versions.length - i}`}</p>
-                    <p className="text-xs text-stone-500">{new Date(v.savedAt).toLocaleString('ko-KR')}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleRestore(v)} title="복원">
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(v.id)}
-                      title="삭제"
-                      className="text-red-500 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  {/* 메모 & 저장 주차 정보 */}
+                  <div className="mt-2 ml-11 space-y-1">
+                    {v.memo && (
+                      <p className="text-xs text-stone-600 bg-white px-2 py-1 rounded border border-stone-200">
+                        {v.memo}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {v.savedWeeks ? (
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                          {v.savedWeeks.join(',')}주차 저장
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded">전체 주차</span>
+                      )}
+                      <span className="text-[10px] text-stone-400">{v.target}</span>
+                    </div>
                   </div>
                 </div>
               ))}

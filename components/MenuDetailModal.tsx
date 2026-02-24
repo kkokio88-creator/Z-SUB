@@ -97,7 +97,7 @@ const MenuDetailModal: React.FC<MenuDetailModalProps> = ({ item, onSave, onClose
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {/* Basic Info Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="p-3">
               <Label className="block mb-1">원가</Label>
               <div className="flex items-center">
@@ -138,6 +138,15 @@ const MenuDetailModal: React.FC<MenuDetailModalProps> = ({ item, onSave, onClose
                 value={draft.process || 0}
                 onChange={e => update('process', parseInt(e.target.value) || 0)}
                 className="bg-transparent border-none p-0 font-bold text-lg text-stone-800 w-full focus:ring-0 shadow-none h-auto"
+              />
+            </Card>
+            <Card className="p-3">
+              <Label className="block mb-1">출시월</Label>
+              <Input
+                type="month"
+                value={draft.launchDate || ''}
+                onChange={e => update('launchDate', e.target.value || undefined)}
+                className="bg-transparent border-none p-0 font-bold text-sm text-stone-800 w-full focus:ring-0 shadow-none h-auto"
               />
             </Card>
           </div>

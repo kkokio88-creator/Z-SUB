@@ -118,6 +118,7 @@ const MealPlanner: React.FC = () => {
   const [swapCandidates, setSwapCandidates] = useState<MenuItem[]>([]);
   const [swapFilterLevel, setSwapFilterLevel] = useState<DuplicationFilterLevel>('60일');
   const [swapSearchQuery, setSwapSearchQuery] = useState('');
+  const [swapCycleFilter, setSwapCycleFilter] = useState<'all' | 'same' | 'other'>('all');
 
   // Save Modal State
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -302,7 +303,7 @@ const MealPlanner: React.FC = () => {
   const handleOpenSaveModal = () => {
     if (!plans.A || !plans.B) return;
     setSaveMemo('');
-    setSaveWeekSelections([1, 2, 3, 4]);
+    setSaveWeekSelections([]);
     setShowSaveModal(true);
   };
 
@@ -471,6 +472,20 @@ const MealPlanner: React.FC = () => {
     return lastUsed;
   }, [historicalPlans]);
 
+  // 현재 생성된 반대 주기 메뉴명 (요일 필터용)
+  const otherCycleMenuNames = useMemo(() => {
+    const normalize = (n: string) =>
+      n
+        .replace(/_냉장|_반조리|_냉동/g, '')
+        .replace(/\s+\d+$/, '')
+        .trim();
+    const namesA = new Set<string>();
+    const namesB = new Set<string>();
+    plans.A?.weeks.forEach(w => w.items.forEach(i => namesA.add(normalize(i.name))));
+    plans.B?.weeks.forEach(w => w.items.forEach(i => namesB.add(normalize(i.name))));
+    return { A: namesA, B: namesB };
+  }, [plans.A, plans.B]);
+
   // swap용 히스토리 기반 제외 목록 (60일/30일)
   const swapExcludedNames = useMemo(() => {
     const buildExcluded = (days: number, cycleType: '화수목' | '금토월') => {
@@ -522,6 +537,7 @@ const MealPlanner: React.FC = () => {
       setSwapCandidates(candidates);
       setSwapFilterLevel('60일');
       setSwapSearchQuery('');
+      setSwapCycleFilter('all');
     },
     [plans, menuItems, getExcludedForSwap]
   );
@@ -839,6 +855,7 @@ const MealPlanner: React.FC = () => {
                   const historyDate = week.usedHistory?.[cleanName];
                   const isFallback = week.fallbackItems?.includes(cleanName);
                   const isHighlighted = highlightedIngredient === item.mainIngredient;
+                  const isDimmed = highlightedIngredient !== null && !isHighlighted;
                   // 마지막 사용일 계산
                   const lastUsed = allMenuLastUsed.get(cleanName);
                   const lastUsedLabel = lastUsed
@@ -866,7 +883,11 @@ const MealPlanner: React.FC = () => {
                             .join(' | ') || undefined
                         }
                         className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${
-                          isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : ingColor.bg
+                          isHighlighted
+                            ? `${ingColor.bg} ring-2 ring-offset-1 ring-current ${ingColor.text} shadow-md scale-[1.02]`
+                            : isDimmed
+                              ? 'bg-stone-50/50 opacity-40'
+                              : 'bg-white'
                         } hover:ring-1 hover:ring-stone-300 ${
                           isExtra ? 'border border-amber-300 border-l-2' : ''
                         } ${isCrossDup ? 'ring-1 ring-orange-400' : ''} ${
@@ -1189,16 +1210,10 @@ const MealPlanner: React.FC = () => {
       ) : (
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto pb-6">
-            {/* Cycle A Row */}
-            {plans.A && renderCycleRow('화수목', plans.A, 'A')}
-
-            {/* Cycle B Row */}
-            {plans.B && renderCycleRow('금토월', plans.B, 'B')}
-
-            {/* 주재료 클릭 하이라이트 필터 */}
-            <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs font-bold text-stone-500">주재료 필터:</span>
+            {/* 주재료 하이라이트 필터 (식단표 상단) */}
+            <div className="bg-white rounded-xl border border-stone-200 p-3 shadow-sm mb-4 sticky top-0 z-10">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-stone-500 mr-1">주재료 필터:</span>
                 {MAJOR_INGREDIENTS.filter(ing => ing.key !== 'vegetable').map(ing => {
                   const isActive = highlightedIngredient === ing.key;
                   const color = PLANNER_INGREDIENT_COLORS[ing.key] || DEFAULT_INGREDIENT_COLOR;
@@ -1207,28 +1222,36 @@ const MealPlanner: React.FC = () => {
                     <button
                       key={ing.key}
                       onClick={() => setHighlightedIngredient(isActive ? null : ing.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                         isActive
-                          ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current shadow-sm`
+                          ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current shadow-sm font-bold`
                           : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full ${color.dot}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${color.dot}`} />
                       {ing.label}
-                      {total > 0 && <span className="text-[10px] opacity-60">({total})</span>}
+                      {total > 0 && (
+                        <span className={`text-[10px] ${isActive ? 'opacity-80' : 'opacity-50'}`}>({total})</span>
+                      )}
                     </button>
                   );
                 })}
                 {highlightedIngredient && (
                   <button
                     onClick={() => setHighlightedIngredient(null)}
-                    className="text-xs text-stone-400 hover:text-stone-600 underline ml-2"
+                    className="text-xs text-red-400 hover:text-red-600 font-medium ml-1 px-2 py-1 rounded hover:bg-red-50"
                   >
-                    초기화
+                    ✕ 해제
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Cycle A Row */}
+            {plans.A && renderCycleRow('화수목', plans.A, 'A')}
+
+            {/* Cycle B Row */}
+            {plans.B && renderCycleRow('금토월', plans.B, 'B')}
           </div>
         </div>
       )}
@@ -1238,9 +1261,22 @@ const MealPlanner: React.FC = () => {
       {/* 3. Swap Modal */}
       {swapTarget &&
         (() => {
+          // 요일(배송그룹) 필터 적용
+          const otherCycleNames = swapTarget.cycle === 'A' ? otherCycleMenuNames.B : otherCycleMenuNames.A;
+          const normalize = (n: string) =>
+            n
+              .replace(/_냉장|_반조리|_냉동/g, '')
+              .replace(/\s+\d+$/, '')
+              .trim();
+          const cycleFiltered =
+            swapCycleFilter === 'all'
+              ? swapCandidates
+              : swapCycleFilter === 'other'
+                ? swapCandidates.filter(c => !otherCycleNames.has(normalize(c.name)))
+                : swapCandidates;
           const filteredCandidates = swapSearchQuery
-            ? swapCandidates.filter(c => c.name.includes(swapSearchQuery) || c.mainIngredient.includes(swapSearchQuery))
-            : swapCandidates;
+            ? cycleFiltered.filter(c => c.name.includes(swapSearchQuery) || c.mainIngredient.includes(swapSearchQuery))
+            : cycleFiltered;
 
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -1266,23 +1302,43 @@ const MealPlanner: React.FC = () => {
                     </Button>
                   </div>
 
-                  {/* 필터 레벨 + 검색 */}
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
-                      {(['60일', '30일', '전체'] as DuplicationFilterLevel[]).map(level => (
-                        <button
-                          key={level}
-                          onClick={() => handleSwapFilterChange(level)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                            swapFilterLevel === level
-                              ? 'bg-white text-stone-900 shadow-sm'
-                              : 'text-stone-500 hover:text-stone-700'
-                          }`}
-                        >
-                          <Filter className="w-3 h-3 inline mr-1" />
-                          {level}
-                        </button>
-                      ))}
+                  {/* 필터 레벨 + 요일 필터 + 검색 */}
+                  <div className="flex flex-col gap-2 mt-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
+                        {(['60일', '30일', '전체'] as DuplicationFilterLevel[]).map(level => (
+                          <button
+                            key={level}
+                            onClick={() => handleSwapFilterChange(level)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                              swapFilterLevel === level
+                                ? 'bg-white text-stone-900 shadow-sm'
+                                : 'text-stone-500 hover:text-stone-700'
+                            }`}
+                          >
+                            <Filter className="w-3 h-3 inline mr-1" />
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 bg-blue-50 rounded-lg p-0.5">
+                        {[
+                          { key: 'all' as const, label: '전체' },
+                          { key: 'other' as const, label: swapTarget.cycle === 'A' ? '금토월 제외' : '화수목 제외' },
+                        ].map(opt => (
+                          <button
+                            key={opt.key}
+                            onClick={() => setSwapCycleFilter(opt.key)}
+                            className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                              swapCycleFilter === opt.key
+                                ? 'bg-white text-blue-700 shadow-sm'
+                                : 'text-blue-400 hover:text-blue-600'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div className="flex-1 relative">
                       <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />

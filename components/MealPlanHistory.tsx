@@ -238,6 +238,7 @@ const PROCESS_COLORS: Record<string, { bg: string; text: string; badge: string }
   '국/탕': { bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' },
   냉장국: { bg: 'bg-cyan-50', text: 'text-cyan-700', badge: 'bg-cyan-100 text-cyan-700' },
   냉동국: { bg: 'bg-indigo-50', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-700' },
+  반조리: { bg: 'bg-rose-50', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-700' },
   밥류: { bg: 'bg-purple-50', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
   '무침/나물': { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-100 text-green-700' },
   볶음: { bg: 'bg-orange-50', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
@@ -249,16 +250,26 @@ const PROCESS_COLORS: Record<string, { bg: string; text: string; badge: string }
 };
 
 function detectProcess(name: string): string {
-  if (name.includes('_냉장') || name.startsWith('냉장')) return '냉장국';
-  if (name.includes('_냉동') || name.startsWith('냉동')) return '냉동국';
-  if (/국$|탕$|찌개$|찌게$|국물|수프/.test(name)) return '국/탕';
-  if (/밥$|죽$|리조또|볶음밥|비빔밥/.test(name)) return '밥류';
-  if (/나물|무침|겉절이|숙채|생채/.test(name)) return '무침/나물';
-  if (/볶음|볶이|잡채/.test(name)) return '볶음';
-  if (/조림|장조림|졸임/.test(name)) return '조림';
-  if (/전$|부침|동그랑땡|까스|커틀릿|튀김/.test(name)) return '전류';
-  if (/김치|깍두기|장아찌|절임|피클/.test(name)) return '김치/절임';
-  if (/샐러드|셀러드/.test(name)) return '샐러드';
+  // 접미사 제거 후 실제 음식 유형으로 분류
+  const baseName = name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+  const isSoupType = /국$|탕$|찌개$|찌게$|국물|수프/.test(baseName);
+
+  // 반조리 판정: _반조리 접미사가 있는 경우
+  if (name.includes('_반조리')) return '반조리';
+  // 냉장국 판정: _냉장 접미사 + 실제 국/탕/찌개인 경우만
+  if ((name.includes('_냉장') || name.startsWith('냉장')) && isSoupType) return '냉장국';
+  // 냉동국 판정: _냉동 접미사 + 실제 국/탕/찌개인 경우만
+  if ((name.includes('_냉동') || name.startsWith('냉동')) && isSoupType) return '냉동국';
+
+  // 실제 음식 유형 분류 (접미사 제거된 이름으로)
+  if (isSoupType) return '국/탕';
+  if (/밥$|죽$|리조또|볶음밥|비빔밥/.test(baseName)) return '밥류';
+  if (/나물|무침|겉절이|숙채|생채/.test(baseName)) return '무침/나물';
+  if (/볶음|볶이|잡채/.test(baseName)) return '볶음';
+  if (/조림|장조림|졸임/.test(baseName)) return '조림';
+  if (/전$|부침|동그랑땡|까스|커틀릿|튀김/.test(baseName)) return '전류';
+  if (/김치|깍두기|장아찌|절임|피클/.test(baseName)) return '김치/절임';
+  if (/샐러드|셀러드/.test(baseName)) return '샐러드';
   return '기타';
 }
 
