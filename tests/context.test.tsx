@@ -62,7 +62,7 @@ describe('MenuContext', () => {
     category: MenuCategory.MAIN,
     cost: 3000,
     recommendedPrice: 8000,
-    tastes: [TasteProfile.BLAND],
+    tastes: [TasteProfile.GANJANG],
     season: Season.ALL,
     tags: ['테스트'],
     isSpicy: false,

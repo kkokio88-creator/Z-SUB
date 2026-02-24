@@ -307,6 +307,9 @@ export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => {
     tags.push('시니어');
   }
 
+  // 태그 중복 제거 (시트 비고 컬럼에 중복 입력 또는 자동 태깅 중복 방지)
+  const uniqueTags = [...new Set(tags)];
+
   return {
     id: row[3] ? row[3].trim() : `item_${index}`,
     code: row[3] ? row[3].trim() : undefined,
@@ -316,7 +319,7 @@ export const rowToMenuItem = (row: string[], index: number = 0): MenuItem => {
     recommendedPrice: parseNumber(row[5]),
     tastes: [],
     season: Season.ALL,
-    tags,
+    tags: uniqueTags,
     isSpicy: spicy,
     mainIngredient: detectMainIngredient((row[1] || '').trim()),
     process: Number(row[2]) || 0,

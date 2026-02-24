@@ -39,14 +39,7 @@ export interface TagGapByCategory {
 
 // ── KID / SENIOR 타겟 목록 ──
 
-const KID_TARGETS = new Set<string>([
-  TargetType.KIDS,
-  TargetType.KIDS_PLUS,
-  TargetType.TODDLER,
-  TargetType.TODDLER_PLUS,
-  TargetType.CHILD,
-  TargetType.CHILD_PLUS,
-]);
+const KID_TARGETS = new Set<string>([TargetType.KIDS, TargetType.KIDS_PLUS]);
 
 const SENIOR_TARGETS = new Set<string>([TargetType.SENIOR, TargetType.SENIOR_HEALTH]);
 

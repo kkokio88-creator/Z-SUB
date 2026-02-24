@@ -19,7 +19,7 @@ const sampleItem: MenuItem = {
   category: MenuCategory.SOUP,
   cost: 1342,
   recommendedPrice: 3000,
-  tastes: [TasteProfile.BLAND],
+  tastes: [TasteProfile.GANJANG],
   season: Season.ALL,
   tags: ['아이선호', '부드러움'],
   isSpicy: false,
@@ -29,25 +29,25 @@ const sampleItem: MenuItem = {
   isUnused: false,
 };
 
-describe('menuItemToRow / rowToMenuItem', () => {
-  it('MenuItem -> row -> MenuItem 왕복 변환', () => {
+describe('menuItemToRow', () => {
+  it('MenuItem -> row 직렬화 (내부 형식)', () => {
     const row = menuItemToRow(sampleItem);
     expect(row).toHaveLength(MENU_DB_HEADERS.length);
-    expect(row[0]).toBe('S001');
-    expect(row[2]).toBe('황태미역국');
-    expect(row[4]).toBe('1342');
-
-    const restored = rowToMenuItem(row);
-    expect(restored.id).toBe(sampleItem.id);
-    expect(restored.name).toBe(sampleItem.name);
-    expect(restored.category).toBe(sampleItem.category);
-    expect(restored.cost).toBe(sampleItem.cost);
-    expect(restored.recommendedPrice).toBe(sampleItem.recommendedPrice);
-    expect(restored.tastes).toEqual(sampleItem.tastes);
-    expect(restored.season).toBe(sampleItem.season);
-    expect(restored.tags).toEqual(sampleItem.tags);
-    expect(restored.isSpicy).toBe(sampleItem.isSpicy);
-    expect(restored.mainIngredient).toBe(sampleItem.mainIngredient);
+    expect(row[0]).toBe('S001'); // id
+    expect(row[1]).toBe('ZIP_P_1001'); // code
+    expect(row[2]).toBe('황태미역국'); // name
+    expect(row[3]).toBe(MenuCategory.SOUP); // category
+    expect(row[4]).toBe('1342'); // cost
+    expect(row[5]).toBe('3000'); // recommendedPrice
+    expect(row[6]).toBe('간장'); // tastes
+    expect(row[7]).toBe(Season.ALL); // season
+    expect(row[8]).toBe('아이선호,부드러움'); // tags
+    expect(row[9]).toBe('false'); // isSpicy
+    expect(row[10]).toBe('seaweed'); // mainIngredient
+    expect(row[11]).toBe('11'); // process
+    expect(row[12]).toBe('600'); // weight
+    expect(row[13]).toBe('false'); // isUnused
+    expect(row[14]).toBe(''); // imageUrl
   });
 
   it('빈 optional 필드 처리', () => {
@@ -56,52 +56,78 @@ describe('menuItemToRow / rowToMenuItem', () => {
       code: undefined,
       process: undefined,
       weight: undefined,
-      isUnused: undefined,
       imageUrl: undefined,
     };
     const row = menuItemToRow(minimalItem);
-    const restored = rowToMenuItem(row);
-    expect(restored.code).toBeUndefined();
-    expect(restored.process).toBe(0);
-    expect(restored.weight).toBe(0);
+    expect(row[1]).toBe(''); // code empty
+    expect(row[11]).toBe('0'); // process default 0
+    expect(row[12]).toBe('0'); // weight default 0
+    expect(row[14]).toBe(''); // imageUrl empty
   });
 
-  it('isSpicy boolean 직렬화', () => {
+  it('isSpicy true 직렬화', () => {
     const spicyItem = { ...sampleItem, isSpicy: true };
     const row = menuItemToRow(spicyItem);
     expect(row[9]).toBe('true');
-    const restored = rowToMenuItem(row);
-    expect(restored.isSpicy).toBe(true);
   });
 
   it('여러 맛 프로필 쉼표 구분', () => {
-    const item = { ...sampleItem, tastes: [TasteProfile.SPICY, TasteProfile.SWEET] };
+    const item = { ...sampleItem, tastes: [TasteProfile.GOCHUJANG, TasteProfile.DOENJANG] };
     const row = menuItemToRow(item);
-    expect(row[6]).toBe('매운맛,달콤함');
-    const restored = rowToMenuItem(row);
-    expect(restored.tastes).toEqual([TasteProfile.SPICY, TasteProfile.SWEET]);
+    expect(row[6]).toBe('고추장,된장');
   });
 
   it('imageUrl이 있으면 보존', () => {
     const itemWithImage = { ...sampleItem, imageUrl: 'https://example.com/img.jpg' };
     const row = menuItemToRow(itemWithImage);
-    const restored = rowToMenuItem(row);
-    expect(restored.imageUrl).toBe('https://example.com/img.jpg');
+    expect(row[14]).toBe('https://example.com/img.jpg');
   });
 
   it('tags가 빈 배열이면 빈 문자열로 직렬화', () => {
     const itemNoTags = { ...sampleItem, tags: [] as string[] };
     const row = menuItemToRow(itemNoTags);
     expect(row[8]).toBe('');
-    const restored = rowToMenuItem(row);
-    expect(restored.tags).toEqual([]);
   });
 
-  it('isUnused true 처리', () => {
+  it('isUnused true 직렬화', () => {
     const unusedItem = { ...sampleItem, isUnused: true };
     const row = menuItemToRow(unusedItem);
-    const restored = rowToMenuItem(row);
-    expect(restored.isUnused).toBe(true);
+    expect(row[13]).toBe('true');
+  });
+});
+
+describe('rowToMenuItem (Google Sheets 형식)', () => {
+  // Google Sheets 형식: [0]구분 [1]메뉴명 [2]공정 [3]품목코드 [4]용량(g) [5]가격 [6]원가
+  // [7]시즌 [8]미사용 [9]매운맛 [10]대용량갯수 [11]비고
+  it('시트 행 -> MenuItem 변환', () => {
+    const sheetRow = ['국', '황태미역국', '11', 'ZIP_P_1001', '600', '3000', '1342', '', '', '', '', ''];
+    const item = rowToMenuItem(sheetRow);
+    expect(item.name).toBe('황태미역국');
+    expect(item.category).toBe(MenuCategory.SOUP);
+    expect(item.cost).toBe(1342);
+    expect(item.recommendedPrice).toBe(3000);
+    expect(item.process).toBe(11);
+    expect(item.weight).toBe(600);
+    expect(item.mainIngredient).toBe('fish'); // '황태미역국' → fish (황태 matches fish keywords)
+  });
+
+  it('매운맛 TRUE 파싱', () => {
+    const row = ['메인', '고추장불고기', '11', 'M001', '500', '5000', '2000', '', '', 'TRUE', '', ''];
+    const item = rowToMenuItem(row);
+    expect(item.isSpicy).toBe(true);
+  });
+
+  it('미사용 TRUE 파싱', () => {
+    const row = ['국', '된장찌개', '11', 'S002', '600', '3000', '1000', '', 'TRUE', '', '', ''];
+    const item = rowToMenuItem(row);
+    expect(item.isUnused).toBe(true);
+  });
+
+  it('비고 컬럼 태그 파싱', () => {
+    const row = ['국', '미역국', '11', 'S003', '600', '3000', '1000', '', '', '', '', '유기농,국내산'];
+    const item = rowToMenuItem(row);
+    expect(item.tags).toContain('유기농');
+    expect(item.tags).toContain('국내산');
   });
 });
 

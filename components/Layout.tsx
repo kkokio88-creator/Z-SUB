@@ -6,7 +6,6 @@ import {
   LogOut,
   Leaf,
   Database,
-  FileText,
   History,
   PanelLeftClose,
   PanelLeft,
@@ -120,13 +119,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
             active={activeTab === 'settings'}
             collapsed={collapsed}
             onClick={() => onTabChange('settings')}
-          />
-          <SidebarItem
-            icon={FileText}
-            label="감사 로그"
-            active={activeTab === 'audit-log'}
-            collapsed={collapsed}
-            onClick={() => onTabChange('audit-log')}
           />
         </nav>
 

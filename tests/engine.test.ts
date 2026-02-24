@@ -17,7 +17,7 @@ const makeItem = (
   recommendedPrice: 3000,
   tastes: [],
   season: Season.ALL,
-  tags: [],
+  tags: ['아이선호', '시니어'],
   isSpicy: false,
   mainIngredient,
   ...extra,

@@ -530,7 +530,7 @@ const SystemSettings: React.FC = () => {
                 <textarea
                   value={aiManual}
                   onChange={e => setAiManual(e.target.value)}
-                  className="flex-1 w-full p-4 text-sm border-stone-300 rounded-xl focus:ring-purple-500 focus:border-purple-500 font-mono leading-relaxed resize-none bg-stone-50 focus:bg-white transition-colors"
+                  className="flex-1 w-full min-h-[400px] p-4 text-sm border-stone-300 rounded-xl focus:ring-purple-500 focus:border-purple-500 font-mono leading-relaxed resize-none bg-stone-50 focus:bg-white transition-colors"
                   placeholder="예: 아이 식단에는 매운 재료(고춧가루, 청양고추)를 절대 사용하지 마세요..."
                 />
                 <p className="text-right text-xs text-stone-400 mt-2">{aiManual.length} 자</p>

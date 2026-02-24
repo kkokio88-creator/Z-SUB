@@ -12,6 +12,7 @@ import {
   Reply,
   FileText,
   Download,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -24,6 +25,7 @@ import {
   addReviewComment,
   getReviewComments,
   resolveComment,
+  requestReReviewAll,
 } from '../services/reviewService';
 import { exportHistoricalPlanToCSV, exportHistoricalPlanToPDF } from '../services/historyReviewService';
 import type { HistoricalMealPlan, PlanReviewRecord, ReviewDepartment, ReviewComment } from '../types';
@@ -102,6 +104,15 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
     if (result) {
       setReview({ ...result });
       addToast({ type: 'success', title: '최종 승인 완료', message: '식단이 최종 확정되었습니다.' });
+      refreshData();
+    }
+  }, [reviewKey, addToast, refreshData]);
+
+  const handleReReview = useCallback(() => {
+    const result = requestReReviewAll(reviewKey);
+    if (result) {
+      setReview({ ...result });
+      addToast({ type: 'info', title: '재검토 요청', message: '모든 부서의 검토 상태가 초기화되었습니다.' });
       refreshData();
     }
   }, [reviewKey, addToast, refreshData]);
@@ -451,6 +462,18 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
           </div>
 
           <div className="flex items-center gap-2">
+            {review &&
+              review.status !== 'finalized' &&
+              review.status !== 'draft' &&
+              review.departments.some(d => d.status !== 'pending') && (
+                <Button
+                  variant="outline"
+                  className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                  onClick={handleReReview}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> 재검토 요청
+                </Button>
+              )}
             {allApproved && review?.status === 'approved' && (
               <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleFinalize}>
                 <CheckCircle className="w-4 h-4" /> 최종 확정

@@ -363,6 +363,26 @@ const MenuDatabase: React.FC = () => {
     addToast({ type: 'success', title: '자동 분류 완료', message: `${results.length}개 항목이 업데이트되었습니다.` });
   };
 
+  // 태그 전체 초기화
+  const handleResetTags = () => {
+    const withTags = menuItems.filter(i => i.tags && i.tags.length > 0);
+    if (withTags.length === 0) {
+      addToast({ type: 'info', title: '태그 초기화', message: '태그가 설정된 항목이 없습니다.' });
+      return;
+    }
+    if (!window.confirm(`${withTags.length}개 항목의 태그를 모두 초기화하시겠습니까?`)) return;
+    bulkUpdate(
+      withTags.map(i => i.id),
+      { tags: [] }
+    );
+    saveToStorage();
+    addToast({
+      type: 'success',
+      title: '태그 초기화 완료',
+      message: `${withTags.length}개 항목의 태그가 초기화되었습니다.`,
+    });
+  };
+
   // 데이터 정리
   const handleCleanup = () => {
     const emptyNameItems = menuItems.filter(i => !i.name || !i.name.trim());
@@ -450,6 +470,15 @@ const MenuDatabase: React.FC = () => {
               title="주재료 기본값인 항목에 자동 분류 적용"
             >
               <Wand2 className="w-3.5 h-3.5" /> 자동분류
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetTags}
+              className="flex items-center gap-1 text-xs font-medium text-rose-600 border-rose-200 hover:bg-rose-50"
+              title="모든 메뉴의 태그를 초기화"
+            >
+              <Eraser className="w-3.5 h-3.5" /> 태그 초기화
             </Button>
             <Button
               variant="outline"
@@ -612,12 +641,13 @@ const MenuDatabase: React.FC = () => {
               <SortHeader field="cost" label="원가" className="text-right w-20" />
               <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-20">사용여부</th>
               <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-12">맵</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-stone-500 w-32">태그</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={12} className="text-center py-12 text-stone-400 text-sm">
+                <td colSpan={13} className="text-center py-12 text-stone-400 text-sm">
                   검색 결과가 없습니다.
                 </td>
               </tr>
@@ -732,6 +762,18 @@ const MenuDatabase: React.FC = () => {
                   </td>
                   <td className="px-3 py-2 text-center">
                     {item.isSpicy && <Flame className="w-3.5 h-3.5 text-red-400 mx-auto" />}
+                  </td>
+                  <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-wrap gap-0.5">
+                      {item.tags.map((tag, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex px-1.5 py-0.5 text-[9px] bg-blue-50 text-blue-600 rounded font-medium"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                 </tr>
               ))

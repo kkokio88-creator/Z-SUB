@@ -553,15 +553,7 @@ export const getSwapCandidates = (
     }
 
     // Spicy filter for kids targets
-    if (
-      (currentPlan.target === TargetType.KIDS ||
-        currentPlan.target === TargetType.KIDS_PLUS ||
-        currentPlan.target === TargetType.TODDLER ||
-        currentPlan.target === TargetType.TODDLER_PLUS ||
-        currentPlan.target === TargetType.CHILD ||
-        currentPlan.target === TargetType.CHILD_PLUS) &&
-      item.isSpicy
-    )
+    if ((currentPlan.target === TargetType.KIDS || currentPlan.target === TargetType.KIDS_PLUS) && item.isSpicy)
       return false;
 
     // Main ingredient overlap with previous week

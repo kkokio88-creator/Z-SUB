@@ -55,11 +55,6 @@ const TARGET_LABELS: Record<string, string> = {
   [TargetType.KIDS_PLUS]: '든든아이',
   [TargetType.KIDS]: '아이',
   [TargetType.SIDE_ONLY]: '골고루반찬',
-  [TargetType.FIRST_MEET]: '첫만남',
-  [TargetType.TODDLER_PLUS]: '든든유아',
-  [TargetType.TODDLER]: '유아',
-  [TargetType.CHILD_PLUS]: '든든어린이',
-  [TargetType.CHILD]: '어린이',
 };
 
 const CYCLES_8WEEKS = 16; // 8주 × 2주기(화수목+금토월)
@@ -91,6 +86,7 @@ const Dashboard: React.FC = () => {
     avgPrice: number;
     avgRatio: number;
   } | null>(null);
+  const [dupTargetFilter, setDupTargetFilter] = useState<string>('all');
 
   // ── 1. 버블 차트: 판매가(X) × 원가율(Y) × 카테고리별 메뉴 수(Size) ──
   const bubbleData = useMemo(() => {
@@ -200,6 +196,7 @@ const Dashboard: React.FC = () => {
 
     for (const plan of recentPlans) {
       for (const target of plan.targets) {
+        if (dupTargetFilter !== 'all' && target.targetType !== dupTargetFilter) continue;
         for (const item of target.items) {
           const name = item.name
             .replace(/_냉장|_반조리|_냉동/g, '')
@@ -215,7 +212,7 @@ const Dashboard: React.FC = () => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
       .map(([name, count]) => ({ name, count }));
-  }, [plans]);
+  }, [plans, dupTargetFilter]);
 
   if (menuLoading && menuItems.length === 0) {
     return (
@@ -572,10 +569,24 @@ const Dashboard: React.FC = () => {
       {/* 4. 중복 위험 분석 */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <AlertTriangle className="w-5 h-5 text-emerald-600" />
-            중복 위험 분석
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <AlertTriangle className="w-5 h-5 text-emerald-600" />
+              중복 위험 분석
+            </CardTitle>
+            <select
+              value={dupTargetFilter}
+              onChange={e => setDupTargetFilter(e.target.value)}
+              className="text-sm border border-stone-300 rounded-lg px-3 py-1.5 bg-white"
+            >
+              <option value="all">전체 식단</option>
+              {Object.entries(TARGET_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
           <p className="text-xs text-stone-500">최근 30일 가장 많이 반복된 메뉴 Top 15</p>
         </CardHeader>
         <CardContent>
@@ -584,7 +595,7 @@ const Dashboard: React.FC = () => {
               {historyLoading ? '히스토리 로딩 중...' : '최근 30일 식단 데이터가 없습니다'}
             </div>
           ) : (
-            <div className="h-[300px]">
+            <div className="h-[500px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={duplicationData} layout="vertical" margin={{ top: 5, right: 20, left: 100, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />

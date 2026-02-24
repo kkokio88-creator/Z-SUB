@@ -8,16 +8,9 @@ import {
   BrainCircuit,
   X,
   AlertTriangle,
-  ArrowRightLeft,
   Flame,
   Layers,
-  Database,
-  Server,
-  Check,
   History,
-  Printer,
-  Download,
-  FileText,
   Upload,
   Search,
   Filter,
@@ -25,17 +18,11 @@ import {
 import { MAJOR_INGREDIENTS, TARGET_CONFIGS, MEAL_PLAN_INTEGRATION_GROUPS } from '../constants';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
-import { registerToMIS } from '../services/misService';
-import { syncChangesToZPPS, type MenuChange } from '../services/zppsService';
 import { addAuditEntry } from '../services/auditService';
 import { useAuth } from '../context/AuthContext';
-import { loadHistory, saveVersion, type PlanVersion } from '../services/historyService';
+import { saveTempSnapshot, type TempSnapshot } from '../services/historyService';
 import PlanHistory from './PlanHistory';
-import PlanDiffView from './PlanDiffView';
-import { printMealPlan, exportToCSV, exportToPDF, exportGodomallCSV, exportMISCSV } from '../services/exportService';
-import { pushMealPlan, exportMealPlanToSheet } from '../services/syncManager';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
-import { addSyncRecord } from '../services/syncTracker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -120,29 +107,11 @@ const MealPlanner: React.FC = () => {
   const [swapSearchQuery, setSwapSearchQuery] = useState('');
   const [swapCycleFilter, setSwapCycleFilter] = useState<'all' | 'same' | 'other'>('all');
 
-  // Save Modal State
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveMemo, setSaveMemo] = useState('');
-  const [saveWeekSelections, setSaveWeekSelections] = useState<number[]>([1, 2, 3, 4]);
-
   // Ingredient highlight state
   const [highlightedIngredient, setHighlightedIngredient] = useState<string | null>(null);
 
-  // Sheets export state
-  const [sheetsExportStatus, setSheetsExportStatus] = useState<'idle' | 'syncing' | 'done'>('idle');
-
-  // Sync Status State
-  const [misSyncStatus, setMisSyncStatus] = useState<'idle' | 'syncing' | 'done'>('idle');
-  const [zppsSyncStatus, setZppsSyncStatus] = useState<'idle' | 'syncing' | 'done'>('idle');
-  const [unsavedChangesCount, setUnsavedChangesCount] = useState(0);
-
-  // History & Diff State
+  // History Modal State
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showDiffView, setShowDiffView] = useState(false);
-  const [diffBeforePlan, setDiffBeforePlan] = useState<MonthlyMealPlan | null>(null);
-
-  // Track swap changes for ZPPS sync
-  const [swapChanges, setSwapChanges] = useState<MenuChange[]>([]);
 
   // 반복 메뉴(셰이크 등) 처리 방식:
   // REPEAT_MENU_TARGETS(아이/든든아이)의 반복 메뉴는 parent-child 관계를 통해 처리됨.
@@ -152,9 +121,6 @@ const MealPlanner: React.FC = () => {
     setIsGenerating(true);
     setReviewResult(null);
     setPlans({ A: null, B: null });
-    setMisSyncStatus('idle');
-    setZppsSyncStatus('idle');
-    setUnsavedChangesCount(0);
 
     setTimeout(() => {
       const activeMenu = menuItems.filter(item => !item.isUnused);
@@ -294,17 +260,10 @@ const MealPlanner: React.FC = () => {
     setShowHistoryModal(true);
   };
 
-  const handleRestoreVersion = (version: PlanVersion) => {
+  const handleRestoreVersion = (version: TempSnapshot) => {
     setPlans({ A: version.planA, B: version.planB });
     setTarget(version.target as TargetType);
     setShowHistoryModal(false);
-  };
-
-  const handleOpenSaveModal = () => {
-    if (!plans.A || !plans.B) return;
-    setSaveMemo('');
-    setSaveWeekSelections([]);
-    setShowSaveModal(true);
   };
 
   const handleSaveVersion = () => {
@@ -328,21 +287,11 @@ const MealPlanner: React.FC = () => {
       }
     }
 
-    saveVersion({
-      planId: plans.A.id,
-      label: `${monthLabel} ${target}`,
-      target: target,
-      status: 'draft',
-      planA: plans.A,
-      planB: plans.B,
-      memo: saveMemo || undefined,
-      savedWeeks: saveWeekSelections.length < 4 ? saveWeekSelections : undefined,
-    });
-    setShowSaveModal(false);
+    saveTempSnapshot(plans.A, plans.B, target);
     addToast({
       type: 'success',
-      title: '식단 저장 완료',
-      message: saveMemo ? `"${saveMemo}" - 저장 완료` : '현재 식단이 히스토리에 저장되었습니다.',
+      title: '임시 저장 완료',
+      message: '현재 식단이 임시 저장되었습니다.',
     });
     addAuditEntry({
       action: 'plan.save',
@@ -350,38 +299,8 @@ const MealPlanner: React.FC = () => {
       userName: user?.displayName || '',
       entityType: 'meal_plan',
       entityId: plans.A.id,
-      entityName: `${monthLabel} ${target}${saveMemo ? ` (${saveMemo})` : ''}`,
+      entityName: `${monthLabel} ${target}`,
     });
-  };
-
-  // 구글 시트로 내보내기
-  const handleExportToSheets = async () => {
-    if (!plans.A || !plans.B) return;
-    setSheetsExportStatus('syncing');
-    try {
-      const result = await exportMealPlanToSheet(plans.A, plans.B, monthLabel, target);
-      if (result.success) {
-        addToast({ type: 'success', title: '시트 내보내기 완료', message: `${result.rowCount}건 내보내기 완료` });
-        setSheetsExportStatus('done');
-      } else {
-        addToast({ type: 'error', title: '시트 내보내기 실패', message: result.error || '오류 발생' });
-        setSheetsExportStatus('idle');
-      }
-    } catch {
-      addToast({ type: 'error', title: '시트 연결 실패', message: '구글 시트에 연결할 수 없습니다.' });
-      setSheetsExportStatus('idle');
-    }
-  };
-
-  const handleDiffWithPrevious = () => {
-    if (!plans.A) return;
-    const versions = loadHistory();
-    if (versions.length === 0) {
-      addToast({ type: 'warning', title: '비교 대상 없음', message: '저장된 이전 버전이 없습니다.' });
-      return;
-    }
-    setDiffBeforePlan(versions[0].planA);
-    setShowDiffView(true);
   };
 
   const handleExpertReview = async (plan: MonthlyMealPlan) => {
@@ -411,22 +330,6 @@ const MealPlanner: React.FC = () => {
       title: '히스토리 등록 완료',
       message: `${count}건의 식단이 등록되었습니다. 식단 히스토리 탭에서 확인하세요.`,
     });
-
-    // 시트 동기화 (백그라운드, 실패해도 로컬에는 이미 저장됨)
-    try {
-      const resultA = await pushMealPlan(plans.A);
-      const resultB = await pushMealPlan(plans.B);
-      if (!resultA.success || !resultB.success) {
-        addSyncRecord({
-          target: 'SHEETS',
-          result: 'error',
-          itemCount: 0,
-          errorMessage: resultA.error || resultB.error || '시트 동기화 실패',
-        });
-      }
-    } catch {
-      // 시트 동기화 실패해도 로컬 등록은 완료된 상태
-    }
   };
 
   // 다음달 식단 메뉴명 수집
@@ -573,27 +476,6 @@ const MealPlanner: React.FC = () => {
         return week;
       });
       setPlans(prev => ({ ...prev, [cycle]: { ...currentPlan, weeks: updatedWeeks } }));
-      setUnsavedChangesCount(prev => prev + 1);
-      setZppsSyncStatus('idle');
-
-      // Track change for ZPPS
-      const slotIndex =
-        currentPlan.weeks
-          .find(w => w.weekIndex === swapTarget.weekIndex)
-          ?.items.findIndex(i => i.id === swapTarget.item.id) ?? 0;
-      setSwapChanges(prev => [
-        ...prev,
-        {
-          planId: currentPlan.id,
-          weekIndex: swapTarget.weekIndex,
-          slotIndex,
-          previousItemId: swapTarget.item.id,
-          previousItemName: swapTarget.item.name,
-          newItemId: newItem.id,
-          newItemName: newItem.name,
-          reason: 'manual_swap',
-        },
-      ]);
 
       addAuditEntry({
         action: 'swap.execute',
@@ -607,94 +489,6 @@ const MealPlanner: React.FC = () => {
       });
     }
     setSwapTarget(null);
-  };
-
-  const handleRegisterToMIS = async () => {
-    if (!plans.A || !plans.B) return;
-
-    const confirmOverwrite = await confirm({
-      title: 'MIS 시스템 등록',
-      message: `${monthLabel} ${target} 식단(화수목+금토월)을 MIS에 등록하시겠습니까?`,
-      confirmLabel: '등록',
-      variant: 'warning',
-    });
-    if (!confirmOverwrite) return;
-
-    setMisSyncStatus('syncing');
-    const misUrl = localStorage.getItem('zsub_mis_url') || '/api/mis/meal-plans';
-
-    try {
-      const resultA = await registerToMIS(plans.A, misUrl);
-      const resultB = await registerToMIS(plans.B, misUrl);
-
-      if (resultA.success && resultB.success) {
-        addToast({
-          type: 'success',
-          title: 'MIS 등록 완료',
-          message: `${monthLabel} 식단 정보가 MIS에 성공적으로 등록되었습니다.`,
-        });
-        setMisSyncStatus('done');
-        setUnsavedChangesCount(0);
-        addAuditEntry({
-          action: 'sync.mis',
-          userId: user?.id || '',
-          userName: user?.displayName || '',
-          entityType: 'meal_plan',
-          entityId: plans.A.id,
-          entityName: `${monthLabel} ${target}`,
-        });
-      } else {
-        const errMsg = resultA.error || resultB.error || 'MIS 등록 실패';
-        addToast({ type: 'error', title: 'MIS 등록 실패', message: errMsg });
-        setMisSyncStatus('idle');
-      }
-    } catch {
-      addToast({ type: 'error', title: 'MIS 연결 실패', message: 'MIS 서버에 연결할 수 없습니다.' });
-      setMisSyncStatus('idle');
-    }
-  };
-
-  const handleSyncToZPPS = async () => {
-    if (unsavedChangesCount === 0 || swapChanges.length === 0) return;
-
-    const confirmSync = await confirm({
-      title: 'ZPPS 생산 연동',
-      message: `총 ${unsavedChangesCount}건의 메뉴 변경사항이 감지되었습니다.\n생산 시스템(ZPPS)에 변경 내역을 반영하시겠습니까?`,
-      confirmLabel: '연동 실행',
-      variant: 'warning',
-    });
-    if (!confirmSync) return;
-
-    setZppsSyncStatus('syncing');
-    const zppsUrl = localStorage.getItem('zsub_zpps_url') || '/api/zpps/menu-changes';
-
-    try {
-      const result = await syncChangesToZPPS(swapChanges, zppsUrl);
-      if (result.success) {
-        addToast({
-          type: 'success',
-          title: 'ZPPS 연동 완료',
-          message: `${result.processedCount}건의 변경 정보가 ZPPS로 전송되었습니다.`,
-        });
-        setZppsSyncStatus('done');
-        setUnsavedChangesCount(0);
-        setSwapChanges([]);
-        addAuditEntry({
-          action: 'sync.zpps',
-          userId: user?.id || '',
-          userName: user?.displayName || '',
-          entityType: 'menu_change',
-          entityId: plans.A?.id || '',
-          entityName: `ZPPS ${result.processedCount}건 동기화`,
-        });
-      } else {
-        addToast({ type: 'error', title: 'ZPPS 연동 실패', message: result.error || 'ZPPS 연동 실패' });
-        setZppsSyncStatus('idle');
-      }
-    } catch {
-      addToast({ type: 'error', title: 'ZPPS 연결 실패', message: 'ZPPS 서버에 연결할 수 없습니다.' });
-      setZppsSyncStatus('idle');
-    }
   };
 
   // 채소를 제외한 주요 식재료 목록
@@ -852,7 +646,6 @@ const MealPlanner: React.FC = () => {
                     .replace(/\s+\d+$/, '')
                     .trim();
                   const isCrossDup = crossDayDuplicates.has(cleanName);
-                  const historyDate = week.usedHistory?.[cleanName];
                   const isFallback = week.fallbackItems?.includes(cleanName);
                   const isHighlighted = highlightedIngredient === item.mainIngredient;
                   const isDimmed = highlightedIngredient !== null && !isHighlighted;
@@ -860,7 +653,11 @@ const MealPlanner: React.FC = () => {
                   const lastUsed = allMenuLastUsed.get(cleanName);
                   const lastUsedLabel = lastUsed
                     ? (() => {
-                        const days = Math.floor((Date.now() - new Date(lastUsed).getTime()) / 86400000);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const used = new Date(lastUsed);
+                        used.setHours(0, 0, 0, 0);
+                        const days = Math.max(0, Math.floor((today.getTime() - used.getTime()) / 86400000));
                         return days < 7
                           ? `${days}일 전`
                           : days < 60
@@ -927,6 +724,22 @@ const MealPlanner: React.FC = () => {
                           </span>
                         )}
                         {item.isSpicy && <Flame className="w-3 h-3 text-red-400" />}
+                        {item.name.includes('_냉장') && (
+                          <span
+                            className="px-1 py-0.5 text-[8px] font-bold text-sky-600 bg-sky-50 rounded border border-sky-200 flex-shrink-0"
+                            title="냉장국 (생산 한도 적용)"
+                          >
+                            냉
+                          </span>
+                        )}
+                        {item.name.includes('_반조리') && (
+                          <span
+                            className="px-1 py-0.5 text-[8px] font-bold text-violet-600 bg-violet-50 rounded border border-violet-200 flex-shrink-0"
+                            title="반조리 (생산 한도 적용)"
+                          >
+                            반
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -938,25 +751,6 @@ const MealPlanner: React.FC = () => {
       </div>
     </div>
   );
-
-  const IngredientCell: React.FC<{ count: number; isTotal?: boolean; menuNames?: string[] }> = ({
-    count,
-    isTotal,
-    menuNames,
-  }) => {
-    if (count === 0) return <span className="text-stone-300">-</span>;
-    let colorClass = 'bg-green-100 text-green-700';
-    if (count >= 4) colorClass = 'bg-red-100 text-red-700 font-bold';
-    else if (count >= 2) colorClass = 'bg-orange-100 text-orange-700 font-bold';
-    return (
-      <span
-        title={menuNames && menuNames.length > 0 ? menuNames.join(', ') : undefined}
-        className={`inline-flex items-center justify-center w-6 h-6 rounded text-[11px] cursor-default ${isTotal ? 'font-bold' : ''} ${colorClass}`}
-      >
-        {count}
-      </span>
-    );
-  };
 
   return (
     <div className="flex flex-col h-full gap-6 relative">
@@ -1053,10 +847,6 @@ const MealPlanner: React.FC = () => {
         {/* Bottom Row: Integration Actions (Visible only when plans exist) */}
         {plans.A && (
           <div className="border-t border-stone-100 pt-3 flex justify-end items-center gap-3">
-            <div className="text-xs text-stone-400 mr-2 flex items-center gap-1">
-              <Server className="w-3 h-3" /> 시스템 연동 센터
-            </div>
-
             {/* 히스토리 등록 Button */}
             <Button
               onClick={handleRegisterToHistory}
@@ -1064,132 +854,6 @@ const MealPlanner: React.FC = () => {
             >
               <Upload className="w-3 h-3" />
               히스토리에 등록
-            </Button>
-
-            <div className="w-px h-6 bg-stone-200 mx-1" />
-
-            {/* MIS Button */}
-            <Button
-              onClick={handleRegisterToMIS}
-              disabled={misSyncStatus === 'syncing' || misSyncStatus === 'done'}
-              variant="outline"
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold ${
-                misSyncStatus === 'done' ? 'bg-green-50 text-green-700 border-green-200' : ''
-              }`}
-            >
-              {misSyncStatus === 'syncing' ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : misSyncStatus === 'done' ? (
-                <Check className="w-3 h-3" />
-              ) : (
-                <Database className="w-3 h-3" />
-              )}
-              {misSyncStatus === 'done' ? 'MIS 등록 완료' : '식단 정보 MIS 등록'}
-            </Button>
-
-            {/* ZPPS Button */}
-            <Button
-              onClick={handleSyncToZPPS}
-              disabled={unsavedChangesCount === 0 || zppsSyncStatus === 'syncing'}
-              variant="outline"
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold ${
-                unsavedChangesCount > 0
-                  ? 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse hover:bg-orange-100'
-                  : 'bg-stone-50 text-stone-300 border-stone-200'
-              }`}
-            >
-              {zppsSyncStatus === 'syncing' ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : (
-                <ArrowRightLeft className="w-3 h-3" />
-              )}
-              ZPPS 변경 연동 {unsavedChangesCount > 0 && `(${unsavedChangesCount}건)`}
-            </Button>
-
-            <div className="w-px h-6 bg-stone-200 mx-1" />
-
-            {/* 시트 내보내기 */}
-            <Button
-              onClick={handleExportToSheets}
-              disabled={sheetsExportStatus === 'syncing'}
-              variant="outline"
-              size="sm"
-              className={`flex items-center gap-1.5 text-xs font-bold ${
-                sheetsExportStatus === 'done' ? 'bg-green-50 text-green-700 border-green-200' : ''
-              }`}
-            >
-              {sheetsExportStatus === 'syncing' ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : (
-                <Upload className="w-3 h-3" />
-              )}
-              {sheetsExportStatus === 'done' ? '시트 완료' : '시트 내보내기'}
-            </Button>
-
-            <div className="w-px h-6 bg-stone-200 mx-1" />
-
-            {/* Save */}
-            <Button
-              variant="outline"
-              onClick={handleOpenSaveModal}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              <Download className="w-3 h-3" /> 저장
-            </Button>
-            {/* Diff */}
-            <Button
-              variant="outline"
-              onClick={handleDiffWithPrevious}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              비교
-            </Button>
-            {/* Print */}
-            <Button
-              variant="outline"
-              onClick={() => plans.A && printMealPlan(plans.A)}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              <Printer className="w-3 h-3" /> 인쇄
-            </Button>
-            {/* PDF Export */}
-            <Button
-              variant="outline"
-              onClick={() => plans.A && exportToPDF(plans.A)}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              <FileText className="w-3 h-3" /> PDF
-            </Button>
-            {/* CSV Export */}
-            <Button
-              variant="outline"
-              onClick={() => plans.A && exportToCSV(plans.A)}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              CSV
-            </Button>
-            {/* MIS CSV */}
-            <Button
-              variant="outline"
-              onClick={() => plans.A && exportMISCSV(plans.A)}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              MIS
-            </Button>
-            {/* 고도몰 CSV */}
-            <Button
-              variant="outline"
-              onClick={() => plans.A && exportGodomallCSV(plans.A)}
-              size="sm"
-              className="flex items-center gap-1.5 text-xs font-bold"
-            >
-              고도몰
             </Button>
           </div>
         )}
@@ -1296,6 +960,28 @@ const MealPlanner: React.FC = () => {
                         현재 메뉴: <span className="font-bold text-blue-600">{swapTarget.item.name}</span>
                         <span className="ml-2 text-stone-400">({filteredCandidates.length}개 사용 가능)</span>
                       </p>
+                      {(() => {
+                        const group = MEAL_PLAN_INTEGRATION_GROUPS.find(
+                          g => g.baseTarget === target || g.plusTarget === target
+                        );
+                        if (!group || !group.plusExtraCount) return null;
+                        const plan = plans[swapTarget.cycle];
+                        const week = plan?.weeks.find(w => w.weekIndex === swapTarget.weekIndex);
+                        const extraCount = week && parentItemCount !== null ? week.items.length - parentItemCount : 0;
+                        return (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded border border-amber-200">
+                              든든 옵션 {extraCount}/{group.plusExtraCount}
+                            </span>
+                            {parentItemCount !== null &&
+                              swapTarget.weekIndex >= 0 &&
+                              week &&
+                              week.items.indexOf(swapTarget.item) >= parentItemCount && (
+                                <span className="text-[10px] text-amber-600">← 이 슬롯은 든든 전용</span>
+                              )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setSwapTarget(null)} className="p-2 rounded-full">
                       <X className="w-5 h-5 text-stone-600" />
@@ -1389,7 +1075,13 @@ const MealPlanner: React.FC = () => {
                           const isNextMonthDup = nextMonthMenuNames.has(cleanCandidate);
                           const lastUsed = allMenuLastUsed.get(cleanCandidate);
                           const daysAgo = lastUsed
-                            ? Math.floor((Date.now() - new Date(lastUsed).getTime()) / 86400000)
+                            ? (() => {
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const used = new Date(lastUsed);
+                                used.setHours(0, 0, 0, 0);
+                                return Math.max(0, Math.floor((today.getTime() - used.getTime()) / 86400000));
+                              })()
                             : null;
                           const isNewProduct = (() => {
                             if (!candidate.launchDate) return false;
@@ -1579,85 +1271,11 @@ const MealPlanner: React.FC = () => {
       {/* 5. History Modal (PlanHistory component) */}
       {showHistoryModal && (
         <PlanHistory
-          planId={plans.A?.id || ''}
           onRestore={handleRestoreVersion}
+          onSave={handleSaveVersion}
+          hasPlan={!!(plans.A && plans.B)}
           onClose={() => setShowHistoryModal(false)}
         />
-      )}
-
-      {/* 6. Diff View Modal */}
-      {showDiffView && diffBeforePlan && plans.A && (
-        <PlanDiffView before={diffBeforePlan} after={plans.A} onClose={() => setShowDiffView(false)} />
-      )}
-
-      {/* 7. Save Modal with memo + week selection */}
-      {showSaveModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="font-bold text-lg text-stone-800 mb-4">식단 저장</h3>
-
-            {/* 버전 메모 */}
-            <div className="mb-4">
-              <Label className="text-xs font-bold text-stone-500 mb-1">버전 메모 (선택)</Label>
-              <Input
-                value={saveMemo}
-                onChange={e => setSaveMemo(e.target.value)}
-                placeholder="예: 품질팀 피드백 반영, 닭곰탕→어묵탕 교체"
-                className="text-sm"
-              />
-            </div>
-
-            {/* 주차 선택 */}
-            <div className="mb-4">
-              <Label className="text-xs font-bold text-stone-500 mb-2 block">저장할 주차 선택</Label>
-              <div className="flex gap-3">
-                {[1, 2, 3, 4].map(w => (
-                  <label key={w} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={saveWeekSelections.includes(w)}
-                      onChange={e => {
-                        if (e.target.checked) {
-                          setSaveWeekSelections(prev => [...prev, w].sort());
-                        } else {
-                          setSaveWeekSelections(prev => prev.filter(x => x !== w));
-                        }
-                      }}
-                      className="w-4 h-4 rounded border-stone-300"
-                    />
-                    <span className="text-sm text-stone-700">{w}주차</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => setSaveWeekSelections([1, 2, 3, 4])}
-                  className="text-xs text-blue-500 hover:underline"
-                >
-                  전체 선택
-                </button>
-                <button onClick={() => setSaveWeekSelections([])} className="text-xs text-stone-400 hover:underline">
-                  선택 해제
-                </button>
-              </div>
-            </div>
-
-            {/* 액션 */}
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowSaveModal(false)} size="sm">
-                취소
-              </Button>
-              <Button
-                onClick={handleSaveVersion}
-                disabled={saveWeekSelections.length === 0}
-                size="sm"
-                className="bg-stone-900 text-white hover:bg-black"
-              >
-                {saveWeekSelections.length === 4 ? '전체 저장' : `${saveWeekSelections.join(',')}주차 저장`}
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

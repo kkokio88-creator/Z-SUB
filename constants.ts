@@ -11,12 +11,18 @@ export const MAJOR_INGREDIENTS = [
   { key: 'beef', label: '소고기' },
   { key: 'pork', label: '한돈' },
   { key: 'chicken', label: '닭' },
+  { key: 'duck', label: '오리' },
   { key: 'fish', label: '생선' },
+  { key: 'squid', label: '오징어' },
+  { key: 'shrimp', label: '새우' },
+  { key: 'shellfish', label: '조개/굴' },
   { key: 'tofu', label: '두부' },
   { key: 'egg', label: '달걀' },
   { key: 'potato', label: '감자' },
+  { key: 'sweetpotato', label: '고구마' },
   { key: 'seaweed', label: '해조류' },
   { key: 'mushroom', label: '버섯' },
+  { key: 'bean', label: '콩/두류' },
   { key: 'vegetable', label: '채소' },
 ];
 
@@ -78,7 +84,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
     bannedTags: ['매운맛', '얼큰함'],
     requiredTags: ['아이선호'],
-    parentTarget: TargetType.KIDS_PLUS, // KIDS는 KIDS_PLUS의 서브셋
   },
   [TargetType.KIDS_PLUS]: {
     target: TargetType.KIDS_PLUS,
@@ -153,7 +158,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 2, [MenuCategory.MAIN]: 2, [MenuCategory.SIDE]: 2 },
     bannedTags: [],
     requiredTags: [],
-    parentTarget: TargetType.FAMILY_PLUS, // FAMILY는 FAMILY_PLUS의 서브셋
   },
   [TargetType.FAMILY_PLUS]: {
     target: TargetType.FAMILY_PLUS,
@@ -163,53 +167,6 @@ export const TARGET_CONFIGS: Record<TargetType, MealPlanConfig> = {
     composition: { [MenuCategory.SOUP]: 2, [MenuCategory.MAIN]: 2, [MenuCategory.SIDE]: 4 },
     bannedTags: [],
     requiredTags: [],
-  },
-  [TargetType.FIRST_MEET]: {
-    target: TargetType.FIRST_MEET,
-    budgetCap: 8940,
-    targetPrice: 29800,
-    targetCostRatio: 30,
-    composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
-    bannedTags: ['매운맛'],
-    requiredTags: [],
-  },
-  [TargetType.TODDLER_PLUS]: {
-    target: TargetType.TODDLER_PLUS,
-    budgetCap: 13440,
-    targetPrice: 44800,
-    targetCostRatio: 30,
-    composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 5 },
-    bannedTags: ['매운맛', '질김'],
-    requiredTags: [],
-  },
-  [TargetType.TODDLER]: {
-    target: TargetType.TODDLER,
-    budgetCap: 10440,
-    targetPrice: 34800,
-    targetCostRatio: 30,
-    composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
-    bannedTags: ['매운맛', '질김'],
-    requiredTags: [],
-    parentTarget: TargetType.TODDLER_PLUS, // TODDLER는 TODDLER_PLUS의 서브셋
-  },
-  [TargetType.CHILD_PLUS]: {
-    target: TargetType.CHILD_PLUS,
-    budgetCap: 14640,
-    targetPrice: 48800,
-    targetCostRatio: 30,
-    composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 6 },
-    bannedTags: ['매운맛'],
-    requiredTags: [],
-  },
-  [TargetType.CHILD]: {
-    target: TargetType.CHILD,
-    budgetCap: 11040,
-    targetPrice: 36800,
-    targetCostRatio: 30,
-    composition: { [MenuCategory.SOUP]: 1, [MenuCategory.MAIN]: 1, [MenuCategory.SIDE]: 3 },
-    bannedTags: ['매운맛'],
-    requiredTags: [],
-    parentTarget: TargetType.CHILD_PLUS, // CHILD는 CHILD_PLUS의 서브셋
   },
 };
 

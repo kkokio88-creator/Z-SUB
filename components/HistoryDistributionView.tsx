@@ -13,11 +13,6 @@ const TARGET_LABELS: Record<string, string> = {
   [TargetType.KIDS_PLUS]: '든든아이',
   [TargetType.KIDS]: '아이',
   [TargetType.SIDE_ONLY]: '골고루반찬',
-  [TargetType.FIRST_MEET]: '첫만남',
-  [TargetType.TODDLER_PLUS]: '든든유아',
-  [TargetType.TODDLER]: '유아',
-  [TargetType.CHILD_PLUS]: '든든어린이',
-  [TargetType.CHILD]: '어린이',
 };
 
 const TARGET_ORDER = Object.values(TargetType);

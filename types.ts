@@ -10,26 +10,19 @@ export enum TargetType {
   KIDS_PLUS = '든든한 아이 식단',
   KIDS = '아이 식단',
   SIDE_ONLY = '골고루 반찬 식단',
-  FIRST_MEET = '첫만남 식단',
-  TODDLER_PLUS = '든든한 유아 식단',
-  TODDLER = '유아 식단',
-  CHILD_PLUS = '든든한 어린이 식단',
-  CHILD = '어린이 식단',
 }
 
 export enum MenuCategory {
   SOUP = '국/찌개',
   MAIN = '메인요리',
   SIDE = '밑반찬',
-  DESSERT = '디저트/간식',
+  DESSERT = '기타',
 }
 
 export enum TasteProfile {
-  SPICY = '매운맛',
-  OILY = '느끼함',
-  SALTY = '짭짤함',
-  SWEET = '달콤함',
-  BLAND = '담백함',
+  GANJANG = '간장',
+  GOCHUJANG = '고추장',
+  DOENJANG = '된장',
 }
 
 export enum Season {

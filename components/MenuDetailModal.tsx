@@ -26,7 +26,7 @@ const MenuDetailModal: React.FC<MenuDetailModalProps> = ({ item, onSave, onClose
     setDraft(prev => ({
       ...prev,
       tastes: newTastes,
-      isSpicy: newTastes.includes(TasteProfile.SPICY),
+      isSpicy: newTastes.includes(TasteProfile.GOCHUJANG),
     }));
   };
 

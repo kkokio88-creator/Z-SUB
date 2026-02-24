@@ -169,6 +169,35 @@ export const resetDepartmentsForReReview = (planId: string, reviewerNames: strin
   return review;
 };
 
+// 전체 부서 재검토 요청 (모든 부서 → pending 리셋)
+export const requestReReviewAll = (planId: string): PlanReviewRecord | null => {
+  const reviews = loadReviews();
+  const review = reviews.find(r => r.planId === planId);
+  if (!review) return null;
+
+  for (const dept of review.departments) {
+    if (dept.status !== 'pending') {
+      dept.status = 'pending';
+      dept.comment = dept.comment ? `[재검토] ${dept.comment}` : '';
+      dept.reviewedAt = null;
+    }
+  }
+  review.status = 'review_requested';
+  saveReviews(reviews);
+  return review;
+};
+
+export const deleteComment = (planId: string, commentId: string): boolean => {
+  const allComments = loadComments();
+  const planComments = allComments[planId] || [];
+  const idx = planComments.findIndex(c => c.id === commentId);
+  if (idx === -1) return false;
+  planComments.splice(idx, 1);
+  allComments[planId] = planComments;
+  saveComments(allComments);
+  return true;
+};
+
 export const resolveComment = (planId: string, commentId: string): ReviewComment | null => {
   const allComments = loadComments();
   const planComments = allComments[planId] || [];

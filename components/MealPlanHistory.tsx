@@ -42,6 +42,7 @@ import {
   addReviewComment,
   getReviewComments,
   resolveComment,
+  deleteComment,
   resetDepartmentsForReReview,
 } from '../services/reviewService';
 import HistoryReviewModal from './HistoryReviewModal';
@@ -61,11 +62,6 @@ const TARGET_LABELS: Record<string, string> = {
   [TargetType.KIDS_PLUS]: '든든아이',
   [TargetType.KIDS]: '아이',
   [TargetType.SIDE_ONLY]: '골고루반찬',
-  [TargetType.FIRST_MEET]: '첫만남',
-  [TargetType.TODDLER_PLUS]: '든든유아',
-  [TargetType.TODDLER]: '유아',
-  [TargetType.CHILD_PLUS]: '든든어린이',
-  [TargetType.CHILD]: '어린이',
 };
 
 const TARGET_COLORS: Record<string, string> = {
@@ -79,11 +75,6 @@ const TARGET_COLORS: Record<string, string> = {
   [TargetType.KIDS_PLUS]: 'bg-slate-100 text-slate-600',
   [TargetType.KIDS]: 'bg-slate-100 text-slate-600',
   [TargetType.SIDE_ONLY]: 'bg-slate-100 text-slate-600',
-  [TargetType.FIRST_MEET]: 'bg-slate-100 text-slate-600',
-  [TargetType.TODDLER_PLUS]: 'bg-slate-100 text-slate-600',
-  [TargetType.TODDLER]: 'bg-slate-100 text-slate-600',
-  [TargetType.CHILD_PLUS]: 'bg-slate-100 text-slate-600',
-  [TargetType.CHILD]: 'bg-slate-100 text-slate-600',
 };
 
 // ── 부모-자식 병합 매핑 ──
@@ -119,20 +110,6 @@ const TARGET_MERGE_MAP: MergeGroup[] = [
     color: 'bg-slate-100 text-slate-600',
   },
   {
-    groupLabel: '유아',
-    baseTarget: TargetType.TODDLER,
-    plusTarget: TargetType.TODDLER_PLUS,
-    plusBadge: '든든',
-    color: 'bg-slate-100 text-slate-600',
-  },
-  {
-    groupLabel: '어린이',
-    baseTarget: TargetType.CHILD,
-    plusTarget: TargetType.CHILD_PLUS,
-    plusBadge: '든든',
-    color: 'bg-slate-100 text-slate-600',
-  },
-  {
     groupLabel: '청소연구소',
     baseTarget: TargetType.YOUTH,
     plusTarget: TargetType.YOUTH_MAIN,
@@ -141,7 +118,7 @@ const TARGET_MERGE_MAP: MergeGroup[] = [
   },
 ];
 
-const STANDALONE_TARGETS = [TargetType.VALUE, TargetType.SIDE_ONLY, TargetType.FIRST_MEET];
+const STANDALONE_TARGETS = [TargetType.VALUE, TargetType.SIDE_ONLY];
 
 type ColumnDef = { type: 'standalone'; target: TargetType } | { type: 'merged'; group: MergeGroup };
 
@@ -288,22 +265,6 @@ const INGREDIENT_HIGHLIGHT_BG: Record<string, string> = {
   vegetable: 'bg-green-100',
 };
 
-// ── 주재료 범례 ──
-
-const IngredientLegend: React.FC = () => (
-  <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
-    <span className="text-[11px] font-medium text-stone-500">주재료:</span>
-    {Object.entries(INGREDIENT_COLORS)
-      .filter(([k]) => k !== 'other')
-      .map(([key, val]) => (
-        <div key={key} className="flex items-center gap-1">
-          <span className={`w-2.5 h-2.5 rounded-full ${val.dot}`} />
-          <span className="text-[11px] text-stone-600">{val.label}</span>
-        </div>
-      ))}
-  </div>
-);
-
 // ── 메뉴 아이템 행 (공통) ──
 
 const MenuItemRow: React.FC<{
@@ -322,7 +283,7 @@ const MenuItemRow: React.FC<{
 }> = ({
   item,
   idx,
-  date,
+  date: _date,
   targetType,
   isEdited,
   originalName,
@@ -689,8 +650,9 @@ const CommentModal: React.FC<{
   menuName: string;
   comments: ReviewComment[];
   onSubmit: (text: string) => void;
+  onDelete: (commentId: string) => void;
   onClose: () => void;
-}> = ({ planKey, scopeKey, menuName, comments, onSubmit, onClose }) => {
+}> = ({ planKey: _planKey, scopeKey, menuName, comments, onSubmit, onDelete, onClose }) => {
   const [text, setText] = useState('');
 
   const scopeComments = useMemo(() => {
@@ -737,6 +699,15 @@ const CommentModal: React.FC<{
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-bold text-stone-700">{c.reviewer}</span>
                   <span className="text-[10px] text-stone-400">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(c.id)}
+                    className="ml-auto h-auto p-0.5 text-stone-300 hover:text-red-500"
+                    title="코멘트 삭제"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
                 </div>
                 <p className="text-sm text-stone-600">{c.comment}</p>
               </div>
@@ -1721,7 +1692,6 @@ const MealPlanHistory: React.FC = () => {
                                     {group.process} ({group.totalQty})
                                   </div>
                                   {group.items.map(item => {
-                                    const prodScopePrefix = `PROD|${item.name}`;
                                     const prodCommentCount = Array.from(commentCounts.entries())
                                       .filter(([k]) => k.endsWith(`-${item.name}`))
                                       .reduce((s, [, v]) => s + v, 0);
@@ -1781,12 +1751,7 @@ const MealPlanHistory: React.FC = () => {
                                 {dInfo &&
                                   (() => {
                                     const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
-                                    const priceRate =
-                                      dInfo.sumRecPrice > 0 ? (Math.abs(priceDiff) / dInfo.sumRecPrice) * 100 : 0;
-                                    const actualCostRatio =
-                                      dInfo.targetPrice > 0 ? (dInfo.totalCost / dInfo.targetPrice) * 100 : 0;
-                                    const costDiff = actualCostRatio - dInfo.targetCostRatio;
-                                    if (priceDiff === 0 && Math.abs(costDiff) < 0.5) return null;
+                                    if (priceDiff === 0) return null;
                                     return (
                                       <div className="mb-1 px-1 py-0.5 rounded text-[9px] space-y-0.5">
                                         {priceDiff !== 0 && (
@@ -1794,27 +1759,13 @@ const MealPlanHistory: React.FC = () => {
                                             className={`flex items-center justify-between ${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
                                           >
                                             <span className="text-stone-500">
-                                              판매 {dInfo.targetPrice.toLocaleString()}
+                                              {dInfo.sumRecPrice.toLocaleString()}원
                                             </span>
                                             <span className="font-bold tabular-nums">
-                                              {priceDiff > 0 ? '초과' : '할인'} {priceDiff > 0 ? '+' : ''}
-                                              {priceDiff.toLocaleString()}원 ({priceRate.toFixed(0)}%)
+                                              {priceDiff > 0 ? '초과' : '미달'} {Math.abs(priceDiff).toLocaleString()}원
                                             </span>
                                           </div>
                                         )}
-                                        <div
-                                          className={`flex items-center justify-between ${costDiff > 0.5 ? 'text-red-400' : costDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
-                                        >
-                                          <span className="text-stone-400">원가 {actualCostRatio.toFixed(1)}%</span>
-                                          <span className="font-medium tabular-nums">
-                                            가이드 {dInfo.targetCostRatio}%{' '}
-                                            {costDiff > 0.5
-                                              ? `+${costDiff.toFixed(1)}%p`
-                                              : costDiff < -0.5
-                                                ? `${costDiff.toFixed(1)}%p`
-                                                : '적정'}
-                                          </span>
-                                        </div>
                                       </div>
                                     );
                                   })()}
@@ -1856,10 +1807,7 @@ const MealPlanHistory: React.FC = () => {
                                 const renderDiscBadge = (dI: typeof baseDInfo, label?: string) => {
                                   if (!dI) return null;
                                   const pDiff = dI.sumRecPrice - dI.targetPrice;
-                                  const pRate = dI.sumRecPrice > 0 ? (Math.abs(pDiff) / dI.sumRecPrice) * 100 : 0;
-                                  const aCR = dI.targetPrice > 0 ? (dI.totalCost / dI.targetPrice) * 100 : 0;
-                                  const cDiff = aCR - dI.targetCostRatio;
-                                  if (pDiff === 0 && Math.abs(cDiff) < 0.5) return null;
+                                  if (pDiff === 0) return null;
                                   return (
                                     <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
                                       {label && <span className="text-stone-400 text-[8px]">{label}</span>}
@@ -1867,26 +1815,12 @@ const MealPlanHistory: React.FC = () => {
                                         <div
                                           className={`flex items-center justify-between ${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
                                         >
-                                          <span className="text-stone-500">판매 {dI.targetPrice.toLocaleString()}</span>
+                                          <span className="text-stone-500">{dI.sumRecPrice.toLocaleString()}원</span>
                                           <span className="font-bold tabular-nums">
-                                            {pDiff > 0 ? '초과' : '할인'} {pDiff > 0 ? '+' : ''}
-                                            {pDiff.toLocaleString()}원 ({pRate.toFixed(0)}%)
+                                            {pDiff > 0 ? '초과' : '미달'} {Math.abs(pDiff).toLocaleString()}원
                                           </span>
                                         </div>
                                       )}
-                                      <div
-                                        className={`flex items-center justify-between ${cDiff > 0.5 ? 'text-red-400' : cDiff < -0.5 ? 'text-emerald-500' : 'text-stone-400'}`}
-                                      >
-                                        <span className="text-stone-400">원가 {aCR.toFixed(1)}%</span>
-                                        <span className="font-medium tabular-nums">
-                                          가이드 {dI.targetCostRatio}%{' '}
-                                          {cDiff > 0.5
-                                            ? `+${cDiff.toFixed(1)}%p`
-                                            : cDiff < -0.5
-                                              ? `${cDiff.toFixed(1)}%p`
-                                              : '적정'}
-                                        </span>
-                                      </div>
                                     </div>
                                   );
                                 };
@@ -1945,6 +1879,10 @@ const MealPlanHistory: React.FC = () => {
           menuName={commentTarget.menuName}
           comments={commentCache[commentTarget.planKey] || []}
           onSubmit={handleSubmitComment}
+          onDelete={commentId => {
+            deleteComment(commentTarget.planKey, commentId);
+            loadCommentsForPlan(commentTarget.planKey);
+          }}
           onClose={() => setCommentTarget(null)}
         />
       )}

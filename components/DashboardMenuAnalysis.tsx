@@ -6,11 +6,9 @@ import { MenuCategory, TasteProfile } from '../types';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart, Cell } from 'recharts';
 
 const TASTE_LABELS: Record<string, string> = {
-  [TasteProfile.SPICY]: '매운맛',
-  [TasteProfile.OILY]: '느끼함',
-  [TasteProfile.SALTY]: '짭짤함',
-  [TasteProfile.SWEET]: '달콤함',
-  [TasteProfile.BLAND]: '담백함',
+  [TasteProfile.GANJANG]: '간장',
+  [TasteProfile.GOCHUJANG]: '고추장',
+  [TasteProfile.DOENJANG]: '된장',
 };
 
 const DashboardMenuAnalysis: React.FC = () => {
