@@ -15,6 +15,7 @@ import {
   Download,
   FileText,
   AlertTriangle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,9 @@ import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { useMenu } from '../context/MenuContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { TargetType } from '../types';
+import { useSheets } from '../context/SheetsContext';
+import { pushSheetData } from '../services/sheetsService';
+import { TargetType, MenuCategory } from '../types';
 import { TARGET_CONFIGS } from '../constants';
 import type {
   HistoricalMenuItem,
@@ -31,6 +34,7 @@ import type {
   HistoricalMealPlan,
   PlanReviewRecord,
   ReviewComment,
+  MenuItem,
 } from '../types';
 import {
   makeReviewKey,
@@ -226,20 +230,23 @@ const PROCESS_COLORS: Record<string, { bg: string; text: string; badge: string }
   기타: { bg: 'bg-stone-50', text: 'text-stone-600', badge: 'bg-stone-100 text-stone-600' },
 };
 
-function detectProcess(name: string): string {
+function detectProcess(name: string, dbItem?: MenuItem): string {
   // 접미사 제거 후 실제 음식 유형으로 분류
   const baseName = name.replace(/_냉장|_반조리|_냉동/g, '').trim();
-  const isSoupType = /국$|탕$|찌개$|찌게$|국물|수프/.test(baseName);
+  // 국/탕/찌개 판정: 이름 끝에 정확히 국/탕/찌개가 오는 경우만 (국물/수프는 제외 - 떡볶이국물 등 오분류 방지)
+  const isSoupType = /국$|탕$|찌개$|찌게$/.test(baseName);
+  // DB에서 카테고리 확인 가능하면 활용
+  const isDbSoup = dbItem?.category === MenuCategory.SOUP;
 
   // 반조리 판정: _반조리 접미사가 있는 경우
   if (name.includes('_반조리')) return '반조리';
-  // 냉장국 판정: _냉장 접미사 + 실제 국/탕/찌개인 경우만
-  if ((name.includes('_냉장') || name.startsWith('냉장')) && isSoupType) return '냉장국';
-  // 냉동국 판정: _냉동 접미사 + 실제 국/탕/찌개인 경우만
-  if ((name.includes('_냉동') || name.startsWith('냉동')) && isSoupType) return '냉동국';
+  // 냉장국 판정: _냉장 접미사 + (DB 국/찌개 카테고리 또는 이름이 국/탕/찌개로 끝남)
+  if ((name.includes('_냉장') || name.startsWith('냉장')) && (isDbSoup || isSoupType)) return '냉장국';
+  // 냉동국 판정: _냉동 접미사 + (DB 국/찌개 카테고리 또는 이름이 국/탕/찌개로 끝남)
+  if ((name.includes('_냉동') || name.startsWith('냉동')) && (isDbSoup || isSoupType)) return '냉동국';
 
   // 실제 음식 유형 분류 (접미사 제거된 이름으로)
-  if (isSoupType) return '국/탕';
+  if (isDbSoup || isSoupType) return '국/탕';
   if (/밥$|죽$|리조또|볶음밥|비빔밥/.test(baseName)) return '밥류';
   if (/나물|무침|겉절이|숙채|생채/.test(baseName)) return '무침/나물';
   if (/볶음|볶이|잡채/.test(baseName)) return '볶음';
@@ -250,19 +257,19 @@ function detectProcess(name: string): string {
   return '기타';
 }
 
-// ── 주재료 하이라이트 배경색 ──
+// ── 주재료 하이라이트 텍스트 색상 (US-022: 글씨 색만 사용) ──
 
-const INGREDIENT_HIGHLIGHT_BG: Record<string, string> = {
-  beef: 'bg-red-100',
-  pork: 'bg-rose-100',
-  chicken: 'bg-amber-100',
-  fish: 'bg-sky-100',
-  tofu: 'bg-yellow-100',
-  egg: 'bg-orange-100',
-  potato: 'bg-stone-200',
-  seaweed: 'bg-teal-100',
-  mushroom: 'bg-violet-100',
-  vegetable: 'bg-green-100',
+const INGREDIENT_HIGHLIGHT_TEXT: Record<string, string> = {
+  beef: 'text-red-600',
+  pork: 'text-rose-600',
+  chicken: 'text-amber-600',
+  fish: 'text-sky-600',
+  tofu: 'text-yellow-600',
+  egg: 'text-orange-600',
+  potato: 'text-stone-500',
+  seaweed: 'text-teal-600',
+  mushroom: 'text-violet-600',
+  vegetable: 'text-green-600',
 };
 
 // ── 메뉴 아이템 행 (공통) ──
@@ -303,12 +310,14 @@ const MenuItemRow: React.FC<{
   return (
     <div
       onClick={() => onAction(targetType, idx, item.name)}
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer border-l-2 ${colors.borderL} ${
-        isHighlighted ? `${INGREDIENT_HIGHLIGHT_BG[ingredient] || 'bg-yellow-100'} ring-2 ring-current` : colors.bg
-      } hover:ring-1 hover:ring-stone-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] leading-tight cursor-pointer bg-white hover:ring-1 hover:ring-stone-200 transition-all ${isEdited ? 'ring-1 ring-green-300 bg-green-50/30' : hasUnresolvedComment ? 'ring-2 ring-red-400 bg-red-50/30' : ''}`}
       title={isEdited && originalName ? `변경: ${originalName} → ${cleanName}` : item.name}
     >
-      <span className={`${colors.text} truncate flex-1`}>{cleanName}</span>
+      <span
+        className={`${isHighlighted ? (INGREDIENT_HIGHLIGHT_TEXT[ingredient] || 'text-stone-700') + ' font-bold' : 'text-stone-700'} truncate flex-1`}
+      >
+        {cleanName}
+      </span>
       {quantity !== null && (
         <span className="px-1 py-0 text-[9px] font-bold text-stone-400 bg-stone-50 rounded shrink-0">{quantity}</span>
       )}
@@ -742,6 +751,7 @@ const MealPlanHistory: React.FC = () => {
   const { menuItems } = useMenu();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { setSyncStatus } = useSheets();
   const [viewYear, setViewYear] = useState(() => {
     const latestDate = HISTORICAL_MEAL_PLANS[HISTORICAL_MEAL_PLANS.length - 1]?.date;
     if (latestDate) return parseInt(latestDate.slice(0, 4));
@@ -889,6 +899,18 @@ const MealPlanHistory: React.FC = () => {
     return result;
   }, [monthPlans]);
 
+  // ── 메뉴 DB 룩업 맵 (이름 → MenuItem) ──
+  const menuLookup = useMemo(() => {
+    const map = new Map<string, MenuItem>();
+    for (const m of menuItems) {
+      map.set(m.name, m);
+      // 접미사 제거된 이름으로도 매핑
+      const clean = m.name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+      if (!map.has(clean)) map.set(clean, m);
+    }
+    return map;
+  }, [menuItems]);
+
   // ── 날짜별 생산수량 계산 (공정별 그룹) ──
   const productionSummary = useMemo(() => {
     const result = new Map<string, { process: string; items: { name: string; qty: number }[]; totalQty: number }[]>();
@@ -904,7 +926,8 @@ const MealPlanHistory: React.FC = () => {
           if (!isValidMenuItem(item.name)) continue;
           const { cleanName } = parseMenuItem(item.name);
           menuQty.set(cleanName, (menuQty.get(cleanName) || 0) + volume);
-          if (!menuProcess.has(cleanName)) menuProcess.set(cleanName, detectProcess(item.name));
+          if (!menuProcess.has(cleanName))
+            menuProcess.set(cleanName, detectProcess(item.name, menuLookup.get(cleanName)));
         }
       }
 
@@ -922,7 +945,7 @@ const MealPlanHistory: React.FC = () => {
       result.set(key, groups);
     }
     return result;
-  }, [monthPlans, shipmentConfig]);
+  }, [monthPlans, shipmentConfig, menuLookup]);
 
   // ── 타겟별 할인 정보 계산 ──
   const discountSummary = useMemo(() => {
@@ -1040,7 +1063,7 @@ const MealPlanHistory: React.FC = () => {
             result.set(cleanName, {
               menuName: cleanName,
               code: item.code,
-              process: detectProcess(item.name),
+              process: detectProcess(item.name, menuLookup.get(cleanName)),
               totalQty: volume,
               byTarget: { [target.targetType]: volume },
             });
@@ -1049,7 +1072,7 @@ const MealPlanHistory: React.FC = () => {
       }
     }
     return [...result.values()].sort((a, b) => b.totalQty - a.totalQty);
-  }, [monthPlans, shipmentConfig]);
+  }, [monthPlans, shipmentConfig, menuLookup]);
 
   // 생산 한도 설정 로드
   const productionLimits = useMemo(() => {
@@ -1090,8 +1113,42 @@ const MealPlanHistory: React.FC = () => {
   const exportToHistoryCSV = useCallback(() => {
     if (monthPlans.length === 0) return;
     let csv: string;
-    const suffix = viewMode === 'ingredient' ? '재료검토' : viewMode === 'distribution' ? '현장배포' : '식단표';
-    if (viewMode === 'ingredient' || viewMode === 'distribution') {
+    const suffix =
+      viewMode === 'ingredient'
+        ? '재료검토'
+        : viewMode === 'distribution'
+          ? '현장배포'
+          : viewMode === 'production'
+            ? '생산통합'
+            : '식단표';
+    if (viewMode === 'plan') {
+      const targetLabels = columns.map(col =>
+        col.type === 'standalone' ? TARGET_LABELS[col.target] || col.target : col.group.groupLabel
+      );
+      const header = '날짜,주기,' + targetLabels.join(',');
+      const rows: string[] = [];
+      for (const plan of monthPlans) {
+        const targetMap = new Map(plan.targets.map(t => [t.targetType, t]));
+        const cells = columns.map(col => {
+          if (col.type === 'standalone') {
+            const target = targetMap.get(col.target);
+            if (!target) return '';
+            const names = target.items.map(item => item.name).filter(n => n && n.trim());
+            return `"${names.join('/')}"`;
+          } else {
+            const baseTarget = targetMap.get(col.group.baseTarget);
+            const plusTarget = targetMap.get(col.group.plusTarget);
+            const names = [
+              ...(baseTarget ? baseTarget.items.map(item => item.name).filter(n => n && n.trim()) : []),
+              ...(plusTarget ? plusTarget.items.map(item => item.name).filter(n => n && n.trim()) : []),
+            ];
+            return `"${names.join('/')}"`;
+          }
+        });
+        rows.push(`${plan.date},"${plan.cycleType}",${cells.join(',')}`);
+      }
+      csv = [header, ...rows].join('\n');
+    } else if (viewMode === 'ingredient' || viewMode === 'distribution') {
       const header = '날짜,주기,식단유형,메뉴명,판매가,원가';
       const rows: string[] = [];
       for (const plan of monthPlans) {
@@ -1106,17 +1163,11 @@ const MealPlanHistory: React.FC = () => {
       }
       csv = [header, ...rows].join('\n');
     } else {
-      const header = '날짜,주기,공정,메뉴명,수량';
-      const rows: string[] = [];
-      for (const plan of monthPlans) {
-        const key = `${plan.date}-${plan.cycleType}`;
-        const groups = productionSummary.get(key) || [];
-        for (const g of groups) {
-          for (const item of g.items) {
-            rows.push(`${plan.date},"${plan.cycleType}","${g.process}","${item.name}",${item.qty}`);
-          }
-        }
-      }
+      // production
+      const header = '메뉴명,제품코드,공정,총생산수량';
+      const rows = consolidatedProduction.map(
+        item => `"${item.menuName}","${item.code ?? ''}","${item.process}",${item.totalQty}`
+      );
       csv = [header, ...rows].join('\n');
     }
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1126,7 +1177,7 @@ const MealPlanHistory: React.FC = () => {
     a.download = `식단히스토리_${viewYear}년${viewMonth + 1}월_${suffix}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [monthPlans, productionSummary, viewYear, viewMonth, viewMode]);
+  }, [monthPlans, productionSummary, consolidatedProduction, columns, viewYear, viewMonth, viewMode]);
 
   const exportToHistoryPDF = useCallback(async () => {
     if (!contentRef.current) return;
@@ -1140,6 +1191,53 @@ const MealPlanHistory: React.FC = () => {
     };
     html2pdf().set(opt).from(contentRef.current).save();
   }, [viewYear, viewMonth]);
+
+  const exportToGoogleSheets = useCallback(async () => {
+    if (monthPlans.length === 0) {
+      addToast({ type: 'error', title: '내보내기 실패', message: '내보낼 식단 데이터가 없습니다.' });
+      return;
+    }
+    const sheetName = `식단_히스토리_${viewYear}년${viewMonth + 1}월`;
+    setSyncStatus(sheetName, 'syncing', 'push');
+    try {
+      const headers = ['날짜', '주기', '식단유형', '메뉴명', '판매가', '원가'];
+      const rows: string[][] = [];
+      for (const plan of monthPlans) {
+        for (const target of plan.targets) {
+          for (const item of target.items) {
+            if (!item.name || !item.name.trim()) continue;
+            rows.push([
+              plan.date,
+              plan.cycleType,
+              TARGET_LABELS[target.targetType] || target.targetType,
+              item.name,
+              String(item.price),
+              String(item.cost),
+            ]);
+          }
+        }
+      }
+      const result = await pushSheetData(sheetName, [headers, ...rows]);
+      if (result.success) {
+        setSyncStatus(sheetName, 'success', 'push');
+        addToast({
+          type: 'success',
+          title: '시트 내보내기 완료',
+          message: `${rows.length}건을 "${sheetName}" 시트에 내보냈습니다.`,
+        });
+      } else {
+        throw new Error(result.message || '시트 쓰기 실패');
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setSyncStatus(sheetName, 'error', 'push', errMsg);
+      addToast({
+        type: 'error',
+        title: '시트 내보내기 실패',
+        message: errMsg,
+      });
+    }
+  }, [monthPlans, viewYear, viewMonth, setSyncStatus, addToast]);
 
   const getItems = useCallback(
     (date: string, targetType: string, items: HistoricalMenuItem[]): HistoricalMenuItem[] => {
@@ -1401,41 +1499,17 @@ const MealPlanHistory: React.FC = () => {
           >
             <FileText className="w-3.5 h-3.5" /> PDF
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToGoogleSheets}
+            className="flex items-center gap-1 text-xs font-medium text-green-700 border-green-300 hover:bg-green-50"
+            title="Google Sheets 내보내기"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" /> 시트 내보내기
+          </Button>
         </div>
       </div>
-
-      {viewMode === 'plan' && (
-        <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
-          <span className="text-[11px] font-medium text-stone-500">주재료 필터:</span>
-          {Object.entries(INGREDIENT_COLORS)
-            .filter(([k]) => k !== 'other')
-            .map(([key, val]) => {
-              const isActive = highlightedIngredient === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setHighlightedIngredient(isActive ? null : key)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
-                    isActive
-                      ? `${INGREDIENT_HIGHLIGHT_BG[key] || 'bg-yellow-100'} ${val.text} ring-2 ring-offset-1 ring-current shadow-sm`
-                      : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
-                  }`}
-                >
-                  <span className={`w-2.5 h-2.5 rounded-full ${val.dot}`} />
-                  {val.label}
-                </button>
-              );
-            })}
-          {highlightedIngredient && (
-            <button
-              onClick={() => setHighlightedIngredient(null)}
-              className="text-[10px] text-stone-400 hover:text-stone-600 underline ml-1"
-            >
-              초기화
-            </button>
-          )}
-        </div>
-      )}
 
       {/* 콘텐츠 */}
       <div ref={contentRef} className="flex-1 flex flex-col min-h-0">
@@ -1450,24 +1524,7 @@ const MealPlanHistory: React.FC = () => {
           <HistoryDistributionView monthPlans={monthPlans} formatDate={formatDate} />
         ) : viewMode === 'production' ? (
           <div className="flex-1 overflow-auto">
-            {/* Production warnings */}
-            {productionWarnings.length > 0 && (
-              <div className="mb-4 space-y-2">
-                {productionWarnings.map((w, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"
-                  >
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                    <span>
-                      <strong>{w.date}</strong> ({w.cycleType}) - {w.category}: {w.total}개 &gt; 한도 {w.limit}개
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Consolidated production table */}
+            {/* Consolidated production table (US-016: inline warnings per item) */}
             <div className="border border-stone-200 rounded-xl overflow-hidden">
               <table className="w-full border-collapse text-sm">
                 <thead className="sticky top-0 z-10">
@@ -1508,7 +1565,13 @@ const MealPlanHistory: React.FC = () => {
                             {item.totalQty.toLocaleString()}
                           </span>
                           {isOverLimit && limitConfig && (
-                            <span className="ml-2 text-[10px] text-red-500">(한도: {limitConfig.dailyLimit})</span>
+                            <span
+                              className="ml-2 inline-flex items-center gap-1 text-[10px] text-red-500"
+                              title={`${item.process} 한도 초과 (${item.totalQty}/${limitConfig.dailyLimit})`}
+                            >
+                              <AlertTriangle className="w-3 h-3" />
+                              한도: {limitConfig.dailyLimit}
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -1530,22 +1593,6 @@ const MealPlanHistory: React.FC = () => {
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
-            {/* Production warnings in plan view */}
-            {productionWarnings.length > 0 && (
-              <div className="mb-2 space-y-1">
-                {productionWarnings.map((w, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-700"
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>
-                      {w.date} ({w.cycleType}) {w.category}: {w.total}개 초과 (한도 {w.limit})
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
             <div className="flex-1 overflow-auto border border-stone-200 rounded-xl">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-20">
@@ -1575,6 +1622,40 @@ const MealPlanHistory: React.FC = () => {
                         </span>
                       </th>
                     ))}
+                  </tr>
+                  <tr className="bg-stone-50 border-b border-stone-200">
+                    <td colSpan={columns.length + 4} className="px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-[11px] font-medium text-stone-500">주재료 필터:</span>
+                        {Object.entries(INGREDIENT_COLORS)
+                          .filter(([k]) => k !== 'other')
+                          .map(([key, val]) => {
+                            const isActive = highlightedIngredient === key;
+                            return (
+                              <button
+                                key={key}
+                                onClick={() => setHighlightedIngredient(isActive ? null : key)}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
+                                  isActive
+                                    ? `bg-stone-100 ${INGREDIENT_HIGHLIGHT_TEXT[key] || 'text-stone-700'} ring-2 ring-offset-1 ring-current shadow-sm font-bold`
+                                    : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
+                                }`}
+                              >
+                                <span className={`w-2 h-2 rounded-full ${val.dot}`} />
+                                {val.label}
+                              </button>
+                            );
+                          })}
+                        {highlightedIngredient && (
+                          <button
+                            onClick={() => setHighlightedIngredient(null)}
+                            className="text-[10px] text-stone-400 hover:text-stone-600 underline ml-1"
+                          >
+                            초기화
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 </thead>
                 <tbody>
@@ -1753,19 +1834,15 @@ const MealPlanHistory: React.FC = () => {
                                     const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
                                     if (priceDiff === 0) return null;
                                     return (
-                                      <div className="mb-1 px-1 py-0.5 rounded text-[9px] space-y-0.5">
-                                        {priceDiff !== 0 && (
-                                          <div
-                                            className={`flex items-center justify-between ${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
-                                          >
-                                            <span className="text-stone-500">
-                                              {dInfo.sumRecPrice.toLocaleString()}원
-                                            </span>
-                                            <span className="font-bold tabular-nums">
-                                              {priceDiff > 0 ? '초과' : '미달'} {Math.abs(priceDiff).toLocaleString()}원
-                                            </span>
-                                          </div>
-                                        )}
+                                      <div className="mb-1 px-1 py-0.5 rounded text-[9px]">
+                                        <div className={`${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                          <span className="text-stone-500">
+                                            판매가 {dInfo.sumRecPrice.toLocaleString()}원
+                                          </span>{' '}
+                                          <span className="font-bold tabular-nums">
+                                            ({Math.abs(priceDiff).toLocaleString()}원 {priceDiff > 0 ? '초과' : '미달'})
+                                          </span>
+                                        </div>
                                       </div>
                                     );
                                   })()}
@@ -1809,18 +1886,16 @@ const MealPlanHistory: React.FC = () => {
                                   const pDiff = dI.sumRecPrice - dI.targetPrice;
                                   if (pDiff === 0) return null;
                                   return (
-                                    <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
-                                      {label && <span className="text-stone-400 text-[8px]">{label}</span>}
-                                      {pDiff !== 0 && (
-                                        <div
-                                          className={`flex items-center justify-between ${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}
-                                        >
-                                          <span className="text-stone-500">{dI.sumRecPrice.toLocaleString()}원</span>
-                                          <span className="font-bold tabular-nums">
-                                            {pDiff > 0 ? '초과' : '미달'} {Math.abs(pDiff).toLocaleString()}원
-                                          </span>
-                                        </div>
-                                      )}
+                                    <div className="px-1 py-0.5 rounded text-[9px]">
+                                      {label && <span className="text-stone-400 text-[8px]">{label} </span>}
+                                      <div className={`${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                        <span className="text-stone-500">
+                                          판매가 {dI.sumRecPrice.toLocaleString()}원
+                                        </span>{' '}
+                                        <span className="font-bold tabular-nums">
+                                          ({Math.abs(pDiff).toLocaleString()}원 {pDiff > 0 ? '초과' : '미달'})
+                                        </span>
+                                      </div>
                                     </div>
                                   );
                                 };

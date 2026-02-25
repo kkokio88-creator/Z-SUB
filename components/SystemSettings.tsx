@@ -24,6 +24,7 @@ import { useToast } from '../context/ToastContext';
 import { checkSheetsConnection } from '../services/sheetsService';
 import { checkMISHealth } from '../services/misService';
 import { checkZPPSHealth } from '../services/zppsService';
+import { getWebhookUrl, setWebhookUrl, sendGoogleChatNotification } from '../services/googleChatService';
 import {
   DEFAULT_INGREDIENT_COLORS,
   INGREDIENT_COLOR_MAP,
@@ -48,6 +49,7 @@ const SystemSettings: React.FC = () => {
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [misApiUrl, setMisApiUrl] = useState('https://api.z-sub.com/v1/mis/sync');
   const [zppsApiUrl, setZppsApiUrl] = useState('https://api.z-sub.com/v1/zpps/update');
+  const [googleChatWebhookUrl, setGoogleChatWebhookUrl] = useState('');
 
   // Shipment volume config
   const [shipmentConfig, setShipmentConfig] = useState<Record<string, { 화수목: number; 금토월: number }>>({});
@@ -75,6 +77,7 @@ const SystemSettings: React.FC = () => {
     sheets: 'idle',
     mis: 'idle',
     zpps: 'idle',
+    googleChat: 'idle',
   });
 
   // Load settings on mount
@@ -184,6 +187,9 @@ const SystemSettings: React.FC = () => {
 
     if (savedSheet) setGoogleSheetUrl(savedSheet);
 
+    const savedWebhook = getWebhookUrl();
+    if (savedWebhook) setGoogleChatWebhookUrl(savedWebhook);
+
     const savedShipment = localStorage.getItem('zsub_shipment_config');
     if (savedShipment) {
       try {
@@ -218,7 +224,14 @@ const SystemSettings: React.FC = () => {
     const savedTargetTags = localStorage.getItem('zsub_target_tags');
     if (savedTargetTags) {
       try {
-        setTargetTags(JSON.parse(savedTargetTags));
+        const parsed: TargetTagConfig[] = JSON.parse(savedTargetTags);
+        const validTargetValues = new Set<string>(Object.values(TargetType));
+        const filtered = parsed.filter(cfg => validTargetValues.has(cfg.targetType));
+        // Persist filtered list back to remove deprecated entries
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem('zsub_target_tags', JSON.stringify(filtered));
+        }
+        setTargetTags(filtered);
       } catch {
         setTargetTags([...DEFAULT_TARGET_TAGS]);
       }
@@ -236,6 +249,7 @@ const SystemSettings: React.FC = () => {
     localStorage.setItem('zsub_ingredient_colors', JSON.stringify(ingredientColors));
     localStorage.setItem('zsub_production_limits', JSON.stringify(productionLimits));
     localStorage.setItem('zsub_target_tags', JSON.stringify(targetTags));
+    setWebhookUrl(googleChatWebhookUrl);
 
     addToast({
       type: 'success',
@@ -381,6 +395,21 @@ const SystemSettings: React.FC = () => {
         case 'zpps':
           result = await checkZPPSHealth(zppsApiUrl);
           break;
+        case 'googleChat': {
+          if (!googleChatWebhookUrl.trim()) {
+            result = { connected: false, message: 'Google Chat 웹훅 URL이 설정되지 않았습니다.' };
+          } else {
+            const ok = await sendGoogleChatNotification({
+              title: 'Z-SUB 연결 테스트',
+              body: 'Google Chat 웹훅 연결이 정상적으로 작동합니다.',
+              status: '테스트 성공',
+            });
+            result = ok
+              ? { connected: true, message: 'Google Chat 웹훅 전송 성공' }
+              : { connected: false, message: 'Google Chat 웹훅 전송 실패. URL을 확인해주세요.' };
+          }
+          break;
+        }
         default:
           result = { connected: false, message: '알 수 없는 대상' };
       }
@@ -667,6 +696,45 @@ const SystemSettings: React.FC = () => {
                       <Activity className="w-4 h-4" />
                       <span>ZPPS 연동은 메뉴 교체(Swap) 발생 시에만 트리거됩니다.</span>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Google Chat Webhook */}
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-stone-100 rounded-lg">
+                        <Activity className="w-5 h-5 text-stone-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-stone-800">Google Chat 웹훅</h4>
+                        <div className="text-xs text-stone-500">식단 검토/확정 알림 전송</div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => runConnectionTest('googleChat')}
+                      className="text-xs"
+                    >
+                      {getStatusIcon(testStatus.googleChat)} 테스트 전송
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Google Chat 웹훅 URL</Label>
+                    <Input
+                      type="text"
+                      value={googleChatWebhookUrl}
+                      onChange={e => setGoogleChatWebhookUrl(e.target.value)}
+                      placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=..."
+                      className="font-mono text-xs"
+                    />
+                    <p className="text-xs text-stone-400">
+                      * Google Chat 스페이스에서 웹훅 URL을 복사하여 입력하세요. 설정 저장 후 테스트 전송으로 확인할 수
+                      있습니다.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

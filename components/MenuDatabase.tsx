@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Database,
   Search,
@@ -14,11 +14,12 @@ import {
   Wand2,
   Eraser,
   ArrowUpDown,
+  ChevronDown,
 } from 'lucide-react';
 import ImportDialog from './ImportDialog';
 import BulkEditDialog from './BulkEditDialog';
 import MenuDetailModal from './MenuDetailModal';
-import { MenuCategory, MenuItem, Season, TasteProfile } from '../types';
+import { MenuCategory, MenuItem, Season, TasteProfile, TargetType, TargetTagConfig } from '../types';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -77,6 +78,51 @@ const MenuDatabase: React.FC = () => {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkEdit, setShowBulkEdit] = useState(false);
+
+  // US-010: Open tag dropdowns per row
+  const [openTagDropdown, setOpenTagDropdown] = useState<string | null>(null);
+  // US-012: Open targetAgeGroup dropdowns per row
+  const [openAgeDropdown, setOpenAgeDropdown] = useState<string | null>(null);
+
+  // US-010: Available tags from localStorage zsub_target_tags
+  const availableTags = useMemo<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('zsub_target_tags');
+      if (!raw) return [];
+      const configs: TargetTagConfig[] = JSON.parse(raw);
+      const tagSet = new Set<string>();
+      for (const cfg of configs) {
+        for (const t of cfg.allowedTags) tagSet.add(t);
+      }
+      return Array.from(tagSet).sort();
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // US-010: One-time tag reset on mount
+  useEffect(() => {
+    const RESET_KEY = 'zsub_tags_reset_v2';
+    if (localStorage.getItem(RESET_KEY)) return;
+    if (menuItems.length === 0) return;
+    for (const item of menuItems) {
+      if (item.tags && item.tags.length > 0) {
+        contextUpdateItem(item.id, { ...item, tags: [] });
+      }
+    }
+    localStorage.setItem(RESET_KEY, '1');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuItems.length > 0]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = () => {
+      setOpenTagDropdown(null);
+      setOpenAgeDropdown(null);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
 
   // Stats
   const stats = useMemo(() => {
@@ -153,7 +199,7 @@ const MenuDatabase: React.FC = () => {
   const pageItems = sortedItems.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   // Reset page when filters change
-  useMemo(() => {
+  useEffect(() => {
     setPage(0);
   }, [filterCategory, filterUsage, searchTerm]);
 
@@ -423,7 +469,7 @@ const MenuDatabase: React.FC = () => {
     }
 
     const msg = [
-      `분석 결과:`,
+      `분析 결과:`,
       emptyNameItems.length > 0 ? `- 빈 이름 항목: ${emptyNameItems.length}개` : null,
       duplicateCount > 0 ? `- 중복 항목: ${duplicateCount}개` : null,
       `\n총 ${totalToRemove}개 항목을 정리하시겠습니까?`,
@@ -642,12 +688,14 @@ const MenuDatabase: React.FC = () => {
               <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-20">사용여부</th>
               <th className="px-3 py-2 text-center text-xs font-semibold text-stone-500 w-12">맵</th>
               <th className="px-3 py-2 text-left text-xs font-semibold text-stone-500 w-32">태그</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-stone-500 w-24">출시일</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-stone-500 w-36">대상 식단</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={13} className="text-center py-12 text-stone-400 text-sm">
+                <td colSpan={15} className="text-center py-12 text-stone-400 text-sm">
                   검색 결과가 없습니다.
                 </td>
               </tr>
@@ -763,16 +811,128 @@ const MenuDatabase: React.FC = () => {
                   <td className="px-3 py-2 text-center">
                     {item.isSpicy && <Flame className="w-3.5 h-3.5 text-red-400 mx-auto" />}
                   </td>
+
+                  {/* US-010: Tags column with toggle dropdown */}
                   <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
-                    <div className="flex flex-wrap gap-0.5">
-                      {item.tags.map((tag, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex px-1.5 py-0.5 text-[9px] bg-blue-50 text-blue-600 rounded font-medium"
+                    <div className="relative">
+                      <div
+                        className="flex flex-wrap gap-0.5 min-h-[20px] cursor-pointer"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setOpenTagDropdown(openTagDropdown === item.id ? null : item.id);
+                          setOpenAgeDropdown(null);
+                        }}
+                      >
+                        {item.tags && item.tags.length > 0 ? (
+                          item.tags.map((tag, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex px-1.5 py-0.5 text-[9px] bg-blue-50 text-blue-600 rounded font-medium"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-stone-300 hover:text-stone-400">
+                            <ChevronDown className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      {openTagDropdown === item.id && availableTags.length > 0 && (
+                        <div
+                          className="absolute left-0 top-full mt-1 z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-2 min-w-[140px] max-h-48 overflow-y-auto"
+                          onClick={e => e.stopPropagation()}
                         >
-                          {tag}
-                        </span>
-                      ))}
+                          {availableTags.map(tag => {
+                            const isSelected = (item.tags || []).includes(tag);
+                            return (
+                              <label
+                                key={tag}
+                                className="flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer hover:bg-stone-50 text-[11px] text-stone-700"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    const current = item.tags || [];
+                                    const next = isSelected ? current.filter(t => t !== tag) : [...current, tag];
+                                    contextUpdateItem(item.id, { ...item, tags: next });
+                                  }}
+                                  className="w-3 h-3 rounded border-stone-300 text-primary-600"
+                                />
+                                {tag}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* US-011: Launch date column */}
+                  <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="month"
+                      value={item.launchDate || ''}
+                      onChange={e => contextUpdateItem(item.id, { ...item, launchDate: e.target.value || undefined })}
+                      className="text-[10px] bg-transparent border border-transparent hover:border-stone-200 focus:border-stone-300 rounded px-1 py-0.5 w-full focus:outline-none text-stone-600"
+                    />
+                  </td>
+
+                  {/* US-012: Target age group column */}
+                  <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="relative">
+                      <div
+                        className="flex flex-wrap gap-0.5 min-h-[20px] cursor-pointer"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setOpenAgeDropdown(openAgeDropdown === item.id ? null : item.id);
+                          setOpenTagDropdown(null);
+                        }}
+                      >
+                        {item.targetAgeGroup && item.targetAgeGroup.length > 0 ? (
+                          item.targetAgeGroup.map((tg, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex px-1.5 py-0.5 text-[9px] bg-emerald-50 text-emerald-700 rounded font-medium leading-tight"
+                            >
+                              {tg}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-stone-300 hover:text-stone-400">
+                            전체 <ChevronDown className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      {openAgeDropdown === item.id && (
+                        <div
+                          className="absolute left-0 top-full mt-1 z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-2 min-w-[180px] max-h-56 overflow-y-auto"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {Object.values(TargetType).map(tg => {
+                            const isSelected = (item.targetAgeGroup || []).includes(tg);
+                            return (
+                              <label
+                                key={tg}
+                                className="flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer hover:bg-stone-50 text-[11px] text-stone-700"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    const current = item.targetAgeGroup || [];
+                                    const next = isSelected ? current.filter(t => t !== tg) : [...current, tg];
+                                    contextUpdateItem(item.id, { ...item, targetAgeGroup: next });
+                                  }}
+                                  className="w-3 h-3 rounded border-stone-300 text-primary-600"
+                                />
+                                {tg}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>

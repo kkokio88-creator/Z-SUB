@@ -29,6 +29,7 @@ import {
 } from '../services/reviewService';
 import { exportHistoricalPlanToCSV, exportHistoricalPlanToPDF } from '../services/historyReviewService';
 import type { HistoricalMealPlan, PlanReviewRecord, ReviewDepartment, ReviewComment } from '../types';
+import { sendGoogleChatNotification, getWebhookUrl } from '../services/googleChatService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -93,6 +94,16 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
           title: `${DEPARTMENT_LABELS[dept]} ${approved ? '승인' : '반려'}`,
           message: approved ? '검토가 완료되었습니다.' : '반려 사유가 기록되었습니다.',
         });
+        // US-029: Send Google Chat notification on status change
+        sendGoogleChatNotification({
+          title: `식단 검토 ${approved ? '승인' : '반려'}`,
+          body: approved
+            ? `${DEPARTMENT_LABELS[dept]}에서 식단을 승인했습니다.`
+            : `${DEPARTMENT_LABELS[dept]}에서 식단을 반려했습니다.\n사유: ${reviewComment || '(사유 없음)'}`,
+          reviewer: user?.displayName || '사용자',
+          date: plan.date,
+          status: approved ? '승인' : '반려',
+        });
         refreshData();
       }
     },
@@ -112,10 +123,30 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
     const result = requestReReviewAll(reviewKey);
     if (result) {
       setReview({ ...result });
-      addToast({ type: 'info', title: '재검토 요청', message: '모든 부서의 검토 상태가 초기화되었습니다.' });
+      // US-028: Send Google Chat notification on re-review request
+      if (getWebhookUrl()) {
+        sendGoogleChatNotification({
+          title: '재검토 요청',
+          body: `${user?.displayName || '사용자'}님이 식단 재검토를 요청했습니다.`,
+          reviewer: user?.displayName || '사용자',
+          date: plan.date,
+          status: '재검토 요청',
+        });
+        addToast({
+          type: 'info',
+          title: '재검토 요청',
+          message: '모든 부서의 검토 상태가 초기화되고 알림이 전송되었습니다.',
+        });
+      } else {
+        addToast({
+          type: 'warning',
+          title: '재검토 요청',
+          message: '검토 상태가 초기화되었습니다. 알림 설정이 필요합니다.',
+        });
+      }
       refreshData();
     }
-  }, [reviewKey, addToast, refreshData]);
+  }, [reviewKey, addToast, refreshData, user, plan.date]);
 
   const handleAddComment = useCallback(() => {
     if (!newComment.trim()) return;

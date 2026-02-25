@@ -1,27 +1,13 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { TargetType, MonthlyMealPlan, MenuItem, MenuCategory, ExpertReview, DuplicationFilterLevel } from '../types';
+import { TargetType, MonthlyMealPlan, MenuItem, MenuCategory, DuplicationFilterLevel } from '../types';
 import { generateMonthlyMealPlan, getSwapCandidates } from '../services/engine';
-import { getExpertReview } from '../services/geminiService';
-import {
-  Sparkles,
-  RefreshCw,
-  BrainCircuit,
-  X,
-  AlertTriangle,
-  Flame,
-  Layers,
-  History,
-  Upload,
-  Search,
-  Filter,
-} from 'lucide-react';
+import { Sparkles, RefreshCw, X, AlertTriangle, Flame, Layers, History, Save, Search, Filter } from 'lucide-react';
 import { MAJOR_INGREDIENTS, TARGET_CONFIGS, MEAL_PLAN_INTEGRATION_GROUPS } from '../constants';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { addAuditEntry } from '../services/auditService';
 import { useAuth } from '../context/AuthContext';
-import { saveTempSnapshot, type TempSnapshot } from '../services/historyService';
-import PlanHistory from './PlanHistory';
+import { saveTempSnapshot, loadSnapshot, type TempSnapshot } from '../services/historyService';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,9 +60,9 @@ const DEFAULT_INGREDIENT_COLOR = {
 
 const MealPlanner: React.FC = () => {
   const { menuItems } = useMenu();
-  const { addToast, confirm } = useToast();
+  const { addToast } = useToast();
   const { user } = useAuth();
-  const { registerPlans, plans: historicalPlans } = useHistoricalPlans();
+  const { plans: historicalPlans } = useHistoricalPlans();
   const [target, setTarget] = useState<TargetType>(TargetType.KIDS);
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     const now = new Date();
@@ -95,11 +81,6 @@ const MealPlanner: React.FC = () => {
   const [plans, setPlans] = useState<{ A: MonthlyMealPlan | null; B: MonthlyMealPlan | null }>({ A: null, B: null });
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Expert Review State
-  const [reviewResult, setReviewResult] = useState<ExpertReview | null>(null);
-  const [, setIsReviewing] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-
   // Swap Modal State
   const [swapTarget, setSwapTarget] = useState<{ cycle: 'A' | 'B'; weekIndex: number; item: MenuItem } | null>(null);
   const [swapCandidates, setSwapCandidates] = useState<MenuItem[]>([]);
@@ -110,8 +91,36 @@ const MealPlanner: React.FC = () => {
   // Ingredient highlight state
   const [highlightedIngredient, setHighlightedIngredient] = useState<string | null>(null);
 
-  // History Modal State
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  // US-020: 든든 전용 메뉴 선정 상태 (key: "cycle-weekIndex-itemId")
+  const [ddeonddeonItems, setDdeonddeonItems] = useState<Set<string>>(new Set());
+  // US-020: 메뉴 클릭 시 든든 옵션 선택 표시용
+  const [ddeonddeonPrompt, setDdeonddeonPrompt] = useState<{
+    cycle: 'A' | 'B';
+    weekIndex: number;
+    item: MenuItem;
+  } | null>(null);
+
+  // 현재 타겟이 통합 식단인지 확인
+  const integrationGroup = useMemo(() => {
+    return MEAL_PLAN_INTEGRATION_GROUPS.find(g => g.baseTarget === target || g.plusTarget === target);
+  }, [target]);
+
+  // US-021: 든든 선정 진행률 카운터
+  const ddeonddeonCounts = useMemo(() => {
+    if (!integrationGroup || !('plusExtraCount' in integrationGroup)) return null;
+    const requiredCount = (integrationGroup as { plusExtraCount: number }).plusExtraCount;
+    const counts: Record<string, { selected: number; required: number }> = {};
+    (['A', 'B'] as const).forEach(cycle => {
+      const plan = plans[cycle];
+      if (!plan) return;
+      plan.weeks.forEach(week => {
+        const key = `${cycle}-${week.weekIndex}`;
+        const selected = week.items.filter(item => ddeonddeonItems.has(`${cycle}-${week.weekIndex}-${item.id}`)).length;
+        counts[key] = { selected, required: requiredCount };
+      });
+    });
+    return counts;
+  }, [integrationGroup, plans, ddeonddeonItems]);
 
   // 반복 메뉴(셰이크 등) 처리 방식:
   // REPEAT_MENU_TARGETS(아이/든든아이)의 반복 메뉴는 parent-child 관계를 통해 처리됨.
@@ -119,7 +128,6 @@ const MealPlanner: React.FC = () => {
   // createSubsetPlan으로 서브셋을 추출하므로, 반복 메뉴가 자동으로 상속됨.
   const handleGenerate = () => {
     setIsGenerating(true);
-    setReviewResult(null);
     setPlans({ A: null, B: null });
 
     setTimeout(() => {
@@ -256,14 +264,15 @@ const MealPlanner: React.FC = () => {
     }, 800);
   };
 
-  const handleOpenHistory = () => {
-    setShowHistoryModal(true);
-  };
-
-  const handleRestoreVersion = (version: TempSnapshot) => {
-    setPlans({ A: version.planA, B: version.planB });
-    setTarget(version.target as TargetType);
-    setShowHistoryModal(false);
+  const handleLoadSnapshot = () => {
+    const snapshot = loadSnapshot();
+    if (snapshot) {
+      setPlans({ A: snapshot.planA, B: snapshot.planB });
+      setTarget(snapshot.target as TargetType);
+      addToast({ type: 'success', title: '불러오기 완료', message: `${snapshot.target} 식단을 불러왔습니다.` });
+    } else {
+      addToast({ type: 'warning', title: '저장된 식단 없음', message: '임시 저장된 식단이 없습니다.' });
+    }
   };
 
   const handleSaveVersion = () => {
@@ -300,35 +309,6 @@ const MealPlanner: React.FC = () => {
       entityType: 'meal_plan',
       entityId: plans.A.id,
       entityName: `${monthLabel} ${target}`,
-    });
-  };
-
-  const handleExpertReview = async (plan: MonthlyMealPlan) => {
-    setIsReviewing(true);
-    const review = await getExpertReview(plan);
-    setReviewResult(review);
-    setIsReviewing(false);
-    setShowReviewModal(true);
-  };
-
-  // 히스토리에 등록
-  const handleRegisterToHistory = async () => {
-    if (!plans.A || !plans.B) return;
-
-    const confirmed = await confirm({
-      title: '히스토리에 등록',
-      message: `${monthLabel} ${target} 식단(화수목+금토월)을 히스토리에 등록하시겠습니까?\n등록 후 히스토리 탭에서 검토를 진행할 수 있습니다.`,
-      confirmLabel: '등록',
-      variant: 'warning',
-    });
-    if (!confirmed) return;
-
-    // 로컬 저장 (즉시 반영)
-    const count = registerPlans(plans.A, plans.B);
-    addToast({
-      type: 'success',
-      title: '히스토리 등록 완료',
-      message: `${count}건의 식단이 등록되었습니다. 식단 히스토리 탭에서 확인하세요.`,
     });
   };
 
@@ -431,6 +411,11 @@ const MealPlanner: React.FC = () => {
   // 메뉴 클릭 시 직접 대체메뉴 모달 열기
   const handleMenuItemClick = useCallback(
     (cycle: 'A' | 'B', weekIndex: number, item: MenuItem) => {
+      // US-020: 통합 식단에서는 든든 옵션 프롬프트 먼저 표시
+      if (integrationGroup) {
+        setDdeonddeonPrompt({ cycle, weekIndex, item });
+        return;
+      }
       const plan = plans[cycle];
       if (!plan) return;
       const activeMenu = menuItems.filter(m => !m.isUnused);
@@ -442,8 +427,41 @@ const MealPlanner: React.FC = () => {
       setSwapSearchQuery('');
       setSwapCycleFilter('all');
     },
-    [plans, menuItems, getExcludedForSwap]
+    [plans, menuItems, getExcludedForSwap, integrationGroup]
   );
+
+  // US-020: 든든 옵션 선정 핸들러
+  const handleMarkDdeonddeon = useCallback(() => {
+    if (!ddeonddeonPrompt) return;
+    const key = `${ddeonddeonPrompt.cycle}-${ddeonddeonPrompt.weekIndex}-${ddeonddeonPrompt.item.id}`;
+    setDdeonddeonItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+    setDdeonddeonPrompt(null);
+  }, [ddeonddeonPrompt]);
+
+  // US-020: 다른 메뉴로 대체 핸들러
+  const handleSwapFromPrompt = useCallback(() => {
+    if (!ddeonddeonPrompt) return;
+    const { cycle, weekIndex, item } = ddeonddeonPrompt;
+    const plan = plans[cycle];
+    if (!plan) return;
+    const activeMenu = menuItems.filter(m => !m.isUnused);
+    const excluded = getExcludedForSwap(cycle, '60일');
+    const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일');
+    setSwapTarget({ cycle, weekIndex, item });
+    setSwapCandidates(candidates);
+    setSwapFilterLevel('60일');
+    setSwapSearchQuery('');
+    setSwapCycleFilter('all');
+    setDdeonddeonPrompt(null);
+  }, [ddeonddeonPrompt, plans, menuItems, getExcludedForSwap]);
 
   // 필터 레벨 변경 시 후보 재계산
   const handleSwapFilterChange = useCallback(
@@ -568,14 +586,6 @@ const MealPlanner: React.FC = () => {
             </span>
           )}
         </div>
-        <Button
-          variant="outline"
-          onClick={() => handleExpertReview(plan)}
-          size="sm"
-          className="text-xs flex items-center gap-1 text-stone-600 hover:text-purple-600 font-bold px-2 py-1"
-        >
-          <BrainCircuit className="w-3 h-3" /> AI 검수
-        </Button>
       </div>
 
       {/* 식재료 범례 */}
@@ -600,7 +610,16 @@ const MealPlanner: React.FC = () => {
           return (
             <div key={week.weekIndex} className="p-3 flex flex-col group h-full">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-sm font-bold text-stone-800">{week.weekIndex}주차</span>
+                <div>
+                  <span className="text-sm font-bold text-stone-800">{week.weekIndex}주차</span>
+                  {/* US-021: 든든 선정 진행률 */}
+                  {ddeonddeonCounts && ddeonddeonCounts[`${cycleKey}-${week.weekIndex}`] && (
+                    <div className="text-[10px] text-indigo-600 mt-0.5">
+                      든든 {ddeonddeonCounts[`${cycleKey}-${week.weekIndex}`].selected}/
+                      {ddeonddeonCounts[`${cycleKey}-${week.weekIndex}`].required}개 선택
+                    </div>
+                  )}
+                </div>
                 <div className="text-right">
                   <div className={`text-xs font-bold ${isOverBudget ? 'text-red-600' : 'text-stone-600'}`}>
                     {week.totalCost.toLocaleString()}원
@@ -740,6 +759,11 @@ const MealPlanner: React.FC = () => {
                             반
                           </span>
                         )}
+                        {ddeonddeonItems.has(`${cycleKey}-${week.weekIndex}-${item.id}`) && (
+                          <span className="px-1 py-0.5 text-[8px] font-bold text-indigo-600 bg-indigo-50 rounded border border-indigo-200 flex-shrink-0">
+                            든든
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -827,11 +851,11 @@ const MealPlanner: React.FC = () => {
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              onClick={handleOpenHistory}
+              onClick={handleLoadSnapshot}
               className="flex items-center gap-2 px-4 py-3 rounded-xl font-bold shadow-sm"
             >
               <History className="w-5 h-5 text-stone-500" />
-              히스토리
+              조회
             </Button>
             <Button
               onClick={handleGenerate}
@@ -841,22 +865,18 @@ const MealPlanner: React.FC = () => {
               {isGenerating ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
               {isGenerating ? '식단 생성 중...' : '통합 식단(화수목/금토월) 자동 생성'}
             </Button>
+            {plans.A && (
+              <Button
+                variant="outline"
+                onClick={handleSaveVersion}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl font-bold shadow-sm"
+              >
+                <Save className="w-5 h-5 text-stone-500" />
+                저장
+              </Button>
+            )}
           </div>
         </div>
-
-        {/* Bottom Row: Integration Actions (Visible only when plans exist) */}
-        {plans.A && (
-          <div className="border-t border-stone-100 pt-3 flex justify-end items-center gap-3">
-            {/* 히스토리 등록 Button */}
-            <Button
-              onClick={handleRegisterToHistory}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm"
-            >
-              <Upload className="w-3 h-3" />
-              히스토리에 등록
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* 2. Main Workspace */}
@@ -1167,115 +1187,59 @@ const MealPlanner: React.FC = () => {
           );
         })()}
 
-      {/* 4. Expert Review Modal */}
-      {showReviewModal && reviewResult && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white">
-              <h3 className="text-xl font-bold text-purple-900 flex items-center gap-2">
-                <BrainCircuit className="w-6 h-6" />
-                AI 전문가 검수 리포트
-              </h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowReviewModal(false)} className="p-2 rounded-full">
-                <X className="w-6 h-6 text-stone-500" />
-              </Button>
+      {/* US-020: 든든 옵션 선택 프롬프트 */}
+      {ddeonddeonPrompt && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-xl w-72 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-stone-100">
+              <p className="text-sm font-bold text-stone-800 truncate">{ddeonddeonPrompt.item.name}</p>
+              <p className="text-[11px] text-stone-400">
+                {integrationGroup?.groupLabel || '통합'} 식단 - {ddeonddeonPrompt.cycle === 'A' ? '화수목' : '금토월'}{' '}
+                {ddeonddeonPrompt.weekIndex}주차
+              </p>
             </div>
-
-            <div className="p-8 overflow-y-auto space-y-8">
-              {/* Score Section */}
-              <div className="flex items-center gap-6 p-6 bg-stone-50 rounded-2xl border border-stone-100">
-                <div className="relative w-24 h-24 flex items-center justify-center">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r="40"
-                      stroke="currentColor"
-                      strokeWidth="8"
-                      fill="transparent"
-                      className="text-stone-200"
-                    />
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r="40"
-                      stroke="currentColor"
-                      strokeWidth="8"
-                      fill="transparent"
-                      className={`${reviewResult.overallScore > 80 ? 'text-green-500' : 'text-yellow-500'}`}
-                      strokeDasharray={251.2}
-                      strokeDashoffset={251.2 - (251.2 * reviewResult.overallScore) / 100}
-                    />
-                  </svg>
-                  <span className="absolute text-2xl font-bold text-stone-800">{reviewResult.overallScore}</span>
-                </div>
+            <div className="p-2 space-y-1">
+              <button
+                onClick={handleMarkDdeonddeon}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-indigo-50 text-left transition-colors"
+              >
+                <span className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                  든
+                </span>
                 <div>
-                  <h4 className="text-lg font-bold text-stone-900">종합 평가 점수</h4>
-                  <p className="text-stone-600 text-sm mt-1">
-                    {reviewResult.overallScore > 80
-                      ? '아주 훌륭한 식단입니다! 영양과 원가 균형이 잘 잡혀있습니다.'
-                      : '몇 가지 개선이 필요합니다. 아래 전문가 의견을 참고하세요.'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Expert Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl border border-green-100 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-4 text-2xl">
-                    🥗
+                  <div className="text-sm font-medium text-stone-800">
+                    {ddeonddeonItems.has(
+                      `${ddeonddeonPrompt.cycle}-${ddeonddeonPrompt.weekIndex}-${ddeonddeonPrompt.item.id}`
+                    )
+                      ? '든든 선정 해제'
+                      : '든든 옵션으로 선정'}
                   </div>
-                  <h4 className="font-bold text-stone-900 mb-2">영양사 분석</h4>
-                  <p className="text-sm text-stone-600 leading-relaxed">{reviewResult.nutritionistComment}</p>
+                  <div className="text-[11px] text-stone-400">든든 전용 메뉴로 지정합니다</div>
                 </div>
-                <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-2xl">
-                    🏭
-                  </div>
-                  <h4 className="font-bold text-stone-900 mb-2">공정 효율성</h4>
-                  <p className="text-sm text-stone-600 leading-relaxed">{reviewResult.processExpertComment}</p>
+              </button>
+              <button
+                onClick={handleSwapFromPrompt}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-orange-50 text-left transition-colors"
+              >
+                <span className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm">
+                  ↺
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-stone-800">다른 메뉴로 대체</div>
+                  <div className="text-[11px] text-stone-400">교체 가능한 메뉴 목록을 봅니다</div>
                 </div>
-                <div className="bg-white p-6 rounded-xl border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mb-4 text-2xl">
-                    💰
-                  </div>
-                  <h4 className="font-bold text-stone-900 mb-2">원가/구매 분석</h4>
-                  <p className="text-sm text-stone-600 leading-relaxed">{reviewResult.costExpertComment}</p>
-                </div>
-              </div>
-
-              {/* Warnings */}
-              {reviewResult.flaggedItemIds && reviewResult.flaggedItemIds.length > 0 && (
-                <div className="bg-red-50 p-5 rounded-xl border border-red-100 flex gap-4">
-                  <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-red-800 mb-1">주의가 필요한 메뉴</h4>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {reviewResult.flaggedItemIds.map((id: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="bg-white border border-red-200 text-red-600 px-2.5 py-1 rounded-md text-xs font-bold"
-                        >
-                          {id}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+              </button>
+            </div>
+            <div className="px-3 pb-2">
+              <button
+                onClick={() => setDdeonddeonPrompt(null)}
+                className="w-full text-xs text-stone-400 hover:text-stone-600 py-1.5"
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* 5. History Modal (PlanHistory component) */}
-      {showHistoryModal && (
-        <PlanHistory
-          onRestore={handleRestoreVersion}
-          onSave={handleSaveVersion}
-          hasPlan={!!(plans.A && plans.B)}
-          onClose={() => setShowHistoryModal(false)}
-        />
       )}
     </div>
   );

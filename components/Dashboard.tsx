@@ -59,6 +59,31 @@ const TARGET_LABELS: Record<string, string> = {
 
 const CYCLES_8WEEKS = 16; // 8주 × 2주기(화수목+금토월)
 
+// Custom YAxis tick that wraps long menu names across multiple SVG lines
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const WrappedYAxisTick = ({ x, y, payload }: any) => {
+  const maxCharsPerLine = 10;
+  const name: string = String(payload?.value ?? '');
+  const lines: string[] = [];
+  let remaining = name;
+  while (remaining.length > maxCharsPerLine) {
+    lines.push(remaining.slice(0, maxCharsPerLine));
+    remaining = remaining.slice(maxCharsPerLine);
+  }
+  if (remaining.length > 0) lines.push(remaining);
+  const lineHeight = 14;
+  const offsetY = -((lines.length - 1) * lineHeight) / 2;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {lines.map((line, i) => (
+        <text key={i} x={0} y={offsetY + i * lineHeight} textAnchor="end" fill="#57534e" fontSize={11}>
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BubbleTooltip = ({ active, payload }: any) => {
   if (!active || !payload || payload.length === 0) return null;
@@ -595,12 +620,12 @@ const Dashboard: React.FC = () => {
               {historyLoading ? '히스토리 로딩 중...' : '최근 30일 식단 데이터가 없습니다'}
             </div>
           ) : (
-            <div className="h-[500px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={duplicationData} layout="vertical" margin={{ top: 5, right: 20, left: 100, bottom: 5 }}>
+            <div className="min-h-[600px] overflow-y-auto">
+              <ResponsiveContainer width="100%" height={620}>
+                <BarChart data={duplicationData} layout="vertical" margin={{ top: 5, right: 20, left: 130, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
                   <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
+                  <YAxis type="category" dataKey="name" tick={<WrappedYAxisTick />} width={125} />
                   <Tooltip />
                   <Bar dataKey="count" name="사용 횟수" fill="#f59e0b" radius={[0, 4, 4, 0]}>
                     {duplicationData.map((entry, index) => (
