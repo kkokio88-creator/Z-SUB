@@ -7,6 +7,7 @@ import {
   Leaf,
   Database,
   History,
+  Users,
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react';
@@ -107,6 +108,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
             active={activeTab === 'meal-history'}
             collapsed={collapsed}
             onClick={() => onTabChange('meal-history')}
+          />
+          <SidebarItem
+            icon={Users}
+            label="구독자 CRM"
+            active={activeTab === 'subscribers'}
+            collapsed={collapsed}
+            onClick={() => onTabChange('subscribers')}
           />
 
           {!collapsed && (

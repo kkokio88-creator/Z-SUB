@@ -15,6 +15,7 @@ const MealPlanner = lazy(() => import('./components/MealPlanner'));
 const MasterDataManagement = lazy(() => import('./components/MasterDataManagement'));
 const SystemSettings = lazy(() => import('./components/SystemSettings'));
 const MealPlanHistory = lazy(() => import('./components/MealPlanHistory'));
+const SubscriberManagement = lazy(() => import('./components/SubscriberManagement'));
 
 const TabFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -40,6 +41,8 @@ const App: React.FC = () => {
         return <SystemSettings />;
       case 'meal-history':
         return <MealPlanHistory />;
+      case 'subscribers':
+        return <SubscriberManagement />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-stone-400">
