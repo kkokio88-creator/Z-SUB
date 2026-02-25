@@ -107,7 +107,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
         refreshData();
       }
     },
-    [reviewKey, user, reviewComment, addToast, refreshData]
+    [reviewKey, user, reviewComment, addToast, refreshData, plan.date]
   );
 
   const handleFinalize = useCallback(() => {

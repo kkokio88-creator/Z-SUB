@@ -3,7 +3,17 @@ import { BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 import { useMenu } from '../context/MenuContext';
 import { MAJOR_INGREDIENTS } from '../constants';
 import { MenuCategory, TasteProfile } from '../types';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart, Cell } from 'recharts';
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Bar,
+  BarChart,
+  Cell,
+  type BarRectangleItem,
+} from 'recharts';
 
 const TASTE_LABELS: Record<string, string> = {
   [TasteProfile.GANJANG]: '간장',
@@ -126,8 +136,8 @@ const DashboardMenuAnalysis: React.FC = () => {
                     name="메뉴 수"
                     radius={[0, 4, 4, 0]}
                     cursor="pointer"
-                    onClick={(data: any) => {
-                      const key: string = data?.key ?? '';
+                    onClick={(data: BarRectangleItem) => {
+                      const key: string = data?.key != null ? String(data.key) : '';
                       if (key) setExpandedIngredient(prev => (prev === key ? null : key));
                     }}
                   >

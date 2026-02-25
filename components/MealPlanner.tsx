@@ -7,7 +7,7 @@ import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
 import { addAuditEntry } from '../services/auditService';
 import { useAuth } from '../context/AuthContext';
-import { saveTempSnapshot, loadSnapshot, type TempSnapshot } from '../services/historyService';
+import { saveTempSnapshot, loadSnapshot } from '../services/historyService';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

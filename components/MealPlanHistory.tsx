@@ -302,7 +302,6 @@ const MenuItemRow: React.FC<{
   onAction,
 }) => {
   const ingredient = detectIngredient(item.name);
-  const colors = INGREDIENT_COLORS[ingredient];
   const { cleanName, quantity } = parseMenuItem(item.name);
   const hasUnresolvedComment = !isEdited && recentComments?.some(c => c.status === 'comment' || c.status === 'issue');
   const isHighlighted = highlightedIngredient != null && ingredient === highlightedIngredient;
@@ -530,7 +529,7 @@ const SwapModal: React.FC<{
         return true;
       })
       .slice(0, 50);
-  }, [search, ingredientFilter]);
+  }, [search, ingredientFilter, menuItems]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -842,14 +841,14 @@ const MealPlanHistory: React.FC = () => {
   const allMonthPlans = useMemo(() => {
     const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
     return HISTORICAL_MEAL_PLANS.filter(p => p.date.startsWith(prefix));
-  }, [viewYear, viewMonth]);
+  }, [viewYear, viewMonth, HISTORICAL_MEAL_PLANS]);
 
   useEffect(() => {
     for (const p of allMonthPlans) {
       const key = makeReviewKey(p.date, p.cycleType);
       if (!commentCache[key]) loadCommentsForPlan(key);
     }
-  }, [allMonthPlans]);
+  }, [allMonthPlans, commentCache, loadCommentsForPlan]);
 
   // 필터
   const filterCounts = useMemo(() => {
@@ -1088,28 +1087,6 @@ const MealPlanHistory: React.FC = () => {
     ];
   }, []);
 
-  // 일일 생산 한도 초과 경고
-  const productionWarnings = useMemo(() => {
-    const warnings: { date: string; cycleType: string; category: string; total: number; limit: number }[] = [];
-    for (const plan of monthPlans) {
-      const key = `${plan.date}-${plan.cycleType}`;
-      const groups = productionSummary.get(key) || [];
-      for (const g of groups) {
-        const limitConfig = productionLimits.find(l => l.enabled && l.category === g.process);
-        if (limitConfig && g.totalQty > limitConfig.dailyLimit) {
-          warnings.push({
-            date: plan.date,
-            cycleType: plan.cycleType,
-            category: g.process,
-            total: g.totalQty,
-            limit: limitConfig.dailyLimit,
-          });
-        }
-      }
-    }
-    return warnings;
-  }, [monthPlans, productionSummary, productionLimits]);
-
   const exportToHistoryCSV = useCallback(() => {
     if (monthPlans.length === 0) return;
     let csv: string;
@@ -1177,7 +1154,7 @@ const MealPlanHistory: React.FC = () => {
     a.download = `식단히스토리_${viewYear}년${viewMonth + 1}월_${suffix}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [monthPlans, productionSummary, consolidatedProduction, columns, viewYear, viewMonth, viewMode]);
+  }, [monthPlans, consolidatedProduction, columns, viewYear, viewMonth, viewMode]);
 
   const exportToHistoryPDF = useCallback(async () => {
     if (!contentRef.current) return;
@@ -1302,7 +1279,7 @@ const MealPlanHistory: React.FC = () => {
 
       setSwapTarget(null);
     },
-    [swapTarget, loadCommentsForPlan, commentCache, user, refreshReviewStatus]
+    [swapTarget, loadCommentsForPlan, commentCache, user, refreshReviewStatus, editedPlans]
   );
 
   // 액션 핸들러
