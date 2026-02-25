@@ -60,8 +60,8 @@ test.describe('식단 생성', () => {
     await page.goto('/');
     await page.click('text=통합 식단(화수목/금토월) 자동 생성');
     // 생성 완료 대기
-    await expect(page.locator('text=1주차')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=2주차')).toBeVisible();
+    await expect(page.locator('text=1주차').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=2주차').first()).toBeVisible();
   });
 });
 
@@ -86,7 +86,7 @@ test.describe('대시보드', () => {
   test('KPI 카드 표시', async ({ page }) => {
     await page.goto('/');
     await page.click('text=통합 대시보드');
-    await expect(page.locator('text=활성 메뉴')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('활성 메뉴', { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
   test('메뉴 분석 섹션 표시', async ({ page }) => {

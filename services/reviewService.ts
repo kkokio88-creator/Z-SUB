@@ -1,4 +1,4 @@
-import type { PlanReviewRecord, PlanStatus, ReviewDepartment, DepartmentReview, ReviewComment } from '../types';
+import type { PlanReviewRecord, ReviewDepartment, ReviewComment } from '../types';
 
 const STORAGE_KEY = 'zsub_plan_reviews';
 const COMMENTS_STORAGE_KEY = 'zsub_review_comments';

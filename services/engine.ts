@@ -524,7 +524,7 @@ export const getSwapCandidates = (
   menuDB: MenuItem[],
   excludedNames?: Set<string>,
   filterLevel?: '60일' | '30일' | '전체',
-  nextMonthMenuNames?: Set<string>
+  _nextMonthMenuNames?: Set<string>
 ): MenuItem[] => {
   const allUsedIds = new Set<string>();
   currentPlan.weeks.forEach(w => w.items.forEach(i => allUsedIds.add(i.id)));
