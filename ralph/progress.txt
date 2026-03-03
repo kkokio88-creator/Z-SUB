@@ -71,3 +71,11 @@
 - 변경 파일: services/autoClassifyService.ts
 - 학습: SOUP을 먼저 체크하되 exclusion으로 예외 처리하는 것이 안전. MAIN 먼저 체크하면 갈비탕이 갈비→MAIN으로 오분류됨
 ---
+
+## 2026-03-03 - US-007: P7-a 히스토리 뷰 레이아웃 정비
+- IngredientView: 행번호(#) 열 추가, sticky left 3열(#, 날짜, 주기), 공정 배지(냉장/반조리/냉동) 추가
+- DistributionView: 메뉴명 옆 공정 배지 추가 (현장 작업자가 공정 구분 가능)
+- ProductionView: 공정별 정렬(PROCESS_ORDER 기준) + 각 그룹 소계 행 추가
+- 변경 파일: HistoryIngredientView.tsx, HistoryDistributionView.tsx, MealPlanHistory.tsx
+- 학습: PROCESS_COLORS 객체에 '반조리' 색상은 있지만 PROCESS_ORDER에는 없었음. 공정 배지는 이름 접미사(_냉장, _반조리, _냉동) 기반 감지
+---

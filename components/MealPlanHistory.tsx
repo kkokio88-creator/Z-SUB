@@ -1098,7 +1098,15 @@ const MealPlanHistory: React.FC = () => {
         }
       }
     }
-    return [...result.values()].sort((a, b) => b.totalQty - a.totalQty);
+    // 공정별 그룹 정렬 후 각 그룹 내 수량 내림차순
+    const items = [...result.values()];
+    const processOrder = new Map(PROCESS_ORDER.map((p, i) => [p, i]));
+    return items.sort((a, b) => {
+      const pa = processOrder.get(a.process) ?? 999;
+      const pb = processOrder.get(b.process) ?? 999;
+      if (pa !== pb) return pa - pb;
+      return b.totalQty - a.totalQty;
+    });
   }, [monthPlans, shipmentConfig, menuLookup]);
 
   // 생산 한도 설정 로드
@@ -1562,39 +1570,82 @@ const MealPlanHistory: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {consolidatedProduction.map((item, idx) => {
-                    const pc = PROCESS_COLORS[item.process] || PROCESS_COLORS['기타'];
-                    const limitConfig = productionLimits.find(l => l.enabled && l.category === item.process);
-                    const isOverLimit = limitConfig && item.totalQty > limitConfig.dailyLimit;
-                    return (
-                      <tr
-                        key={idx}
-                        className={`border-b border-stone-100 hover:bg-stone-50 ${isOverLimit ? 'bg-red-50' : ''}`}
-                      >
-                        <td className="px-4 py-2.5 font-medium text-stone-800">{item.menuName}</td>
-                        <td className="px-4 py-2.5 text-stone-500 font-mono text-xs">{item.code || '-'}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${pc.badge}`}>
-                            {item.process}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          <span className={`font-bold tabular-nums ${isOverLimit ? 'text-red-600' : 'text-stone-800'}`}>
-                            {item.totalQty.toLocaleString()}
-                          </span>
-                          {isOverLimit && limitConfig && (
-                            <span
-                              className="ml-2 inline-flex items-center gap-1 text-[10px] text-red-500"
-                              title={`${item.process} 한도 초과 (${item.totalQty}/${limitConfig.dailyLimit})`}
-                            >
-                              <AlertTriangle className="w-3 h-3" />
-                              한도: {limitConfig.dailyLimit}
+                  {(() => {
+                    let lastProcess = '';
+                    const rows: React.ReactNode[] = [];
+                    consolidatedProduction.forEach((item, idx) => {
+                      // 공정 그룹 헤더 (새 공정 시작 시)
+                      if (item.process !== lastProcess) {
+                        if (lastProcess) {
+                          // 이전 그룹 소계
+                          const groupItems = consolidatedProduction.filter(i => i.process === lastProcess);
+                          const groupTotal = groupItems.reduce((s, i) => s + i.totalQty, 0);
+                          const gpc = PROCESS_COLORS[lastProcess] || PROCESS_COLORS['기타'];
+                          rows.push(
+                            <tr key={`sub-${lastProcess}`} className={`${gpc.bg} border-b border-stone-200`}>
+                              <td colSpan={3} className="px-4 py-1.5 text-[11px] font-bold text-stone-500">
+                                {lastProcess} 소계 ({groupItems.length}건)
+                              </td>
+                              <td className="px-4 py-1.5 text-right text-xs font-bold text-stone-700 tabular-nums">
+                                {groupTotal.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        }
+                        lastProcess = item.process;
+                      }
+                      const pc = PROCESS_COLORS[item.process] || PROCESS_COLORS['기타'];
+                      const limitConfig = productionLimits.find(l => l.enabled && l.category === item.process);
+                      const isOverLimit = limitConfig && item.totalQty > limitConfig.dailyLimit;
+                      rows.push(
+                        <tr
+                          key={idx}
+                          className={`border-b border-stone-100 hover:bg-stone-50 ${isOverLimit ? 'bg-red-50' : ''}`}
+                        >
+                          <td className="px-4 py-2.5 font-medium text-stone-800">{item.menuName}</td>
+                          <td className="px-4 py-2.5 text-stone-500 font-mono text-xs">{item.code || '-'}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${pc.badge}`}>
+                              {item.process}
                             </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span
+                              className={`font-bold tabular-nums ${isOverLimit ? 'text-red-600' : 'text-stone-800'}`}
+                            >
+                              {item.totalQty.toLocaleString()}
+                            </span>
+                            {isOverLimit && limitConfig && (
+                              <span
+                                className="ml-2 inline-flex items-center gap-1 text-[10px] text-red-500"
+                                title={`${item.process} 한도 초과 (${item.totalQty}/${limitConfig.dailyLimit})`}
+                              >
+                                <AlertTriangle className="w-3 h-3" />
+                                한도: {limitConfig.dailyLimit}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    });
+                    // 마지막 그룹 소계
+                    if (lastProcess) {
+                      const groupItems = consolidatedProduction.filter(i => i.process === lastProcess);
+                      const groupTotal = groupItems.reduce((s, i) => s + i.totalQty, 0);
+                      const gpc = PROCESS_COLORS[lastProcess] || PROCESS_COLORS['기타'];
+                      rows.push(
+                        <tr key={`sub-${lastProcess}`} className={`${gpc.bg} border-b border-stone-200`}>
+                          <td colSpan={3} className="px-4 py-1.5 text-[11px] font-bold text-stone-500">
+                            {lastProcess} 소계 ({groupItems.length}건)
+                          </td>
+                          <td className="px-4 py-1.5 text-right text-xs font-bold text-stone-700 tabular-nums">
+                            {groupTotal.toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return rows;
+                  })()}
                 </tbody>
                 <tfoot>
                   <tr className="bg-stone-50 border-t border-stone-200">

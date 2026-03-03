@@ -115,8 +115,8 @@
         "npx vite build passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "MealPlanHistory.tsx의 viewMode별 렌더링 로직. 기존 엑셀 시트 구조를 참조하여 열 순서, 그룹핑, 소계 등을 맞춤. 레이아웃 정비가 CSV/PDF 내보내기의 선행 조건."
+      "passes": true,
+      "notes": "DONE: IngredientView에 행번호+sticky열+공정배지 추가. DistributionView에 공정배지(냉장/반조리/냉동) 추가. ProductionView에 공정별 그룹 정렬+소계행 추가."
     },
     {
       "id": "US-008",

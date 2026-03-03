@@ -92,11 +92,33 @@ const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) =>
                         );
                       const validItems = target.items.filter(i => i.name && i.name.trim());
                       const item = validItems[rowIdx];
+                      const proc = item
+                        ? item.name.includes('_반조리')
+                          ? '반조리'
+                          : item.name.includes('_냉장')
+                            ? '냉장'
+                            : item.name.includes('_냉동')
+                              ? '냉동'
+                              : null
+                        : null;
                       return (
                         <td key={t} className="px-2 py-1.5 text-center border-r border-stone-100 text-sm">
                           {item ? (
                             <span className="text-stone-800">
                               {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
+                              {proc && (
+                                <span
+                                  className={`ml-1 text-[8px] px-1 rounded font-bold ${
+                                    proc === '냉장'
+                                      ? 'bg-cyan-100 text-cyan-600'
+                                      : proc === '반조리'
+                                        ? 'bg-rose-100 text-rose-600'
+                                        : 'bg-indigo-100 text-indigo-600'
+                                  }`}
+                                >
+                                  {proc}
+                                </span>
+                              )}
                             </span>
                           ) : (
                             <span className="text-stone-200">—</span>

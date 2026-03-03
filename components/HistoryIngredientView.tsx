@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import type { HistoricalMealPlan } from '../types';
-import { TargetType } from '../types';
+import type { HistoricalMealPlan, MenuItem } from '../types';
+import { TargetType, MenuCategory } from '../types';
 import { TARGET_CONFIGS } from '../constants';
 
 const TARGET_LABELS: Record<string, string> = {
@@ -18,9 +18,18 @@ const TARGET_LABELS: Record<string, string> = {
 
 const TARGET_ORDER = Object.values(TargetType);
 
+// 공정 타입 감지 (이름 접미사 기반)
+function detectItemProcess(name: string): string | null {
+  if (name.includes('_반조리')) return '반조리';
+  if (name.includes('_냉장')) return '냉장';
+  if (name.includes('_냉동')) return '냉동';
+  return null;
+}
+
 interface Props {
   monthPlans: HistoricalMealPlan[];
   formatDate: (d: string) => string;
+  menuItems?: MenuItem[];
 }
 
 const HistoryIngredientView: React.FC<Props> = ({ monthPlans, formatDate }) => {
@@ -39,10 +48,13 @@ const HistoryIngredientView: React.FC<Props> = ({ monthPlans, formatDate }) => {
       <table className="w-full border-collapse text-xs">
         <thead className="sticky top-0 z-20">
           <tr className="bg-stone-50">
-            <th className="sticky left-0 z-30 bg-stone-50 px-3 py-2.5 text-left font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[80px]">
+            <th className="sticky left-0 z-30 bg-stone-50 px-2 py-2.5 text-center font-semibold text-stone-500 border-b border-r border-stone-200 w-8">
+              #
+            </th>
+            <th className="sticky left-8 z-30 bg-stone-50 px-3 py-2.5 text-left font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[80px]">
               날짜
             </th>
-            <th className="px-2 py-2.5 text-center font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[48px]">
+            <th className="sticky left-[112px] z-30 bg-stone-50 px-2 py-2.5 text-center font-semibold text-stone-500 border-b border-r border-stone-200 min-w-[48px]">
               주기
             </th>
             {allTargets.map(t => {
@@ -64,14 +76,17 @@ const HistoryIngredientView: React.FC<Props> = ({ monthPlans, formatDate }) => {
           </tr>
         </thead>
         <tbody>
-          {monthPlans.map(plan => {
+          {monthPlans.map((plan, rowIdx) => {
             const targetMap = new Map(plan.targets.map(t => [t.targetType, t]));
             return (
               <tr key={`${plan.date}-${plan.cycleType}`} className="border-b border-stone-100 hover:bg-stone-50/30">
-                <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-stone-200 font-medium text-stone-700 whitespace-nowrap align-top">
+                <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-stone-200 text-center text-xs text-stone-400 font-medium align-top">
+                  {rowIdx + 1}
+                </td>
+                <td className="sticky left-8 z-10 bg-white px-3 py-2 border-r border-stone-200 font-medium text-stone-700 whitespace-nowrap align-top">
                   {formatDate(plan.date)}
                 </td>
-                <td className="px-2 py-2 border-r border-stone-200 text-center align-top">
+                <td className="sticky left-[112px] z-10 bg-white px-2 py-2 border-r border-stone-200 text-center align-top">
                   <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600">
                     {plan.cycleType}
                   </span>
@@ -95,19 +110,35 @@ const HistoryIngredientView: React.FC<Props> = ({ monthPlans, formatDate }) => {
                       <div className="space-y-0.5">
                         {target.items
                           .filter(i => i.name && i.name.trim())
-                          .map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-1 text-[11px] leading-tight">
-                              <span className="text-stone-700 truncate flex-1">
-                                {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
-                              </span>
-                              <span className="text-blue-600 font-medium shrink-0 tabular-nums text-[10px]">
-                                {item.price > 0 ? item.price.toLocaleString() : '-'}
-                              </span>
-                              <span className="text-stone-400 shrink-0 tabular-nums text-[9px]">
-                                /{item.cost > 0 ? item.cost.toLocaleString() : '-'}
-                              </span>
-                            </div>
-                          ))}
+                          .map((item, idx) => {
+                            const proc = detectItemProcess(item.name);
+                            return (
+                              <div key={idx} className="flex items-center gap-1 text-[11px] leading-tight">
+                                <span className="text-stone-700 truncate flex-1">
+                                  {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
+                                </span>
+                                {proc && (
+                                  <span
+                                    className={`shrink-0 text-[8px] px-1 py-0 rounded font-bold ${
+                                      proc === '냉장'
+                                        ? 'bg-cyan-100 text-cyan-600'
+                                        : proc === '반조리'
+                                          ? 'bg-rose-100 text-rose-600'
+                                          : 'bg-indigo-100 text-indigo-600'
+                                    }`}
+                                  >
+                                    {proc}
+                                  </span>
+                                )}
+                                <span className="text-blue-600 font-medium shrink-0 tabular-nums text-[10px]">
+                                  {item.price > 0 ? item.price.toLocaleString() : '-'}
+                                </span>
+                                <span className="text-stone-400 shrink-0 tabular-nums text-[9px]">
+                                  /{item.cost > 0 ? item.cost.toLocaleString() : '-'}
+                                </span>
+                              </div>
+                            );
+                          })}
                       </div>
                       {/* 합계 */}
                       <div className="mt-1.5 pt-1.5 border-t border-stone-200 space-y-0.5">
