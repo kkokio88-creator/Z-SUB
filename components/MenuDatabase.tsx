@@ -25,7 +25,8 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { validateMenuItem, type ValidationError } from '../services/validationService';
 import { addAuditEntry } from '../services/auditService';
-import { autoClassifyBatch } from '../services/autoClassifyService';
+import { autoClassifyFull, buildHistoryLookup } from '../services/autoClassifyService';
+import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -60,6 +61,7 @@ const MenuDatabase: React.FC = () => {
   } = useMenu();
   const { addToast } = useToast();
   const { user } = useAuth();
+  const { plans: historicalPlans } = useHistoricalPlans();
   const [, setValidationErrors] = useState<ValidationError[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterUsage, setFilterUsage] = useState<'ALL' | 'active' | 'unused'>('active');
@@ -385,17 +387,36 @@ const MenuDatabase: React.FC = () => {
     });
   };
 
-  // 자동 분류
+  // 자동 분류 (전체 메뉴 대상 + 히스토리 기반 세부정보 자동 입력)
   const handleAutoClassify = () => {
-    const targets = menuItems.filter(item => item.mainIngredient === 'vegetable' && !item.isUnused);
-    const results = autoClassifyBatch(targets);
+    const targets = menuItems.filter(item => !item.isUnused);
+    const historyLookup = buildHistoryLookup(historicalPlans);
+    const results = autoClassifyFull(targets, historyLookup);
 
     if (results.length === 0) {
       addToast({ type: 'info', title: '자동 분류', message: '분류 변경이 필요한 항목이 없습니다.' });
       return;
     }
 
-    if (!window.confirm(`${results.length}개 항목에 자동 분류를 적용하시겠습니까?`)) return;
+    const summary = results.reduce(
+      (acc, r) => {
+        r.fieldsChanged.forEach(f => {
+          acc[f] = (acc[f] || 0) + 1;
+        });
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    const summaryText = Object.entries(summary)
+      .map(([field, count]) => `${field} ${count}건`)
+      .join(', ');
+
+    if (
+      !window.confirm(
+        `${results.length}개 메뉴에 자동 분류를 적용합니다.\n\n변경 내역: ${summaryText}\n\n적용하시겠습니까?`
+      )
+    )
+      return;
 
     for (const change of results) {
       const item = menuItems.find(i => i.id === change.id);
@@ -403,10 +424,16 @@ const MenuDatabase: React.FC = () => {
       const updated: Partial<MenuItem> = {};
       if (change.mainIngredient) updated.mainIngredient = change.mainIngredient;
       if (change.category) updated.category = change.category;
+      if (change.cost !== undefined) updated.cost = change.cost;
+      if (change.recommendedPrice !== undefined) updated.recommendedPrice = change.recommendedPrice;
       contextUpdateItem(item.id, { ...item, ...updated });
     }
     saveToStorage();
-    addToast({ type: 'success', title: '자동 분류 완료', message: `${results.length}개 항목이 업데이트되었습니다.` });
+    addToast({
+      type: 'success',
+      title: '자동 분류 완료',
+      message: `${results.length}개 메뉴 업데이트 (${summaryText})`,
+    });
   };
 
   // 태그 전체 초기화
@@ -513,7 +540,7 @@ const MenuDatabase: React.FC = () => {
               size="sm"
               onClick={handleAutoClassify}
               className="flex items-center gap-1 bg-amber-50 border-amber-200 text-amber-700 text-xs font-medium hover:bg-amber-100"
-              title="주재료 기본값인 항목에 자동 분류 적용"
+              title="히스토리 기반 카테고리/주재료/원가/가격 자동 입력"
             >
               <Wand2 className="w-3.5 h-3.5" /> 자동분류
             </Button>
