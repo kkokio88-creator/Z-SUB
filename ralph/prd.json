@@ -147,8 +147,8 @@
         "npx vite build passes"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": "MealPlanHistory.tsx productionLimits(lines 1077-1088). localStorage zsub_production_limits. 현재 행 단위 bg-red-50 + AlertTriangle 존재하나 정상 동작 안 함. 한도 비교 로직 점검."
+      "passes": true,
+      "notes": "DONE: 기본 한도 10개로 수정. 생산통합 소계행에 품목수 기반 한도 초과 경고(AlertTriangle) 추가. 카테고리명/현재수량/한도수량 표시. localStorage zsub_production_limits 연동."
     },
     {
       "id": "US-010",
