@@ -112,6 +112,25 @@ const Dashboard: React.FC = () => {
     avgRatio: number;
   } | null>(null);
   const [dupTargetFilter, setDupTargetFilter] = useState<string>('all');
+  const [dupDays, setDupDays] = useState(30);
+  const [dupStartDate, setDupStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dupEndDate, setDupEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expandedDupMenu, setExpandedDupMenu] = useState<string | null>(null);
+
+  // 프리셋 변경 시 날짜 자동 갱신
+  const applyDupPreset = (days: number) => {
+    setDupDays(days);
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    setDupStartDate(start.toISOString().slice(0, 10));
+    setDupEndDate(end.toISOString().slice(0, 10));
+    setExpandedDupMenu(null);
+  };
 
   // ── 1. 버블 차트: 판매가(X) × 원가율(Y) × 카테고리별 메뉴 수(Size) ──
   const bubbleData = useMemo(() => {
@@ -210,14 +229,11 @@ const Dashboard: React.FC = () => {
       .sort((a, b) => b.recommendedPrice - a.recommendedPrice);
   }, [selectedCategory, selectedDetail, selectedTarget, menuItems]);
 
-  // ── 3. 중복 위험 분석 (최근 30일) ──
+  // ── 3. 중복 위험 분석 (동적 기간) ──
   const duplicationData = useMemo(() => {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 30);
-    const cutoff = cutoffDate.toISOString().slice(0, 10);
-
     const menuCount: Record<string, number> = {};
-    const recentPlans = plans.filter(p => p.date >= cutoff);
+    const menuDates: Record<string, string[]> = {};
+    const recentPlans = plans.filter(p => p.date >= dupStartDate && p.date <= dupEndDate);
 
     for (const plan of recentPlans) {
       for (const target of plan.targets) {
@@ -229,6 +245,8 @@ const Dashboard: React.FC = () => {
             .trim();
           if (!name || /^\d+$/.test(name) || name.length < 2) continue;
           menuCount[name] = (menuCount[name] || 0) + 1;
+          if (!menuDates[name]) menuDates[name] = [];
+          if (!menuDates[name].includes(plan.date)) menuDates[name].push(plan.date);
         }
       }
     }
@@ -236,8 +254,8 @@ const Dashboard: React.FC = () => {
     return Object.entries(menuCount)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
-      .map(([name, count]) => ({ name, count }));
-  }, [plans, dupTargetFilter]);
+      .map(([name, count]) => ({ name, count, dates: (menuDates[name] || []).sort() }));
+  }, [plans, dupTargetFilter, dupStartDate, dupEndDate]);
 
   if (menuLoading && menuItems.length === 0) {
     return (
@@ -612,31 +630,132 @@ const Dashboard: React.FC = () => {
               ))}
             </select>
           </div>
-          <p className="text-xs text-stone-500">최근 30일 가장 많이 반복된 메뉴 Top 15</p>
+          {/* 기간 설정: 프리셋 + 날짜 직접 입력 */}
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <div className="flex gap-1">
+              {[
+                { label: '2주', days: 14 },
+                { label: '30일', days: 30 },
+                { label: '60일', days: 60 },
+              ].map(preset => (
+                <Button
+                  key={preset.days}
+                  variant={dupDays === preset.days ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => applyDupPreset(preset.days)}
+                  className="text-xs h-7 px-2.5"
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-stone-500">
+              <input
+                type="date"
+                value={dupStartDate}
+                onChange={e => {
+                  setDupStartDate(e.target.value);
+                  setDupDays(0);
+                  setExpandedDupMenu(null);
+                }}
+                className="border border-stone-300 rounded px-2 py-1 text-xs bg-white"
+              />
+              <span>~</span>
+              <input
+                type="date"
+                value={dupEndDate}
+                onChange={e => {
+                  setDupEndDate(e.target.value);
+                  setDupDays(0);
+                  setExpandedDupMenu(null);
+                }}
+                className="border border-stone-300 rounded px-2 py-1 text-xs bg-white"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-stone-500 mt-1">
+            {dupStartDate} ~ {dupEndDate} 가장 많이 반복된 메뉴 Top 15 · 바 클릭 시 사용 날짜 표시
+          </p>
         </CardHeader>
         <CardContent>
           {duplicationData.length === 0 ? (
             <div className="text-center py-8 text-stone-400 text-sm">
-              {historyLoading ? '히스토리 로딩 중...' : '최근 30일 식단 데이터가 없습니다'}
+              {historyLoading ? '히스토리 로딩 중...' : '해당 기간 식단 데이터가 없습니다'}
             </div>
           ) : (
-            <div className="min-h-[600px] overflow-y-auto">
-              <ResponsiveContainer width="100%" height={620}>
-                <BarChart data={duplicationData} layout="vertical" margin={{ top: 5, right: 20, left: 130, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" tick={<WrappedYAxisTick />} width={125} />
-                  <Tooltip />
-                  <Bar dataKey="count" name="사용 횟수" fill="#f59e0b" radius={[0, 4, 4, 0]}>
-                    {duplicationData.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={entry.count >= 10 ? '#ef4444' : entry.count >= 5 ? '#f59e0b' : '#3b82f6'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="flex gap-4">
+              <div className={expandedDupMenu ? 'flex-1 min-w-0' : 'w-full'}>
+                <div className="min-h-[700px] overflow-y-auto">
+                  <ResponsiveContainer width="100%" height={700}>
+                    <BarChart
+                      data={duplicationData}
+                      layout="vertical"
+                      margin={{ top: 5, right: 20, left: 130, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                      <XAxis type="number" tick={{ fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" tick={<WrappedYAxisTick />} width={125} />
+                      <Tooltip />
+                      <Bar
+                        dataKey="count"
+                        name="사용 횟수"
+                        fill="#f59e0b"
+                        radius={[0, 4, 4, 0]}
+                        cursor="pointer"
+                        onClick={(data: { name: string }) => {
+                          setExpandedDupMenu(prev => (prev === data.name ? null : data.name));
+                        }}
+                      >
+                        {duplicationData.map((entry, index) => (
+                          <Cell
+                            key={index}
+                            fill={entry.count >= 10 ? '#ef4444' : entry.count >= 5 ? '#f59e0b' : '#3b82f6'}
+                            stroke={expandedDupMenu === entry.name ? '#1d4ed8' : undefined}
+                            strokeWidth={expandedDupMenu === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              {expandedDupMenu && (
+                <div className="w-56 shrink-0 border border-stone-200 rounded-lg p-4 bg-stone-50 overflow-y-auto max-h-[700px]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-stone-800 truncate">{expandedDupMenu}</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedDupMenu(null)}
+                      className="h-auto p-0 text-stone-400 hover:text-stone-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {(() => {
+                    const entry = duplicationData.find(d => d.name === expandedDupMenu);
+                    if (!entry) return null;
+                    return (
+                      <>
+                        <p className="text-xs text-stone-500 mb-2">사용 횟수: {entry.count}회</p>
+                        <div className="border-t border-stone-200 pt-2">
+                          <p className="text-[11px] font-semibold text-stone-600 mb-1.5">사용 날짜</p>
+                          <div className="space-y-1">
+                            {entry.dates.map(date => (
+                              <div
+                                key={date}
+                                className="text-xs text-stone-700 bg-white px-2 py-1 rounded border border-stone-100"
+                              >
+                                {date}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </CardContent>

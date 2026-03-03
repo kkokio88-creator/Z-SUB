@@ -354,8 +354,8 @@
         "npx vite build passes"
       ],
       "priority": 22,
-      "passes": false,
-      "notes": "Dashboard.tsx. 기존 30일 고정을 동적 기간 선택으로 변경. 날짜 피커 UI 추가. 주재료별 expandedIngredient 구현(이미 존재 여부 확인). max-h 확대."
+      "passes": true,
+      "notes": "DONE: 프리셋(2주/30일/60일) 버튼 + 시작일~종료일 date input 추가. duplicationData에 dates 필드 추가(사용 날짜 수집). 바 클릭 시 expandedDupMenu로 사용 날짜 사이드패널 표시. 차트 높이 620→700 확대."
     },
     {
       "id": "US-023",

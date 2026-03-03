@@ -191,3 +191,13 @@
 - 변경 파일: types.ts, services/engine.ts, components/MenuDatabase.tsx, components/MealPlanner.tsx
 - 학습: engine.ts의 필터 로직이 baseFilter, availableMenu30, 3차 fallback, boostWeekPrice, getSwapCandidates 5곳에 분산. 모든 필터 경로에 동일 조건 추가 필요
 ---
+
+## 2026-03-03 - US-022: P21 대시보드 중복 위험 분석 기간 설정 + 확대
+- 구현: dupDays/dupStartDate/dupEndDate 상태 + applyDupPreset 함수 추가
+- 프리셋 버튼 (2주/30일/60일) + 시작일~종료일 date input UI 추가
+- duplicationData에 dates 필드 추가 (메뉴별 사용 날짜 수집)
+- 바 클릭 시 expandedDupMenu 사이드패널에 사용 날짜 목록 표시
+- 차트 높이 620→700으로 확대
+- 변경 파일: components/Dashboard.tsx
+- 학습: 기존 cutoff 고정 방식에서 dupStartDate/dupEndDate 범위 필터로 변경. 프리셋은 dupDays 상태로 active 표시
+---
