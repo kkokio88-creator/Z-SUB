@@ -9,6 +9,7 @@ import { addAuditEntry } from '../services/auditService';
 import { useAuth } from '../context/AuthContext';
 import { saveTempSnapshot, loadSnapshot } from '../services/historyService';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
+import { normalizeMenuName } from '../services/menuUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -143,10 +144,7 @@ const MealPlanner: React.FC = () => {
         // 메뉴명 → 주재료 룩업 테이블 (cross-target 식재료 비교용)
         const nameToIngredient = new Map<string, string>();
         activeMenu.forEach(item => {
-          const clean = item.name
-            .replace(/_냉장|_반조리|_냉동/g, '')
-            .replace(/\s+\d+$/, '')
-            .trim();
+          const clean = normalizeMenuName(item.name);
           if (clean && item.mainIngredient) nameToIngredient.set(clean, item.mainIngredient);
         });
 
@@ -166,10 +164,7 @@ const MealPlanner: React.FC = () => {
               .filter(t => t.targetType !== target)
               .forEach(t => {
                 t.items.forEach(item => {
-                  const clean = item.name
-                    .replace(/_냉장|_반조리|_냉동/g, '')
-                    .replace(/\s+\d+$/, '')
-                    .trim();
+                  const clean = normalizeMenuName(item.name);
                   const ing = nameToIngredient.get(clean);
                   if (ing && ing !== 'vegetable') ingredients.push(ing);
                 });
@@ -202,10 +197,7 @@ const MealPlanner: React.FC = () => {
             .forEach(p =>
               p.targets.forEach(t =>
                 t.items.forEach(item => {
-                  const clean = item.name
-                    .replace(/_냉장|_반조리|_냉동/g, '')
-                    .replace(/\s+\d+$/, '')
-                    .trim();
+                  const clean = normalizeMenuName(item.name);
                   if (clean) {
                     excluded.add(clean);
                     const existing = lastUsed.get(clean);
@@ -362,10 +354,7 @@ const MealPlanner: React.FC = () => {
       .forEach(p =>
         p.targets.forEach(t =>
           t.items.forEach(item => {
-            const clean = item.name
-              .replace(/_냉장|_반조리|_냉동/g, '')
-              .replace(/\s+\d+$/, '')
-              .trim();
+            const clean = normalizeMenuName(item.name);
             if (clean) names.add(clean);
           })
         )
@@ -379,10 +368,7 @@ const MealPlanner: React.FC = () => {
     historicalPlans.forEach(p =>
       p.targets.forEach(t =>
         t.items.forEach(item => {
-          const clean = item.name
-            .replace(/_냉장|_반조리|_냉동/g, '')
-            .replace(/\s+\d+$/, '')
-            .trim();
+          const clean = normalizeMenuName(item.name);
           if (clean) {
             const existing = lastUsed.get(clean);
             if (!existing || p.date > existing) lastUsed.set(clean, p.date);
@@ -395,15 +381,10 @@ const MealPlanner: React.FC = () => {
 
   // 현재 생성된 반대 주기 메뉴명 (요일 필터용)
   const otherCycleMenuNames = useMemo(() => {
-    const normalize = (n: string) =>
-      n
-        .replace(/_냉장|_반조리|_냉동/g, '')
-        .replace(/\s+\d+$/, '')
-        .trim();
     const namesA = new Set<string>();
     const namesB = new Set<string>();
-    plans.A?.weeks.forEach(w => w.items.forEach(i => namesA.add(normalize(i.name))));
-    plans.B?.weeks.forEach(w => w.items.forEach(i => namesB.add(normalize(i.name))));
+    plans.A?.weeks.forEach(w => w.items.forEach(i => namesA.add(normalizeMenuName(i.name))));
+    plans.B?.weeks.forEach(w => w.items.forEach(i => namesB.add(normalizeMenuName(i.name))));
     return { A: namesA, B: namesB };
   }, [plans.A, plans.B]);
 
@@ -574,13 +555,8 @@ const MealPlanner: React.FC = () => {
   // 크로스데이(A↔B) 겹침 메뉴 감지
   const crossDayDuplicates = useMemo(() => {
     if (!plans.A || !plans.B) return new Set<string>();
-    const normalize = (n: string) =>
-      n
-        .replace(/_냉장|_반조리|_냉동/g, '')
-        .replace(/\s+\d+$/, '')
-        .trim();
-    const namesA = new Set(plans.A.weeks.flatMap(w => w.items.map(i => normalize(i.name))));
-    const namesB = new Set(plans.B.weeks.flatMap(w => w.items.map(i => normalize(i.name))));
+    const namesA = new Set(plans.A.weeks.flatMap(w => w.items.map(i => normalizeMenuName(i.name))));
+    const namesB = new Set(plans.B.weeks.flatMap(w => w.items.map(i => normalizeMenuName(i.name))));
     const overlap = new Set<string>();
     namesA.forEach(n => {
       if (namesB.has(n)) overlap.add(n);
@@ -731,10 +707,7 @@ const MealPlanner: React.FC = () => {
                 {week.items.map((item, itemIdx) => {
                   const isExtra = parentItemCount !== null && itemIdx >= parentItemCount;
                   const ingColor = PLANNER_INGREDIENT_COLORS[item.mainIngredient] || DEFAULT_INGREDIENT_COLOR;
-                  const cleanName = item.name
-                    .replace(/_냉장|_반조리|_냉동/g, '')
-                    .replace(/\s+\d+$/, '')
-                    .trim();
+                  const cleanName = normalizeMenuName(item.name);
                   const isCrossDup = crossDayDuplicates.has(cleanName);
                   const isFallback = week.fallbackItems?.includes(cleanName);
                   const isHighlighted = highlightedIngredient === item.mainIngredient;
@@ -1002,16 +975,11 @@ const MealPlanner: React.FC = () => {
         (() => {
           // 요일(배송그룹) 필터 적용
           const otherCycleNames = swapTarget.cycle === 'A' ? otherCycleMenuNames.B : otherCycleMenuNames.A;
-          const normalize = (n: string) =>
-            n
-              .replace(/_냉장|_반조리|_냉동/g, '')
-              .replace(/\s+\d+$/, '')
-              .trim();
           const cycleFiltered =
             swapCycleFilter === 'all'
               ? swapCandidates
               : swapCycleFilter === 'other'
-                ? swapCandidates.filter(c => !otherCycleNames.has(normalize(c.name)))
+                ? swapCandidates.filter(c => !otherCycleNames.has(normalizeMenuName(c.name)))
                 : swapCandidates;
           const filteredCandidates = swapSearchQuery
             ? cycleFiltered.filter(c => c.name.includes(swapSearchQuery) || c.mainIngredient.includes(swapSearchQuery))
@@ -1143,10 +1111,7 @@ const MealPlanner: React.FC = () => {
                         })
                         .map(candidate => {
                           const priceDiff = candidate.recommendedPrice - swapTarget.item.recommendedPrice;
-                          const cleanCandidate = candidate.name
-                            .replace(/_냉장|_반조리|_냉동/g, '')
-                            .replace(/\s+\d+$/, '')
-                            .trim();
+                          const cleanCandidate = normalizeMenuName(candidate.name);
                           const isNextMonthDup = nextMonthMenuNames.has(cleanCandidate);
                           const lastUsed = allMenuLastUsed.get(cleanCandidate);
                           const swapDeliveryDate = getDeliveryDate(selectedYear, selectedMonth, swapTarget.weekIndex);

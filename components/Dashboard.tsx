@@ -21,6 +21,7 @@ import { TARGET_CONFIGS, TARGET_LABELS } from '../constants';
 import { MenuCategory, TargetType } from '../types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { normalizeMenuName } from '../services/menuUtils';
 
 // 정책에 저장된 식단 목록 로드
 const loadPolicyTargets = (): Set<TargetType> => {
@@ -226,10 +227,7 @@ const Dashboard: React.FC = () => {
       for (const target of plan.targets) {
         if (dupTargetFilter !== 'all' && target.targetType !== dupTargetFilter) continue;
         for (const item of target.items) {
-          const name = item.name
-            .replace(/_냉장|_반조리|_냉동/g, '')
-            .replace(/\s+\d+$/, '')
-            .trim();
+          const name = normalizeMenuName(item.name);
           if (!name || /^\d+$/.test(name) || name.length < 2) continue;
           menuCount[name] = (menuCount[name] || 0) + 1;
           if (!menuDates[name]) menuDates[name] = [];

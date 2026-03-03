@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { normalizeMenuName } from '../services/menuUtils';
 
 const DEPT_ICONS: Record<ReviewDepartment, React.ElementType> = {
   quality: Shield,
@@ -155,7 +156,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
     for (const target of plan.targets) {
       for (const item of target.items) {
         if (item.name && item.name.trim()) {
-          names.add(item.name.replace(/_냉장|_반조리|_냉동/g, '').trim());
+          names.add(normalizeMenuName(item.name));
         }
       }
     }
@@ -266,10 +267,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {t.items.slice(0, 4).map((item, i) => (
                       <span key={i} className="px-1.5 py-0.5 text-[10px] bg-stone-100 text-stone-600 rounded">
-                        {item.name
-                          .replace(/_냉장|_반조리|_냉동/g, '')
-                          .replace(/\s+\d+$/, '')
-                          .trim()}
+                        {normalizeMenuName(item.name)}
                       </span>
                     ))}
                     {t.items.length > 4 && (

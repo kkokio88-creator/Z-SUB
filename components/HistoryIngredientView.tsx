@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { HistoricalMealPlan, MenuItem } from '../types';
 import { TargetType, MenuCategory } from '../types';
 import { TARGET_CONFIGS, TARGET_LABELS } from '../constants';
+import { normalizeMenuName } from '../services/menuUtils';
 
 const TARGET_ORDER = Object.values(TargetType);
 
@@ -101,9 +102,7 @@ const HistoryIngredientView: React.FC<Props> = ({ monthPlans, formatDate }) => {
                             const proc = detectItemProcess(item.name);
                             return (
                               <div key={idx} className="flex items-center gap-1 text-[11px] leading-tight">
-                                <span className="text-stone-700 truncate flex-1">
-                                  {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
-                                </span>
+                                <span className="text-stone-700 truncate flex-1">{normalizeMenuName(item.name)}</span>
                                 {proc && (
                                   <span
                                     className={`shrink-0 text-[8px] px-1 py-0 rounded font-bold ${

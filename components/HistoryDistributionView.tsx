@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { HistoricalMealPlan } from '../types';
 import { TargetType } from '../types';
 import { TARGET_LABELS } from '../constants';
+import { normalizeMenuName } from '../services/menuUtils';
 
 const TARGET_ORDER = Object.values(TargetType);
 
@@ -93,7 +94,7 @@ const HistoryDistributionView: React.FC<Props> = ({ monthPlans, formatDate }) =>
                         <td key={t} className="px-2 py-1.5 text-center border-r border-stone-100 text-sm">
                           {item ? (
                             <span className="text-stone-800">
-                              {item.name.replace(/_냉장|_반조리|_냉동/g, '').trim()}
+                              {normalizeMenuName(item.name)}
                               {proc && (
                                 <span
                                   className={`ml-1 text-[8px] px-1 rounded font-bold ${

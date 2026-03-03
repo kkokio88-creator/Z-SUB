@@ -53,6 +53,7 @@ import {
 import HistoryReviewModal from './HistoryReviewModal';
 import HistoryIngredientView from './HistoryIngredientView';
 import HistoryDistributionView from './HistoryDistributionView';
+import { normalizeMenuName, stripProcessSuffix } from '../services/menuUtils';
 
 // ── 상수 ──
 
@@ -181,7 +182,7 @@ function isValidMenuItem(name: string): boolean {
 
 // 메뉴명에서 수량과 클린명 추출
 function parseMenuItem(name: string): { cleanName: string; quantity: number | null } {
-  const stripped = name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+  const stripped = stripProcessSuffix(name);
   const match = stripped.match(/^(.+?)\s+(\d+)$/);
   if (match) return { cleanName: match[1].trim(), quantity: parseInt(match[2]) };
   return { cleanName: stripped, quantity: null };
@@ -220,7 +221,7 @@ const PROCESS_COLORS: Record<string, { bg: string; text: string; badge: string }
 
 function detectProcess(name: string, dbItem?: MenuItem): string {
   // 접미사 제거 후 실제 음식 유형으로 분류
-  const baseName = name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+  const baseName = stripProcessSuffix(name);
   // 국/탕/찌개 판정: 이름 끝에 정확히 국/탕/찌개가 오는 경우만 (국물/수프는 제외 - 떡볶이국물 등 오분류 방지)
   const isSoupType = /국$|탕$|찌개$|찌게$/.test(baseName);
   // DB에서 카테고리 확인 가능하면 활용
@@ -922,7 +923,7 @@ const MealPlanHistory: React.FC = () => {
     for (const m of menuItems) {
       map.set(m.name, m);
       // 접미사 제거된 이름으로도 매핑
-      const clean = m.name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+      const clean = normalizeMenuName(m.name);
       if (!map.has(clean)) map.set(clean, m);
     }
     return map;
@@ -1165,7 +1166,7 @@ const MealPlanHistory: React.FC = () => {
                 : item.name.includes('_냉동')
                   ? '냉동'
                   : '';
-            const cleanName = item.name.replace(/_냉장|_반조리|_냉동/g, '').trim();
+            const cleanName = normalizeMenuName(item.name);
             rows.push(
               `${plan.date},"${plan.cycleType}","${TARGET_LABELS[target.targetType] || target.targetType}","${cleanName}","${proc}",${item.price},${item.cost}`
             );
