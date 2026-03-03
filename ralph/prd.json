@@ -369,8 +369,8 @@
         "npx vite build passes"
       ],
       "priority": 23,
-      "passes": false,
-      "notes": "Layout.tsx header(line 161). 오른쪽 영역의 날짜/배송일/상태 배지 div 전체 제거. 단순 삭제 작업."
+      "passes": true,
+      "notes": "DONE: US-017에서 헤더 정리 완료(날짜/배송일/정상운영 제거, Bell 아이콘만 유지). 미사용 Badge import 제거."
     }
   ]
 }

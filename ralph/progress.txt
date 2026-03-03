@@ -201,3 +201,9 @@
 - 변경 파일: components/Dashboard.tsx
 - 학습: 기존 cutoff 고정 방식에서 dupStartDate/dupEndDate 범위 필터로 변경. 프리셋은 dupDays 상태로 active 표시
 ---
+
+## 2026-03-03 - US-023: P22 상단 고정 바 UI 정리
+- 확인: US-017에서 날짜/배송일/정상운영 표시 이미 제거 완료 (Bell 아이콘만 유지)
+- 추가: 미사용 Badge import 제거 (Layout.tsx)
+- 변경 파일: components/Layout.tsx
+---
