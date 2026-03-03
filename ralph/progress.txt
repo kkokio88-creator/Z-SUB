@@ -63,3 +63,11 @@
 - 변경 파일: services/autoClassifyService.ts
 - 학습: 카테고리 키워드 순서가 중요. 더 구체적인 키워드(MAIN:탕수)를 일반 키워드(SOUP:탕)보다 먼저 체크해야 함
 ---
+
+## 2026-03-03 - US-006: P6 카테고리 필터 오류 수정
+- SOUP 순서 복원(갈비탕→SOUP 정확 분류 유지) + CATEGORY_EXCLUSIONS로 탕수→MAIN 보장
+- 흐름: '탕수육'→'탕' SOUP매칭→제외규칙 차단→'탕수' MAIN매칭 ✓
+- detectProcess는 /국$|탕$|찌개$/ 앵커 사용으로 이미 정확 (탕수 미해당)
+- 변경 파일: services/autoClassifyService.ts
+- 학습: SOUP을 먼저 체크하되 exclusion으로 예외 처리하는 것이 안전. MAIN 먼저 체크하면 갈비탕이 갈비→MAIN으로 오분류됨
+---

@@ -2,8 +2,12 @@ import { MenuCategory, MenuItem, HistoricalMealPlan, TargetType } from '../types
 import { SPICY_KEYWORDS, AUTO_TAG_RULES } from '../constants';
 import { isKidFriendly, isSeniorFriendly } from './sheetsSerializer';
 
-// 메뉴명 키워드 → 카테고리 매핑 (MAIN을 먼저 체크하여 탕수→MAIN 우선)
+// 메뉴명 키워드 → 카테고리 매핑 (SOUP 먼저, CATEGORY_EXCLUSIONS로 오분류 방지)
 const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
+  {
+    category: MenuCategory.SOUP,
+    keywords: ['국', '찌개', '탕', '전골', '수프', '미역국', '된장국', '김치찌개', '부대찌개', '순두부찌개'],
+  },
   {
     category: MenuCategory.MAIN,
     keywords: [
@@ -24,10 +28,6 @@ const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
     ],
   },
   {
-    category: MenuCategory.SOUP,
-    keywords: ['국', '찌개', '탕', '전골', '수프', '미역국', '된장국', '김치찌개', '부대찌개', '순두부찌개'],
-  },
-  {
     category: MenuCategory.SIDE,
     keywords: ['볶음', '나물', '무침', '조림', '절임', '샐러드', '김치', '젓갈', '장아찌', '겉절이', '잡채'],
   },
@@ -38,7 +38,7 @@ const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
 ];
 
 // 카테고리 제외 규칙: 짧은 키워드가 긴 키워드의 일부인 경우 해당 카테고리 매칭 제외
-// 예: '탕' 매칭 시 이름에 '탕수'가 포함되면 SOUP 매칭 건너뜀
+// 예: '탕' 매칭 시 이름에 '탕수'가 포함되면 SOUP 매칭 건너뜀 → 다음 카테고리(MAIN)에서 '탕수' 매칭
 const CATEGORY_EXCLUSIONS: Record<string, string[]> = {
   탕: ['탕수'],
 };

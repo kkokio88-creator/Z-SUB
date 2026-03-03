@@ -99,8 +99,8 @@
         "npx vite build passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "MenuDatabase.tsx filteredItems(lines 142-154). autoClassifyService.ts CATEGORY_KEYWORDS: '탕'이 국/찌개에 포함되어 '탕수'도 국으로 분류되는 문제. 키워드 우선순위 또는 제외 패턴 추가 필요."
+      "passes": true,
+      "notes": "DONE: SOUP 순서 유지 + CATEGORY_EXCLUSIONS('탕'→'탕수' 제외)로 정확한 분류. '갈비탕'=SOUP, '탕수육'=MAIN 정확 분류. detectProcess는 $앵커 사용으로 이미 정확."
     },
     {
       "id": "US-007",
