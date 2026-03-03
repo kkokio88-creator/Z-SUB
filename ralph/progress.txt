@@ -79,3 +79,10 @@
 - 변경 파일: HistoryIngredientView.tsx, HistoryDistributionView.tsx, MealPlanHistory.tsx
 - 학습: PROCESS_COLORS 객체에 '반조리' 색상은 있지만 PROCESS_ORDER에는 없었음. 공정 배지는 이름 접미사(_냉장, _반조리, _냉동) 기반 감지
 ---
+
+## 2026-03-03 - US-008: P7-b CSV/PDF 다운로드 기능 수정
+- ingredient/distribution CSV: 공정 열 추가, 메뉴명에서 접미사(_냉장 등) 제거
+- production CSV: 공정별 소계 행 + 최종 합계 행 추가
+- PDF: html2pdf WYSIWYG 방식으로 US-007 레이아웃 개선 그대로 반영
+- 변경 파일: components/MealPlanHistory.tsx
+---

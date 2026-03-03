@@ -1162,25 +1162,51 @@ const MealPlanHistory: React.FC = () => {
       }
       csv = [header, ...rows].join('\n');
     } else if (viewMode === 'ingredient' || viewMode === 'distribution') {
-      const header = '날짜,주기,식단유형,메뉴명,판매가,원가';
+      const header = '날짜,주기,식단유형,메뉴명,공정,판매가,원가';
       const rows: string[] = [];
       for (const plan of monthPlans) {
         for (const target of plan.targets) {
           for (const item of target.items) {
             if (!item.name || !item.name.trim()) continue;
+            const proc = item.name.includes('_반조리')
+              ? '반조리'
+              : item.name.includes('_냉장')
+                ? '냉장'
+                : item.name.includes('_냉동')
+                  ? '냉동'
+                  : '';
+            const cleanName = item.name.replace(/_냉장|_반조리|_냉동/g, '').trim();
             rows.push(
-              `${plan.date},"${plan.cycleType}","${TARGET_LABELS[target.targetType] || target.targetType}","${item.name}",${item.price},${item.cost}`
+              `${plan.date},"${plan.cycleType}","${TARGET_LABELS[target.targetType] || target.targetType}","${cleanName}","${proc}",${item.price},${item.cost}`
             );
           }
         }
       }
       csv = [header, ...rows].join('\n');
     } else {
-      // production
+      // production - 공정별 그룹 + 소계
       const header = '메뉴명,제품코드,공정,총생산수량';
-      const rows = consolidatedProduction.map(
-        item => `"${item.menuName}","${item.code ?? ''}","${item.process}",${item.totalQty}`
-      );
+      const rows: string[] = [];
+      let lastProcess = '';
+      for (const item of consolidatedProduction) {
+        if (item.process !== lastProcess) {
+          if (lastProcess) {
+            const groupTotal = consolidatedProduction
+              .filter(i => i.process === lastProcess)
+              .reduce((s, i) => s + i.totalQty, 0);
+            rows.push(`"${lastProcess} 소계","","${lastProcess}",${groupTotal}`);
+          }
+          lastProcess = item.process;
+        }
+        rows.push(`"${item.menuName}","${item.code ?? ''}","${item.process}",${item.totalQty}`);
+      }
+      if (lastProcess) {
+        const groupTotal = consolidatedProduction
+          .filter(i => i.process === lastProcess)
+          .reduce((s, i) => s + i.totalQty, 0);
+        rows.push(`"${lastProcess} 소계","","${lastProcess}",${groupTotal}`);
+      }
+      rows.push(`"합계","","",${consolidatedProduction.reduce((s, i) => s + i.totalQty, 0)}`);
       csv = [header, ...rows].join('\n');
     }
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });

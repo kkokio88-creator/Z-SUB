@@ -130,8 +130,8 @@
         "npx vite build passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": "MealPlanHistory.tsx exportToHistoryCSV(lines 1090-1156), exportToHistoryPDF(lines 1159-1222). exportService.ts. US-007(레이아웃 정비) 완료 후 진행. viewMode별 데이터 구조에 맞게 내보내기 로직 수정."
+      "passes": true,
+      "notes": "DONE: ingredient/distribution CSV에 공정 열 추가 + 접미사 제거. production CSV에 공정별 소계+합계 행 추가. PDF는 html2pdf WYSIWYG으로 현재 뷰 그대로 출력."
     },
     {
       "id": "US-009",
