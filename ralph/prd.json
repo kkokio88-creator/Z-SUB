@@ -212,8 +212,8 @@
         "npx vite build passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "MealPlanner.tsx 검토 영역. 기존 가격 퍼센트/미달 표시에 원가 검토 병렬 추가. TARGET_CONFIGS의 budgetCap과 비교."
+      "passes": true,
+      "notes": "DONE: MealPlanner.tsx에 원가 검토 블록 추가 (가격 검토 블록 아래). 목표 원가(budgetCap) vs 실제 원가(totalCost), 원가율(costRatio%) vs 목표 원가율(targetCostRatio%) 비교. 충족/초과 시각적 구분."
     },
     {
       "id": "US-014",

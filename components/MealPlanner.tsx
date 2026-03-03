@@ -653,6 +653,9 @@ const MealPlanner: React.FC = () => {
           const isPriceCompliant = week.totalPrice > targetPrice;
           const priceDiff = week.totalPrice - targetPrice;
           const savingsPercent = week.totalPrice > 0 ? ((priceDiff / week.totalPrice) * 100).toFixed(1) : '0.0';
+          const targetCostRatio = TARGET_CONFIGS[target].targetCostRatio;
+          const isCostCompliant = targetCostRatio > 0 ? parseFloat(costRatio) <= targetCostRatio : true;
+          const costDiff = week.totalCost - currentBudgetCap;
 
           return (
             <div key={week.weekIndex} className="p-3 flex flex-col group h-full">
@@ -699,6 +702,37 @@ const MealPlanner: React.FC = () => {
                     {isPriceCompliant ? '-' : '+'}
                     {Math.abs(priceDiff).toLocaleString()}원
                     <span className="font-normal text-[10px] ml-0.5">({savingsPercent}%)</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 원가 검토 */}
+              <div
+                className={`mb-3 p-2 rounded-lg border text-[11px] ${
+                  isCostCompliant ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <div className="flex justify-between text-stone-500">
+                  <span>목표 원가</span>
+                  <span className="font-medium">
+                    {currentBudgetCap.toLocaleString()}원 ({targetCostRatio}%)
+                  </span>
+                </div>
+                <div className="flex justify-between text-stone-500 mt-0.5">
+                  <span>실제 원가</span>
+                  <span className="font-medium">
+                    {week.totalCost.toLocaleString()}원 ({costRatio}%)
+                  </span>
+                </div>
+                <div
+                  className={`border-t mt-1.5 pt-1.5 flex justify-between font-bold ${
+                    isCostCompliant ? 'border-green-200 text-green-700' : 'border-red-200 text-red-600'
+                  }`}
+                >
+                  <span>{isCostCompliant ? '✓ 원가 충족' : '✗ 원가 초과'}</span>
+                  <span>
+                    {costDiff > 0 ? '+' : '-'}
+                    {Math.abs(costDiff).toLocaleString()}원
                   </span>
                 </div>
               </div>

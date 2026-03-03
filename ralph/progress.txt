@@ -118,3 +118,11 @@
 - 변경 파일: components/MealPlanHistory.tsx
 - 학습: discountSummary useMemo가 이미 totalCost와 targetCostRatio를 계산하고 있어 렌더링만 추가하면 됨
 ---
+
+## 2026-03-03 - US-013: P12 식단 구성 원가 필터 추가
+- 구현: MealPlanner.tsx에 원가 검토 블록 추가 (가격 검토 블록 바로 아래)
+- 목표 원가(budgetCap) vs 실제 원가(totalCost) 비교 표시
+- 원가율(costRatio%) vs 목표 원가율(targetCostRatio%) 비교, 초과 시 빨간색
+- 원가 충족/초과 시각적 구분 (초록/빨강 배경)
+- 변경 파일: components/MealPlanner.tsx
+---
