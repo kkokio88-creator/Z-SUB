@@ -17,7 +17,6 @@ import { useMenu } from '../context/MenuContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSheets } from '../context/SheetsContext';
-import { pushSheetData } from '../services/sheetsService';
 import { TargetType } from '../types';
 import { TARGET_CONFIGS, TARGET_LABELS } from '../constants';
 import type { MenuItem } from '../types';
@@ -26,24 +25,18 @@ import HistoryReviewModal from './HistoryReviewModal';
 import HistoryIngredientView from './HistoryIngredientView';
 import HistoryDistributionView from './HistoryDistributionView';
 import { normalizeMenuName } from '../services/menuUtils';
-import {
-  PROCESS_ORDER,
-  PROCESS_COLORS,
-  isValidMenuItem,
-  parseMenuItem,
-  detectProcess,
-} from './history/historyConstants';
+import { isValidMenuItem, parseMenuItem, detectProcess } from './history/historyConstants';
 import { SwapModal, ActionModal, CommentModal, HistoryPlanTable, HistoryProductionTable } from './history';
 import { useHistoryNavigation } from '../hooks/useHistoryNavigation';
 import { useHistoryReview } from '../hooks/useHistoryReview';
 import { useHistoryEdit } from '../hooks/useHistoryEdit';
 import {
   computeColumns,
-  buildPlanCSV,
-  buildDetailCSV,
-  buildProductionCSV,
-  buildSheetsRows,
   computeConsolidatedProduction,
+  computeProductionSummary,
+  doExportCSV,
+  doExportPDF,
+  doExportGoogleSheets,
 } from './history/historyExports';
 
 const MealPlanHistory: React.FC = () => {
@@ -92,37 +85,10 @@ const MealPlanHistory: React.FC = () => {
   }, [menuItems]);
 
   // Production summary per date
-  const productionSummary = useMemo(() => {
-    const result = new Map<string, { process: string; items: { name: string; qty: number }[]; totalQty: number }[]>();
-    for (const plan of review.monthPlans) {
-      const key = `${plan.date}-${plan.cycleType}`;
-      const menuQty = new Map<string, number>();
-      const menuProcess = new Map<string, string>();
-      for (const target of plan.targets) {
-        const volume = shipmentConfig[target.targetType]?.[plan.cycleType as '화수목' | '금토월'] || 0;
-        if (volume === 0) continue;
-        for (const item of target.items) {
-          if (!isValidMenuItem(item.name)) continue;
-          const { cleanName } = parseMenuItem(item.name);
-          menuQty.set(cleanName, (menuQty.get(cleanName) || 0) + volume);
-          if (!menuProcess.has(cleanName))
-            menuProcess.set(cleanName, detectProcess(item.name, menuLookup.get(cleanName)));
-        }
-      }
-      const processGroups = new Map<string, { name: string; qty: number }[]>();
-      for (const [name, qty] of menuQty) {
-        const process = menuProcess.get(name) || '기타';
-        if (!processGroups.has(process)) processGroups.set(process, []);
-        processGroups.get(process)!.push({ name, qty });
-      }
-      const groups = PROCESS_ORDER.filter(p => processGroups.has(p)).map(p => {
-        const items = processGroups.get(p)!.sort((a, b) => b.qty - a.qty);
-        return { process: p, items, totalQty: items.reduce((s, i) => s + i.qty, 0) };
-      });
-      result.set(key, groups);
-    }
-    return result;
-  }, [review.monthPlans, shipmentConfig, menuLookup]);
+  const productionSummary = useMemo(
+    () => computeProductionSummary(review.monthPlans, shipmentConfig, menuLookup, detectProcess),
+    [review.monthPlans, shipmentConfig, menuLookup]
+  );
 
   // Discount summary
   const discountSummary = useMemo(() => {
@@ -203,74 +169,35 @@ const MealPlanHistory: React.FC = () => {
     edit.setActionTarget(null);
   }, [edit.actionTarget, edit.originalNameMap, review]);
 
-  // Export handlers
-  const exportToHistoryCSV = useCallback(() => {
-    if (review.monthPlans.length === 0) return;
-    const suffix =
-      nav.viewMode === 'ingredient'
-        ? '재료검토'
-        : nav.viewMode === 'distribution'
-          ? '현장배포'
-          : nav.viewMode === 'production'
-            ? '생산통합'
-            : '식단표';
-    let csv: string;
-    if (nav.viewMode === 'plan') {
-      csv = buildPlanCSV(review.monthPlans, columns);
-    } else if (nav.viewMode === 'ingredient' || nav.viewMode === 'distribution') {
-      csv = buildDetailCSV(review.monthPlans);
-    } else {
-      csv = buildProductionCSV(consolidatedProduction);
-    }
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `식단히스토리_${nav.viewYear}년${nav.viewMonth + 1}월_${suffix}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [review.monthPlans, consolidatedProduction, columns, nav.viewYear, nav.viewMonth, nav.viewMode]);
-
-  const exportToHistoryPDF = useCallback(async () => {
-    if (!contentRef.current) return;
-    const html2pdf = (await import('html2pdf.js')).default;
-    const opt = {
-      margin: [10, 10, 10, 10] as [number, number, number, number],
-      filename: `식단히스토리_${nav.viewYear}년${nav.viewMonth + 1}월.pdf`,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { orientation: 'landscape' as const, unit: 'mm' as const, format: 'a4' as const } as const,
-    };
-    html2pdf().set(opt).from(contentRef.current).save();
-  }, [nav.viewYear, nav.viewMonth]);
-
-  const exportToGoogleSheets = useCallback(async () => {
-    if (review.monthPlans.length === 0) {
-      addToast({ type: 'error', title: '내보내기 실패', message: '내보낼 식단 데이터가 없습니다.' });
-      return;
-    }
-    const sheetName = `식단_히스토리_${nav.viewYear}년${nav.viewMonth + 1}월`;
-    setSyncStatus(sheetName, 'syncing', 'push');
-    try {
-      const headers = ['날짜', '주기', '식단유형', '메뉴명', '판매가', '원가'];
-      const rows = buildSheetsRows(review.monthPlans);
-      const result = await pushSheetData(sheetName, [headers, ...rows]);
-      if (result.success) {
-        setSyncStatus(sheetName, 'success', 'push');
-        addToast({
-          type: 'success',
-          title: '시트 내보내기 완료',
-          message: `${rows.length}건을 "${sheetName}" 시트에 내보냈습니다.`,
-        });
-      } else {
-        throw new Error(result.message || '시트 쓰기 실패');
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      setSyncStatus(sheetName, 'error', 'push', errMsg);
-      addToast({ type: 'error', title: '시트 내보내기 실패', message: errMsg });
-    }
-  }, [review.monthPlans, nav.viewYear, nav.viewMonth, setSyncStatus, addToast]);
+  // Export handlers (delegated to historyExports)
+  const exportDeps = useMemo(
+    () => ({
+      monthPlans: review.monthPlans,
+      viewYear: nav.viewYear,
+      viewMonth: nav.viewMonth,
+      viewMode: nav.viewMode,
+      columns,
+      consolidatedProduction,
+      addToast,
+      setSyncStatus,
+    }),
+    [
+      review.monthPlans,
+      nav.viewYear,
+      nav.viewMonth,
+      nav.viewMode,
+      columns,
+      consolidatedProduction,
+      addToast,
+      setSyncStatus,
+    ]
+  );
+  const exportToHistoryCSV = useCallback(() => doExportCSV(exportDeps), [exportDeps]);
+  const exportToHistoryPDF = useCallback(
+    () => doExportPDF(contentRef, nav.viewYear, nav.viewMonth),
+    [nav.viewYear, nav.viewMonth]
+  );
+  const exportToGoogleSheets = useCallback(() => doExportGoogleSheets(exportDeps), [exportDeps]);
 
   return (
     <div className="h-full flex flex-col">

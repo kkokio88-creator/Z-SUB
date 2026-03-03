@@ -1,83 +1,128 @@
-# Ralph Progress - Z-SUB Shared Utilities
-# Branch: ralph/shared-utilities
-# Started: 2026-03-03
-# Stories: 7 total (US-001 ~ US-007)
+# Ralph Progress - Z-SUB Component Refactoring
+# Branch: ralph/component-refactoring
+# Started: 2026-03-04
+# Stories: 9 total (US-001 ~ US-009)
 
 ## Codebase Patterns
 - 프로젝트 루트에 src/ 없음. App.tsx, types.ts, constants.ts 등 루트 레벨
 - 컴포넌트: components/, 서비스: services/, 컨텍스트: context/, 훅: hooks/
 - UI: shadcn/ui + Tailwind CSS 4 + lucide-react 아이콘
 - 상태: React Context (MenuContext, AuthContext, ToastContext, SheetsContext, HistoricalPlansContext)
-- 빌드: Vite 6, TypeScript, npx vite build로 검증
-- 중앙 상수: constants.ts (MAJOR_INGREDIENTS, TARGET_CONFIGS, MEAL_PLAN_INTEGRATION_GROUPS 등)
+- 빌드: Vite 6, TypeScript strict, npx vite build로 검증
+- 중앙 상수: constants.ts (MAJOR_INGREDIENTS, TARGET_CONFIGS, TARGET_LABELS, INGREDIENT_KEYWORDS 등)
 - 타입 정의: types.ts (TargetType enum, MenuItem interface 등)
-- 메뉴명 정규화: /_냉장|_반조리|_냉동/g 제거 + /\s+\d+$/ 후미 숫자 제거 + trim
-- engine.ts에 normalizeMenuName 로컬 정의(미export), 나머지 파일은 인라인 정규식 사용
-- INGREDIENT_KEYWORDS 3곳 분산: autoClassifyService(최완전), sheetsSerializer, MealPlanHistory
-- TARGET_LABELS 4곳 중복: Dashboard, MealPlanHistory, HistoryDistributionView, HistoryIngredientView
-- 알림: MyPage.tsx의 pendingItems useMemo가 getAllReviews+getReviewComments로 미확인 건수 계산
-- 페이지네이션: MenuDatabase.tsx에 PAGE_SIZE=9999로 사실상 비활성화
+- 메뉴명 정규화: services/menuUtils.ts (normalizeMenuName, stripProcessSuffix)
 - lint-staged: 커밋 시 eslint --fix + prettier --write 자동 실행
+- 테스트: Vitest (98개), Playwright E2E (13개)
+- MealPlanHistory.tsx(2,136줄): 인라인 컴포넌트 6개(줄 253~724) + 메인(줄 727~2136)
+- MealPlanner.tsx(1,262줄): 단일 컴포넌트 + 상단 유틸
+- SystemSettings.tsx(1,234줄): 7개 activeSection 탭
+- MenuDatabase.tsx(1,142줄): 필터/정렬/페이지네이션 + CRUD
 
 ---
 
-## 2026-03-03 - US-001: TARGET_LABELS를 constants.ts로 통합
-- constants.ts 끝에 TARGET_LABELS export 추가 (Record<string, string>, 10개 항목)
-- Dashboard.tsx: import 추가 + 로컬 정의 제거
-- MealPlanHistory.tsx: import 추가 + 로컬 정의 제거
-- HistoryDistributionView.tsx: import 추가 + 로컬 정의 제거
-- HistoryIngredientView.tsx: import 추가 + 로컬 정의 제거
-- 변경 파일: constants.ts, components/Dashboard.tsx, components/MealPlanHistory.tsx, components/HistoryDistributionView.tsx, components/HistoryIngredientView.tsx
+## 2026-03-04 - US-001: Dashboard TypeScript 빌드 에러 수정
+- Dashboard.tsx:690의 Recharts BarChart onClick 핸들러 타입 수정
+- BarRectangleItem.name이 string | undefined → typeof 가드 적용
+- 변경 파일: components/Dashboard.tsx (3줄 추가, 2줄 삭제)
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## 2026-03-03 - US-002: normalizeMenuName 공유 유틸 추출 (Part 1: services)
-- services/menuUtils.ts 신규 생성: export const normalizeMenuName
-- engine.ts: 로컬 normalizeMenuName 제거 + import { normalizeMenuName } from './menuUtils' 추가
-- autoClassifyService.ts: 로컬 normalizeMenuName 제거 + import 추가 (사용처 2곳 변경 없음)
-- tagAnalysisService.ts: 인라인 .replace(/_냉장|_반조리|_냉동/g, '').replace(/\s+\d+$/, '').trim()을 normalizeMenuName(item.name) 호출로 교체
-- 변경 파일: services/menuUtils.ts(신규), services/engine.ts, services/autoClassifyService.ts, services/tagAnalysisService.ts
+## 2026-03-04 - US-002: MealPlanHistory 인라인 서브컴포넌트 추출
+- 6개 인라인 컴포넌트를 components/history/ 디렉토리로 추출
+- 신규 파일: historyConstants.ts, MenuItemRow.tsx, MergedTableCell.tsx, HistoryTableCell.tsx, SwapModal.tsx, ActionModal.tsx, CommentModal.tsx, index.ts
+- TableCell → HistoryTableCell로 리네임 (HTML 충돌 방지)
+- 공유 상수/유틸을 historyConstants.ts로 통합 (순환 참조 방지)
+- MealPlanHistory.tsx: 2,136 → 1,484줄 (652줄 감소)
+- 변경 파일: MealPlanHistory.tsx + 8개 신규 파일
+- Learnings: Edit 도구로 큰 블록 제거 시 Python 스크립트 활용 효과적
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## 2026-03-03 - US-003: normalizeMenuName 공유 유틸 추출 (Part 2: components)
-- menuUtils.ts에 stripProcessSuffix 추가 (공정 접미사만 제거, 후미 숫자 보존)
-- MealPlanner.tsx: 10곳 인라인 → normalizeMenuName (3개 로컬 normalize 함수 제거)
-- MealPlanHistory.tsx: parseMenuItem·detectProcess → stripProcessSuffix, 나머지 2곳 → normalizeMenuName
-- HistoryReviewModal.tsx: 2곳 교체 (1곳 normalizeMenuName, 1곳 normalizeMenuName)
-- Dashboard.tsx: 1곳 → normalizeMenuName
-- HistoryDistributionView.tsx: 1곳 → normalizeMenuName
-- HistoryIngredientView.tsx: 1곳 → normalizeMenuName
-- 패턴 발견: 후미 숫자가 수량 정보인 경우 stripProcessSuffix 사용 필요 (parseMenuItem)
-- 변경 파일: services/menuUtils.ts, 6개 컴포넌트 파일
+## 2026-03-04 - US-003: MealPlanHistory 커스텀 훅 추출
+- 3개 커스텀 훅 추출: useHistoryNavigation(68줄), useHistoryReview(150줄), useHistoryEdit(178줄)
+- 추가 추출: HistoryPlanTable(434줄), HistoryProductionTable(124줄), historyExports(176줄)
+- computeColumns 함수를 historyExports.ts에 공유로 추출 (PlanTable과 CSV export 공유)
+- ToastType import 필요 (string 대신 ToastType 사용)
+- MenuItem.process는 number | undefined (string 아님) - 타입 주의
+- handleChooseComment은 edit+review 훅 브릿지 → 메인 컴포넌트에 유지
+- formatDate는 useCallback으로 공유 (IngredientView, DistributionView에 전달)
+- MealPlanHistory.tsx: 1,484 → 499줄 (985줄 감소, 목표 500줄 이하 달성)
+- MealPlanHistory 빌드 청크: 69.04 KB → 68.80 KB (미미한 차이, 회귀 없음)
+- 변경 파일: MealPlanHistory.tsx + 6개 신규 파일 + index.ts 업데이트
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## 2026-03-03 - US-004: INGREDIENT_KEYWORDS 단일 소스 통합
-- constants.ts에 INGREDIENT_KEYWORDS 추가 (Record<string, string[]>, 10개 재료)
-- autoClassifyService 기준 + sheetsSerializer '설렁탕' 병합 = 최완전 버전
-- autoClassifyService.ts: 배열 형식({ingredient, keywords}[]) → Object.entries() 순회로 변경
-- sheetsSerializer.ts: 로컬 정의 제거 + import 추가 (vegetable 카테고리 추가됨 = 버그 수정)
-- MealPlanHistory.tsx: 로컬 정의 제거 + import 추가 (닭강정/닭가슴/돈까스 등 키워드 추가 = 분류 개선)
-- 변경 파일: constants.ts, services/autoClassifyService.ts, services/sheetsSerializer.ts, components/MealPlanHistory.tsx
+## 2026-03-04 - US-004: MealPlanner 서브컴포넌트 및 훅 추출
+- 6개 파일로 분리: plannerConstants.ts, GenerationPanel.tsx, PlanDisplay.tsx, PlanSwapModal.tsx, usePlanGeneration.ts, usePlanState.ts
+- plannerConstants.ts(42줄): PLANNER_INGREDIENT_COLORS, DEFAULT_INGREDIENT_COLOR, getDeliveryDate, calcDaysGap
+- usePlanGeneration.ts(219줄): target/year/month 상태 + handleGenerate (170줄 생성 로직)
+- usePlanState.ts(241줄): plans, swap상태, ddeonddeon상태, handleLoadSnapshot, handleSaveVersion, performSwap
+- GenerationPanel.tsx(122줄): 컨트롤바 (식단대상/연도/월 선택 + 생성/조회/저장 버튼)
+- PlanDisplay.tsx(404줄): CycleRow 내부 컴포넌트 + 주재료 필터 + 빈 상태
+- PlanSwapModal.tsx(333줄): swap 후보 목록 모달 + DdeonddeonPrompt 컴포넌트
+- MealPlanner.tsx: 1,262 → 246줄 (1,016줄 감소)
+- MealPlanner 빌드 청크: 41.44 KB (이전 대비 미미한 차이)
+- Learnings: handleGenerate에 setPlans를 콜백으로 전달하는 패턴이 훅 간 결합을 줄이는 데 효과적
+- Learnings: usePlanState에 swap 관련 상태/핸들러를 함께 묶으면 일관성 유지 용이
+- 변경 파일: MealPlanner.tsx + 6개 신규 파일 + index.ts
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## 2026-03-03 - US-005: 알림 벨 red dot 조건부 표시
-- Layout.tsx에 useMemo + getAllReviews/getReviewComments import 추가
-- pendingCount: pending departments + issue comments 합산
-- 하드코딩 red dot 제거 → pendingCount > 0일 때만 빨간 배지 + 숫자 표시 (99+ 캡)
-- 변경 파일: components/Layout.tsx
+## 2026-03-04 - US-005: SystemSettings 섹션별 서브컴포넌트 추출
+- 7개 섹션을 components/settings/ 디렉토리로 추출
+- 신규 파일: settingsConstants.ts, AlgorithmSection.tsx, PolicySection.tsx, IntegrationSection.tsx, ShipmentSection.tsx, IngredientColorSection.tsx, ProductionLimitSection.tsx, TargetTagSection.tsx, index.ts
+- hooks/useSettingsState.ts(383줄): 모든 상태 + useEffect 로드 + handleSave + 헬퍼 함수
+- settingsConstants.ts(96줄): DEFAULT_AI_MANUAL 기본 텍스트 분리
+- getStatusIcon은 IntegrationSection 내부 유틸로 이동 (해당 섹션에서만 사용)
+- COLOR_OPTIONS도 IngredientColorSection 내부 상수로 이동
+- SECTION_META + NAV_ITEMS 데이터 기반으로 사이드바/헤더 렌더링 (반복 코드 제거)
+- SystemSettings.tsx: 1,234 → 175줄 (1,059줄 감소)
+- SystemSettings 빌드 청크: 53.08 KB
+- Learnings: 설정 화면처럼 섹션이 독립적인 경우 hook으로 상태를 통합하고 섹션별 props 전달이 깔끔
+- Learnings: 대량 텍스트 상수(AI 매뉴얼 기본값)는 별도 파일로 분리하면 훅 파일 크기 관리 용이
+- 변경 파일: SystemSettings.tsx + 10개 신규 파일
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## 2026-03-03 - US-006: PAGE_SIZE 정상화 + 페이지네이션 활성화
-- MenuDatabase.tsx: PAGE_SIZE 9999 → 50
-- 기존 pagination UI(이전/다음 버튼, 페이지 카운트) + setPage(0) 리셋 이미 구현 확인
-- 변경 파일: components/MenuDatabase.tsx
+## 2026-03-04 - US-006: MenuDatabase 훅 추출 및 컴포넌트 분리
+- menuConstants.ts(32줄): PAGE_SIZE, INGREDIENT_LABELS, SortField, SortDir, categoryBadgeClass
+- useMenuFilters.ts(419줄): 15개+ useState, useMemo(stats/filteredItems/sortedItems/availableTags), 18개 핸들러
+- MenuToolbar.tsx(174줄): 상단 액션바 + 통계 + 필터 바 (카테고리/사용여부/검색)
+- MenuRow.tsx(268줄): 테이블 행 + 인라인 편집 (카테고리, 계절, 주재료, 맛속성, 사용여부, 태그 드롭다운, 출시일, 대상 식단)
+- index.ts(2줄): MenuToolbar, MenuRow 배럴 export
+- MenuDatabase.tsx: 1,142 → 189줄 (953줄 감소)
+- Learnings: 훅에서 모든 핸들러(handleTagToggle, handleAddNewTag 등)를 제공하면 Row 컴포넌트 props가 깔끔해짐
+- Learnings: SortHeader는 부모 closure(sortField, handleSort)에 의존 → 메인 컴포넌트 내부에 유지가 자연스러움
+- 변경 파일: MenuDatabase.tsx + 5개 신규 파일 + index.ts
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## 2026-03-03 - US-007: 미사용 import 및 dead code 정리
-- HistoryIngredientView.tsx: MenuCategory import 제거
-- MealPlanner.tsx: Input import 제거
-- MyPage.tsx: PlanReviewRecord, ReviewComment type import 제거
-- eslint 경고 0건 확인 (변경 파일 한정)
-- 변경 파일: components/HistoryIngredientView.tsx, components/MealPlanner.tsx, components/MyPage.tsx
+## 2026-03-04 - US-007: 성능 최적화 (useMemo / useCallback / React.memo)
+- React.memo 적용: MenuRow, MenuToolbar, MenuItemRow (리스트 렌더링 최적화)
+- useCallback 적용: useMenuFilters 훅의 8개 핸들러 (handleSort, handleUpdateItem, toggleSelectItem, toggleSelectAll, handleTagToggle, handleAddNewTag, handleAgeGroupToggle, handleLaunchDateChange)
+- 기존 확인: History/Planner 훅은 이미 useCallback 전수 적용 (useHistoryNavigation 3개, useHistoryReview 4개, useHistoryEdit 5개, usePlanGeneration 1개, usePlanState 4개)
+- 기존 확인: useMemo는 모든 훅에서 computed values에 적용 완료 (filteredItems, sortedItems, stats, monthPlans 등)
+- Learnings: React.memo는 리스트 항목 컴포넌트(MenuRow 등)에 가장 효과적 → useCallback된 핸들러와 조합 필수
+- 변경 파일: useMenuFilters.ts, MenuRow.tsx, MenuToolbar.tsx, MenuItemRow.tsx
+- 검증: tsc 0에러, vite build 성공, vitest 98/98 통과
 ---
 
-## COMPLETE: 7/7 stories passed
+## 2026-03-04 - US-008: 추출된 커스텀 훅 단위 테스트 추가
+- 7개 테스트 파일 생성: useHistoryNavigation(6), useHistoryReview(4), useHistoryEdit(4), usePlanGeneration(4), usePlanState(3), useMenuFilters(6), useSettingsState(6)
+- 총 33개 신규 테스트, 전체 131/131 통과
+- Learnings: renderHook + vi.mock 조합으로 커스텀 훅 격리 테스트 가능. 훅 파라미터 인터페이스를 정확히 맞춰야 함
+- 변경 파일: tests/hooks/ 7개 파일 생성
+- 검증: tsc 0에러, vite build 성공, vitest 131/131 통과
+---
+
+## 2026-03-04 - US-009: 최종 검증 및 파일 크기 확인
+- MealPlanHistory.tsx 546→493줄: export 핸들러 3개(CSV/PDF/Sheets)를 historyExports.ts의 doExportCSV/doExportPDF/doExportGoogleSheets로 추출
+- useMenuFilters.ts 576→462줄: handleAutoClassify/handleCleanup을 menuActions.ts 유틸로 추출
+- 최종 파일 크기: MealPlanHistory(493), MealPlanner(246), SystemSettings(179), MenuDatabase(200)
+- 모든 신규 파일 500줄 이하 (최대: HistoryPlanTable 454줄)
+- Learnings: prettier/lint-staged가 useCallback 래핑 시 줄 수를 크게 늘림 → 대형 핸들러는 별도 유틸 파일로 추출이 효과적
+- 변경 파일: MealPlanHistory.tsx, useMenuFilters.ts, historyExports.ts, menuActions.ts(신규)
+- 검증: tsc 0에러, vite build 성공, vitest 131/131 통과
+---
+

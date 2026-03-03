@@ -1,7 +1,10 @@
 import { TargetType } from '../../types';
 import type { HistoricalMealPlan, MenuItem } from '../../types';
+import type { ToastMessage } from '../../context/ToastContext';
+import type { SyncStatus, SyncDirection } from '../../context/SheetsContext';
 import { TARGET_LABELS } from '../../constants';
 import { normalizeMenuName } from '../../services/menuUtils';
+import { pushSheetData } from '../../services/sheetsService';
 import {
   TARGET_MERGE_MAP,
   STANDALONE_TARGETS,
@@ -142,6 +145,126 @@ export function buildSheetsRows(monthPlans: HistoricalMealPlan[]): string[][] {
     }
   }
   return rows;
+}
+
+export type ProcessGroup = { process: string; items: { name: string; qty: number }[]; totalQty: number };
+
+export function computeProductionSummary(
+  monthPlans: HistoricalMealPlan[],
+  shipmentConfig: Record<string, { 화수목: number; 금토월: number }>,
+  menuLookup: Map<string, MenuItem>,
+  detectProcessFn: (name: string, menu?: MenuItem) => string
+): Map<string, ProcessGroup[]> {
+  const result = new Map<string, ProcessGroup[]>();
+  for (const plan of monthPlans) {
+    const key = `${plan.date}-${plan.cycleType}`;
+    const menuQty = new Map<string, number>();
+    const menuProcess = new Map<string, string>();
+    for (const target of plan.targets) {
+      const volume = shipmentConfig[target.targetType]?.[plan.cycleType as '화수목' | '금토월'] || 0;
+      if (volume === 0) continue;
+      for (const item of target.items) {
+        if (!isValidMenuItem(item.name)) continue;
+        const { cleanName } = parseMenuItem(item.name);
+        menuQty.set(cleanName, (menuQty.get(cleanName) || 0) + volume);
+        if (!menuProcess.has(cleanName))
+          menuProcess.set(cleanName, detectProcessFn(item.name, menuLookup.get(cleanName)));
+      }
+    }
+    const processGroups = new Map<string, { name: string; qty: number }[]>();
+    for (const [name, qty] of menuQty) {
+      const process = menuProcess.get(name) || '기타';
+      if (!processGroups.has(process)) processGroups.set(process, []);
+      processGroups.get(process)!.push({ name, qty });
+    }
+    const groups = PROCESS_ORDER.filter(p => processGroups.has(p)).map(p => {
+      const items = processGroups.get(p)!.sort((a, b) => b.qty - a.qty);
+      return { process: p, items, totalQty: items.reduce((s, i) => s + i.qty, 0) };
+    });
+    result.set(key, groups);
+  }
+  return result;
+}
+
+// --- Export action helpers (extracted from MealPlanHistory) ---
+
+interface ExportDeps {
+  monthPlans: HistoricalMealPlan[];
+  viewYear: number;
+  viewMonth: number;
+  viewMode: string;
+  columns: ColumnDef[];
+  consolidatedProduction: ConsolidatedItem[];
+  addToast: (t: Omit<ToastMessage, 'id'>) => void;
+  setSyncStatus: (name: string, status: SyncStatus, direction?: SyncDirection, error?: string) => void;
+}
+
+export function doExportCSV(deps: ExportDeps): void {
+  if (deps.monthPlans.length === 0) return;
+  const suffix =
+    deps.viewMode === 'ingredient'
+      ? '재료검토'
+      : deps.viewMode === 'distribution'
+        ? '현장배포'
+        : deps.viewMode === 'production'
+          ? '생산통합'
+          : '식단표';
+  let csv: string;
+  if (deps.viewMode === 'plan') csv = buildPlanCSV(deps.monthPlans, deps.columns);
+  else if (deps.viewMode === 'ingredient' || deps.viewMode === 'distribution') csv = buildDetailCSV(deps.monthPlans);
+  else csv = buildProductionCSV(deps.consolidatedProduction);
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `식단히스토리_${deps.viewYear}년${deps.viewMonth + 1}월_${suffix}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function doExportPDF(
+  contentRef: React.RefObject<HTMLDivElement | null>,
+  viewYear: number,
+  viewMonth: number
+): Promise<void> {
+  if (!contentRef.current) return;
+  const html2pdf = (await import('html2pdf.js')).default;
+  const opt = {
+    margin: [10, 10, 10, 10] as [number, number, number, number],
+    filename: `식단히스토리_${viewYear}년${viewMonth + 1}월.pdf`,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { orientation: 'landscape' as const, unit: 'mm' as const, format: 'a4' as const } as const,
+  };
+  html2pdf().set(opt).from(contentRef.current).save();
+}
+
+export async function doExportGoogleSheets(deps: ExportDeps): Promise<void> {
+  if (deps.monthPlans.length === 0) {
+    deps.addToast({ type: 'error', title: '내보내기 실패', message: '내보낼 식단 데이터가 없습니다.' });
+    return;
+  }
+  const sheetName = `식단_히스토리_${deps.viewYear}년${deps.viewMonth + 1}월`;
+  deps.setSyncStatus(sheetName, 'syncing', 'push');
+  try {
+    const headers = ['날짜', '주기', '식단유형', '메뉴명', '판매가', '원가'];
+    const rows = buildSheetsRows(deps.monthPlans);
+    const result = await pushSheetData(sheetName, [headers, ...rows]);
+    if (result.success) {
+      deps.setSyncStatus(sheetName, 'success', 'push');
+      deps.addToast({
+        type: 'success',
+        title: '시트 내보내기 완료',
+        message: `${rows.length}건을 "${sheetName}" 시트에 내보냈습니다.`,
+      });
+    } else {
+      throw new Error(result.message || '시트 쓰기 실패');
+    }
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    deps.setSyncStatus(sheetName, 'error', 'push', errMsg);
+    deps.addToast({ type: 'error', title: '시트 내보내기 실패', message: errMsg });
+  }
 }
 
 export function computeConsolidatedProduction(
