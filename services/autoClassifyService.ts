@@ -2,12 +2,8 @@ import { MenuCategory, MenuItem, HistoricalMealPlan, TargetType } from '../types
 import { SPICY_KEYWORDS, AUTO_TAG_RULES } from '../constants';
 import { isKidFriendly, isSeniorFriendly } from './sheetsSerializer';
 
-// 메뉴명 키워드 → 카테고리 매핑
+// 메뉴명 키워드 → 카테고리 매핑 (MAIN을 먼저 체크하여 탕수→MAIN 우선)
 const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
-  {
-    category: MenuCategory.SOUP,
-    keywords: ['국', '찌개', '탕', '전골', '수프', '미역국', '된장국', '김치찌개', '부대찌개', '순두부찌개'],
-  },
   {
     category: MenuCategory.MAIN,
     keywords: [
@@ -28,6 +24,10 @@ const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
     ],
   },
   {
+    category: MenuCategory.SOUP,
+    keywords: ['국', '찌개', '탕', '전골', '수프', '미역국', '된장국', '김치찌개', '부대찌개', '순두부찌개'],
+  },
+  {
     category: MenuCategory.SIDE,
     keywords: ['볶음', '나물', '무침', '조림', '절임', '샐러드', '김치', '젓갈', '장아찌', '겉절이', '잡채'],
   },
@@ -36,6 +36,12 @@ const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
     keywords: ['떡', '과일', '요거트', '젤리', '케이크', '빵', '고구마', '감자', '옥수수'],
   },
 ];
+
+// 카테고리 제외 규칙: 짧은 키워드가 긴 키워드의 일부인 경우 해당 카테고리 매칭 제외
+// 예: '탕' 매칭 시 이름에 '탕수'가 포함되면 SOUP 매칭 건너뜀
+const CATEGORY_EXCLUSIONS: Record<string, string[]> = {
+  탕: ['탕수'],
+};
 
 // 메뉴명 키워드 → 주재료 매핑
 const INGREDIENT_KEYWORDS: { ingredient: string; keywords: string[] }[] = [
@@ -84,7 +90,14 @@ export function autoClassifyMenu(name: string): AutoClassifyResult {
   const result: AutoClassifyResult = {};
 
   for (const { category, keywords } of CATEGORY_KEYWORDS) {
-    if (keywords.some(kw => name.includes(kw))) {
+    const matched = keywords.some(kw => {
+      if (!name.includes(kw)) return false;
+      // 제외 규칙 체크: '탕' 매칭 시 '탕수'가 포함되면 건너뜀
+      const exclusions = CATEGORY_EXCLUSIONS[kw];
+      if (exclusions && exclusions.some(ex => name.includes(ex))) return false;
+      return true;
+    });
+    if (matched) {
       result.category = category;
       break;
     }
@@ -107,24 +120,26 @@ const normalizeMenuName = (name: string): string =>
     .replace(/\s+\d+$/, '')
     .trim();
 
-// 히스토리에서 메뉴별 가격/원가 정보 수집
+// 히스토리에서 메뉴별 가격/원가/사용대상 정보 수집
 export interface HistoryMenuInfo {
   price: number;
   cost: number;
   count: number;
+  targetTypes: Set<string>; // 히스토리에서 실제 사용된 대상 타입들
 }
 
 export function buildHistoryLookup(historicalPlans: HistoricalMealPlan[]): Map<string, HistoryMenuInfo> {
-  const lookup = new Map<string, { prices: number[]; costs: number[] }>();
+  const lookup = new Map<string, { prices: number[]; costs: number[]; targets: Set<string> }>();
 
   for (const plan of historicalPlans) {
     for (const target of plan.targets) {
       for (const item of target.items) {
         const clean = normalizeMenuName(item.name);
         if (!clean) continue;
-        const existing = lookup.get(clean) || { prices: [], costs: [] };
+        const existing = lookup.get(clean) || { prices: [], costs: [], targets: new Set<string>() };
         if (item.price > 0) existing.prices.push(item.price);
         if (item.cost > 0) existing.costs.push(item.cost);
+        if (target.targetType) existing.targets.add(target.targetType);
         lookup.set(clean, existing);
       }
     }
@@ -132,7 +147,7 @@ export function buildHistoryLookup(historicalPlans: HistoricalMealPlan[]): Map<s
 
   const result = new Map<string, HistoryMenuInfo>();
   for (const [name, data] of lookup) {
-    if (data.prices.length === 0 && data.costs.length === 0) continue;
+    if (data.prices.length === 0 && data.costs.length === 0 && data.targets.size === 0) continue;
     const median = (arr: number[]) => {
       if (arr.length === 0) return 0;
       const sorted = [...arr].sort((a, b) => a - b);
@@ -143,6 +158,7 @@ export function buildHistoryLookup(historicalPlans: HistoricalMealPlan[]): Map<s
       price: median(data.prices),
       cost: median(data.costs),
       count: data.prices.length || data.costs.length,
+      targetTypes: data.targets,
     });
   }
 
@@ -264,9 +280,16 @@ export function autoClassifyFull(
       change.fieldsChanged.push('태그');
     }
 
-    // 대상식단: 비어있으면 자동 분류
+    // 대상식단: 히스토리에 사용 기록이 있으면 히스토리 기반, 없으면 키워드 기반
     if (!item.targetAgeGroup || item.targetAgeGroup.length === 0) {
-      const detectedTargets = detectTargetAgeGroups(item.name, currentSpicy);
+      let detectedTargets: TargetType[];
+      if (historyInfo && historyInfo.targetTypes.size > 0) {
+        // 히스토리 기반: 실제 사용된 대상 타입 활용
+        detectedTargets = [...historyInfo.targetTypes] as TargetType[];
+      } else {
+        // 키워드 기반 폴백
+        detectedTargets = detectTargetAgeGroups(item.name, currentSpicy);
+      }
       if (detectedTargets.length > 0) {
         change.targetAgeGroup = detectedTargets;
         change.fieldsChanged.push('대상식단');
