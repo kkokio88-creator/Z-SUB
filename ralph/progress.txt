@@ -135,6 +135,13 @@
 - 변경 파일: components/MenuDatabase.tsx
 ---
 
+## 2026-03-03 - US-020: P19 태그 초기화 시 중복 데이터 태그 잔존 버그
+- 원인: P4 dedup 적용 전에 v2 reset이 실행되어, 이후 dedup 후 재초기화 안 됨
+- 수정: RESET_KEY를 zsub_tags_reset_v2 → v3으로 변경, 재초기화 실행
+- 초기화 건수 console.log 추가
+- 변경 파일: components/MenuDatabase.tsx
+---
+
 ## 2026-03-03 - US-019: P18 반찬 리스트 테이블 헤더 고정
 - 확인: thead에 이미 sticky top-0 z-10 bg-stone-50 적용됨
 - 추가: 스크롤 시 시각적 구분을 위한 shadow 효과 추가

@@ -322,8 +322,8 @@
         "npx vite build passes"
       ],
       "priority": 20,
-      "passes": false,
-      "notes": "MenuDatabase.tsx 태그 초기화 로직. P4(중복 데이터 정리)와 연관. 중복 레코드가 존재할 때 일부만 초기화되는 문제. 전체 menuItems 순회 확인."
+      "passes": true,
+      "notes": "DONE: RESET_KEY를 v2→v3으로 버전 업. P4 dedup 적용 후 재초기화로 중복 레코드 태그 잔존 해결. 초기화 건수 콘솔 로그 추가."
     },
     {
       "id": "US-021",

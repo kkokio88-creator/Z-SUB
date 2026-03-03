@@ -106,15 +106,20 @@ const MenuDatabase: React.FC = () => {
     }
   }, [tagVersion]);
 
-  // US-010: One-time tag reset on mount
+  // US-010/US-020: One-time tag reset on mount (v3 after dedup fix)
   useEffect(() => {
-    const RESET_KEY = 'zsub_tags_reset_v2';
+    const RESET_KEY = 'zsub_tags_reset_v3';
     if (localStorage.getItem(RESET_KEY)) return;
     if (menuItems.length === 0) return;
+    let resetCount = 0;
     for (const item of menuItems) {
       if (item.tags && item.tags.length > 0) {
         contextUpdateItem(item.id, { ...item, tags: [] });
+        resetCount++;
       }
+    }
+    if (resetCount > 0) {
+      console.log(`[US-020] 태그 초기화 완료: ${resetCount}건`);
     }
     localStorage.setItem(RESET_KEY, '1');
     // eslint-disable-next-line react-hooks/exhaustive-deps
