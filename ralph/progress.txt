@@ -101,3 +101,11 @@
 - 변경 파일: services/reviewService.ts
 - 학습: resetDepartmentsForReReview는 메뉴 변경 시 특정 검토자 리셋 (별도 함수)
 ---
+
+## 2026-03-03 - US-011: P10 댓글 기능 고도화
+- ReviewComment에 menuName 옵셔널 필드 추가 (types.ts)
+- 댓글 입력 폼에 메뉴 연결 select 추가 (plan의 메뉴 목록에서 선택)
+- 대댓글(parentId+Reply 버튼), 논의완료(resolveComment+해결 버튼) 이미 구현 확인
+- 연결 메뉴명 배지(🍽) 표시 추가
+- 변경 파일: types.ts, components/HistoryReviewModal.tsx
+---

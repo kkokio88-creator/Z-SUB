@@ -63,6 +63,7 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
   const [reviewComment, setReviewComment] = useState('');
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [linkedMenu, setLinkedMenu] = useState('');
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
 
@@ -148,19 +149,34 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
     }
   }, [reviewKey, addToast, refreshData, user, plan.date]);
 
+  // 식단에 포함된 메뉴 목록 (댓글 메뉴 연결용)
+  const planMenuNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const target of plan.targets) {
+      for (const item of target.items) {
+        if (item.name && item.name.trim()) {
+          names.add(item.name.replace(/_냉장|_반조리|_냉동/g, '').trim());
+        }
+      }
+    }
+    return [...names].sort();
+  }, [plan]);
+
   const handleAddComment = useCallback(() => {
     if (!newComment.trim()) return;
     addReviewComment(reviewKey, {
       department: 'quality',
       reviewer: user?.displayName || '사용자',
-      scope: 'plan',
-      scopeKey: reviewKey,
+      scope: linkedMenu ? 'item' : 'plan',
+      scopeKey: linkedMenu ? `${reviewKey}-${linkedMenu}` : reviewKey,
       comment: newComment,
+      menuName: linkedMenu || undefined,
       status: 'comment',
     });
     setNewComment('');
+    setLinkedMenu('');
     refreshData();
-  }, [reviewKey, newComment, user, refreshData]);
+  }, [reviewKey, newComment, linkedMenu, user, refreshData]);
 
   const handleSubmitReply = useCallback(() => {
     if (!replyTarget || !replyText.trim()) return;
@@ -370,19 +386,34 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
             </h3>
 
             {/* Add comment */}
-            <div className="flex gap-2 mb-4">
-              <Input
-                type="text"
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder="코멘트를 입력하세요..."
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleAddComment();
-                }}
-              />
-              <Button onClick={handleAddComment} disabled={!newComment.trim()} size="icon">
-                <Send className="w-4 h-4" />
-              </Button>
+            <div className="space-y-1.5 mb-4">
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                  placeholder="코멘트를 입력하세요..."
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddComment();
+                  }}
+                />
+                <Button onClick={handleAddComment} disabled={!newComment.trim()} size="icon">
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+              {/* 메뉴 연결 선택 */}
+              <select
+                value={linkedMenu}
+                onChange={e => setLinkedMenu(e.target.value)}
+                className="w-full text-xs border border-stone-200 rounded-md px-2 py-1.5 text-stone-600 bg-white"
+              >
+                <option value="">메뉴 연결 (선택사항)</option>
+                {planMenuNames.map(name => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {topLevelComments.length === 0 ? (
@@ -424,6 +455,11 @@ const HistoryReviewModal: React.FC<HistoryReviewModalProps> = ({ plan, reviewKey
                         </Button>
                       )}
                     </div>
+                    {comment.menuName && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-medium mb-1 border border-blue-200">
+                        🍽 {comment.menuName}
+                      </span>
+                    )}
                     <p className="text-xs text-stone-700 mb-1">{comment.comment}</p>
                     <div className="text-[10px] text-stone-400">
                       {new Date(comment.createdAt).toLocaleString('ko-KR')}

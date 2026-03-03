@@ -181,8 +181,8 @@
         "npx vite build passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": "HistoryReviewModal.tsx comments(lines 372-469). reviewService.ts addReviewComment, resolveComment. 이미 parentId 기반 대댓글과 resolveComment 존재 여부 확인. 메뉴 연결은 comment에 menuItemId 필드 추가."
+      "passes": true,
+      "notes": "DONE: ReviewComment에 menuName 필드 추가. 댓글 입력 시 메뉴 연결 select 추가. 대댓글(parentId)과 논의완료(resolveComment) 기존 구현 확인+검증. 연결 메뉴명 배지 표시."
     },
     {
       "id": "US-012",

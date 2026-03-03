@@ -184,6 +184,7 @@ export interface ReviewComment {
   scope: 'plan' | 'week' | 'item';
   scopeKey: string; // plan: planId, week: "A-1", item: "A-1-돈까스"
   comment: string;
+  menuName?: string; // 연결된 메뉴명
   status: 'comment' | 'issue' | 'resolved';
   createdAt: string;
 }
