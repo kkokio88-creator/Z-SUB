@@ -3,7 +3,6 @@ import { Bell, CheckCircle, MessageSquare, RefreshCw, User } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import { getAllReviews, getReviewComments, DEPARTMENT_LABELS } from '../services/reviewService';
-import type { PlanReviewRecord, ReviewComment } from '../types';
 
 const MyPage: React.FC = () => {
   const { user, loginWithGoogle, isOfflineMode } = useAuth();

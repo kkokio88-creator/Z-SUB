@@ -11,7 +11,6 @@ import { saveTempSnapshot, loadSnapshot } from '../services/historyService';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { normalizeMenuName } from '../services/menuUtils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 // ── 식재료별 컬러 맵 ──

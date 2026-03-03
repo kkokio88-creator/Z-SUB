@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { HistoricalMealPlan, MenuItem } from '../types';
-import { TargetType, MenuCategory } from '../types';
+import { TargetType } from '../types';
 import { TARGET_CONFIGS, TARGET_LABELS } from '../constants';
 import { normalizeMenuName } from '../services/menuUtils';
 
