@@ -66,8 +66,8 @@
         "npx vite build passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "MenuDatabase.tsx 또는 MenuContext에서 중복 탐지/제거 로직 추가. data/realMenuDB.ts에서 중복 레코드 직접 정리. 신규 등록 시 code+name unique check 추가."
+      "passes": true,
+      "notes": "DONE: MenuContext에 deduplicateItems 유틸 추가(code+name 기준). loadMenuFromStorage/refreshFromSheet에서 자동 dedup 적용. addItem에 중복 방지 체크 추가. MenuDatabase CSV import에서 중복 건너뛰기+카운트 표시."
     },
     {
       "id": "US-005",

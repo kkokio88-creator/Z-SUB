@@ -46,3 +46,12 @@
 - 추가: 식단표 메뉴 아이템 "(N주 전)" 표시에도 동일 title 속성 추가
 - 변경 파일: components/MealPlanner.tsx
 ---
+
+## 2026-03-03 - US-004: P4 반찬 리스트 중복 데이터 정리 + 중복 방지
+- 구현: MenuContext에 deduplicateItems(code+name 기준) 유틸 함수 추가
+- loadMenuFromStorage, refreshFromSheet에서 자동 dedup 적용 (로드 시 중복 자동 정리)
+- addItem에 중복 방지 로직 추가 (동일 code+name 존재 시 무시)
+- MenuDatabase CSV import에서 중복 건너뛰기 + 카운트 리포트
+- 변경 파일: context/MenuContext.tsx, components/MenuDatabase.tsx
+- 학습: 기존 handleCleanup (MenuDatabase.tsx:500)은 수동 정리. 이번에 추가한 로직은 로드/추가 시 자동 방지
+---

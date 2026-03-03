@@ -1052,14 +1052,26 @@ const MenuDatabase: React.FC = () => {
         <ImportDialog
           existingItems={menuItems}
           onImport={items => {
+            const existingNames = new Set(
+              menuItems.map(m => (m.code && m.code.trim() ? `${m.code.trim()}|${m.name.trim()}` : m.name.trim()))
+            );
+            let added = 0;
             items.forEach(item => {
-              if (item.name) addItem(item as MenuItem);
+              if (!item.name) return;
+              const key = item.code && item.code.trim() ? `${item.code.trim()}|${item.name.trim()}` : item.name.trim();
+              if (existingNames.has(key)) return;
+              existingNames.add(key);
+              addItem(item as MenuItem);
+              added++;
             });
             saveToStorage();
             addToast({
               type: 'success',
-              title: 'CSV \uAC00\uC838\uC624\uAE30 \uC644\uB8CC',
-              message: `${items.length}\uAC1C \uBA54\uB274\uAC00 \uCD94\uAC00\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`,
+              title: 'CSV 가져오기 완료',
+              message:
+                added < items.length
+                  ? `${added}개 추가 (${items.length - added}개 중복 건너뜀)`
+                  : `${added}개 메뉴가 추가되었습니다.`,
             });
             setShowImportDialog(false);
           }}

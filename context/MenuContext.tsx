@@ -37,12 +37,23 @@ const applyAutoTags = (items: MenuItem[]): MenuItem[] =>
     return item;
   });
 
+// 중복 제거: 동일 name 기준 첫 번째만 유지 (code가 있으면 code+name 기준)
+const deduplicateItems = (items: MenuItem[]): MenuItem[] => {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const key = item.code && item.code.trim() ? `${item.code.trim()}|${item.name.trim()}` : item.name.trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const loadMenuFromStorage = (): MenuItem[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const items: MenuItem[] = JSON.parse(stored);
-      return applyAutoTags(redetectIngredients(items.filter(item => item.name && item.name.trim())));
+      return deduplicateItems(applyAutoTags(redetectIngredients(items.filter(item => item.name && item.name.trim()))));
     }
   } catch {
     // ignore parse errors
@@ -73,7 +84,7 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const result = await pullMenuDB();
       if (result.success && result.items.length > 0) {
-        const filtered = applyAutoTags(result.items.filter(item => item.name && item.name.trim()));
+        const filtered = deduplicateItems(applyAutoTags(result.items.filter(item => item.name && item.name.trim())));
         setMenuItems(filtered);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
       }
@@ -93,7 +104,19 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const addItem = useCallback((item: MenuItem) => {
-    setMenuItems(prev => [item, ...prev]);
+    setMenuItems(prev => {
+      // 중복 방지: 동일 code+name 또는 동일 name 이미 존재하면 추가하지 않음
+      const key = item.code && item.code.trim() ? `${item.code.trim()}|${item.name.trim()}` : item.name.trim();
+      const exists = prev.some(existing => {
+        const existingKey =
+          existing.code && existing.code.trim()
+            ? `${existing.code.trim()}|${existing.name.trim()}`
+            : existing.name.trim();
+        return existingKey === key;
+      });
+      if (exists) return prev;
+      return [item, ...prev];
+    });
   }, []);
 
   const deleteItem = useCallback((id: string) => {
