@@ -75,7 +75,7 @@ const MealPlanner: React.FC = () => {
     return nextMonth > 12 ? 1 : nextMonth;
   });
   const monthLabel = `${selectedYear}년 ${selectedMonth}월`;
-  const [checkDupes, setCheckDupes] = useState<boolean>(true);
+  const checkDupes = true; // 항상 중복 제외 활성화
 
   // Dual Plans for Cycle A (Tue-Thu) and Cycle B (Fri-Mon)
   const [plans, setPlans] = useState<{ A: MonthlyMealPlan | null; B: MonthlyMealPlan | null }>({ A: null, B: null });
@@ -833,19 +833,6 @@ const MealPlanner: React.FC = () => {
                 ))}
               </select>
             </div>
-
-            <div className="flex items-center h-full pt-6 ml-2">
-              <Label className="inline-flex items-center cursor-pointer">
-                <Input
-                  type="checkbox"
-                  checked={checkDupes}
-                  onChange={e => setCheckDupes(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="relative w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
-                <span className="ms-2 text-sm font-medium text-stone-600">60일 중복 제외</span>
-              </Label>
-            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -863,7 +850,7 @@ const MealPlanner: React.FC = () => {
               className={`flex items-center gap-2 px-6 py-3 bg-stone-900 hover:bg-black text-white rounded-xl font-bold shadow-lg transition-all active:scale-95 ${isGenerating ? 'opacity-75 cursor-wait' : ''}`}
             >
               {isGenerating ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-              {isGenerating ? '식단 생성 중...' : '통합 식단(화수목/금토월) 자동 생성'}
+              {isGenerating ? '식단 생성 중...' : 'AI 식단 구성'}
             </Button>
             {plans.A && (
               <Button

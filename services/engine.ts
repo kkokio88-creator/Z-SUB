@@ -159,6 +159,19 @@ const generateWeeklyCycle = (
       })
     : null;
 
+  // 최근 사용일 기반 페널티 점수 (0~3, 최근일수록 높음)
+  const getRecencyPenalty = (item: MenuItem): number => {
+    if (!historyContext?.menuLastUsed) return 0;
+    const clean = normalizeMenuName(item.name);
+    const lastUsedDate = historyContext.menuLastUsed.get(clean);
+    if (!lastUsedDate) return 0; // 사용 이력 없음 → 페널티 0
+    const daysSince = Math.floor((Date.now() - new Date(lastUsedDate).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSince <= 30) return 3; // 30일 이내: 최고 페널티
+    if (daysSince <= 45) return 2; // 31~45일: 중간 페널티
+    if (daysSince <= 60) return 1; // 46~60일: 약한 페널티
+    return 0;
+  };
+
   // 카테고리별 선택 공통 로직
   const selectFromPool = (
     pool: MenuItem[],
@@ -171,30 +184,32 @@ const generateWeeklyCycle = (
     const alreadyIds = new Set(alreadySelected.map(s => s.id));
     const remaining = itemsInCategory.filter(m => !alreadyIds.has(m.id));
 
-    // Sort logic:
-    // 1. Deprioritize items with main ingredients used last week
-    // 2. Prioritize required tags
-    // 3. Deprioritize items with main ingredients used in other cycle (배송 그룹 간 분배)
+    // Sort logic: 점수 기반 정렬 (낮을수록 우선)
     const prioritized = remaining.sort((a, b) => {
+      let aScore = 0;
+      let bScore = 0;
+
+      // 최근 사용일 페널티 (가장 중요: 0~3점)
+      aScore += getRecencyPenalty(a) * 2;
+      bScore += getRecencyPenalty(b) * 2;
+
       // Penalty for repeated ingredients from previous week
-      const aRepeats = prevWeekIngredients.has(a.mainIngredient) ? 1 : 0;
-      const bRepeats = prevWeekIngredients.has(b.mainIngredient) ? 1 : 0;
-      if (aRepeats !== bRepeats) return aRepeats - bRepeats;
+      if (prevWeekIngredients.has(a.mainIngredient)) aScore += 3;
+      if (prevWeekIngredients.has(b.mainIngredient)) bScore += 3;
 
       // Penalty for ingredients used in other delivery cycle (50:50 분배)
-      const aOtherCycle = otherIngredientsSet.has(a.mainIngredient) ? 1 : 0;
-      const bOtherCycle = otherIngredientsSet.has(b.mainIngredient) ? 1 : 0;
-      if (aOtherCycle !== bOtherCycle) return aOtherCycle - bOtherCycle;
+      if (otherIngredientsSet.has(a.mainIngredient)) aScore += 2;
+      if (otherIngredientsSet.has(b.mainIngredient)) bScore += 2;
 
       // Penalty for ingredients used in other target (같은 날 다른 식단 간 식재료 분배)
-      const aOtherTarget = otherTargetIngsSet.has(a.mainIngredient) ? 1 : 0;
-      const bOtherTarget = otherTargetIngsSet.has(b.mainIngredient) ? 1 : 0;
-      if (aOtherTarget !== bOtherTarget) return aOtherTarget - bOtherTarget;
+      if (otherTargetIngsSet.has(a.mainIngredient)) aScore += 1;
+      if (otherTargetIngsSet.has(b.mainIngredient)) bScore += 1;
 
       // Bonus for required tags
-      const aMatch = a.tags.some(t => config.requiredTags.includes(t)) ? 1 : 0;
-      const bMatch = b.tags.some(t => config.requiredTags.includes(t)) ? 1 : 0;
-      return bMatch - aMatch;
+      if (a.tags.some(t => config.requiredTags.includes(t))) aScore -= 1;
+      if (b.tags.some(t => config.requiredTags.includes(t))) bScore -= 1;
+
+      return aScore - bScore;
     });
 
     // Filter out items similar to previous week's menus
@@ -218,9 +233,10 @@ const generateWeeklyCycle = (
     const nonSimilarToSelected = pickPool.filter(item => !allSelected.some(sel => isSimilarMenu(item.name, sel.name)));
     const safePool = nonSimilarToSelected.length >= count ? nonSimilarToSelected : pickPool;
 
-    // 가격 우선 선택: 고가 아이템 상위 풀에서 랜덤 (다양성 + 가격 보장)
+    // 가격 기준 상위 풀에서 랜덤 선택 (풀을 넓혀 다양성 확보)
     const priceSorted = [...safePool].sort((a, b) => b.recommendedPrice - a.recommendedPrice);
-    const topPool = priceSorted.slice(0, Math.max(count + 2, Math.min(safePool.length, count + 4)));
+    const poolSize = Math.max(count * 3, Math.min(safePool.length, count + 8));
+    const topPool = priceSorted.slice(0, poolSize);
     return shuffle(topPool).slice(0, count);
   };
 
@@ -243,7 +259,7 @@ const generateWeeklyCycle = (
       selected = [...selected, ...extras30];
     }
 
-    // 3차 갯수 보장 폴백: excludedNames 전체 해제하여 재시도
+    // 3차 갯수 보장 폴백: excludedNames 해제하되, 가장 오래 전에 사용된 메뉴 우선
     if (selected.length < needed && excludedNames && excludedNames.size > 0) {
       const deficit = needed - selected.length;
       const selectedIds = new Set(selected.map(s => s.id));
@@ -256,7 +272,15 @@ const generateWeeklyCycle = (
         if (config.requiredTags.length > 0 && !m.tags.some(tag => config.requiredTags.includes(tag))) return false;
         return true;
       });
-      const extras = shuffle(fallbackPoolFull).slice(0, deficit);
+      // 가장 오래 전에 사용된 메뉴 우선 정렬 (최근 사용 메뉴는 후순위)
+      const sortedByAge = fallbackPoolFull.sort((a, b) => {
+        const aClean = normalizeMenuName(a.name);
+        const bClean = normalizeMenuName(b.name);
+        const aDate = historyContext?.menuLastUsed?.get(aClean) || '0000-00-00';
+        const bDate = historyContext?.menuLastUsed?.get(bClean) || '0000-00-00';
+        return aDate.localeCompare(bDate); // 오래된 것이 앞으로
+      });
+      const extras = sortedByAge.slice(0, deficit);
       // 히스토리 메뉴 사용 기록
       if (historyContext?.menuLastUsed) {
         extras.forEach(item => {

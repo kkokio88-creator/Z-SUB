@@ -34,11 +34,11 @@ const SidebarItem: React.FC<{
     title={collapsed ? label : undefined}
     className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-medium rounded-lg transition-colors ${
       active
-        ? 'bg-emerald-500/15 text-emerald-400 border-l-[3px] border-l-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-400'
-        : 'text-stone-400 hover:bg-stone-700/50 hover:text-stone-200'
+        ? 'bg-emerald-50 text-emerald-700 border-l-[3px] border-l-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'
+        : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
     }`}
   >
-    <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-emerald-400' : 'text-stone-500'}`} />
+    <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-emerald-600' : 'text-stone-400'}`} />
     {!collapsed && label}
   </Button>
 );
@@ -52,18 +52,18 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
     <div className="flex h-screen bg-stone-50 overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`${collapsed ? 'w-16' : 'w-64'} transition-all duration-200 bg-gradient-sidebar border-r border-stone-800 flex flex-col flex-shrink-0 z-20`}
+        className={`${collapsed ? 'w-16' : 'w-64'} transition-all duration-200 bg-white border-r border-stone-200 flex flex-col flex-shrink-0 z-20`}
       >
         <div
-          className={`h-16 flex items-center ${collapsed ? 'justify-center px-2' : 'px-6'} border-b border-stone-800`}
+          className={`h-16 flex items-center ${collapsed ? 'justify-center px-2' : 'px-6'} border-b border-stone-200`}
         >
-          <Leaf className="w-6 h-6 text-emerald-400 flex-shrink-0" />
-          {!collapsed && <span className="text-xl font-bold text-stone-100 tracking-tight ml-2">Z-SUB</span>}
+          <Leaf className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+          {!collapsed && <span className="text-xl font-bold text-stone-800 tracking-tight ml-2">Z-SUB</span>}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(c => !c)}
-            className={`${collapsed ? '' : 'ml-auto'} h-7 w-7 text-stone-400 hover:text-stone-200 hover:bg-stone-700/50`}
+            className={`${collapsed ? '' : 'ml-auto'} h-7 w-7 text-stone-400 hover:text-stone-600 hover:bg-stone-100`}
             title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
           >
             {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
@@ -72,7 +72,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
 
         <nav className={`flex-1 ${collapsed ? 'px-1' : 'px-3'} py-6 space-y-1 overflow-y-auto`}>
           {!collapsed && (
-            <div className="px-4 mb-2 text-xs font-semibold text-stone-500 uppercase tracking-wider">운영 및 관리</div>
+            <div className="px-4 mb-2 text-xs font-semibold text-stone-400 uppercase tracking-wider">운영 및 관리</div>
           )}
           <SidebarItem
             icon={LayoutDashboard}
@@ -90,7 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
           />
 
           {!collapsed && (
-            <div className="mt-8 px-4 mb-2 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+            <div className="mt-8 px-4 mb-2 text-xs font-semibold text-stone-400 uppercase tracking-wider">
               데이터 센터
             </div>
           )}
@@ -118,7 +118,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
           />
 
           {!collapsed && (
-            <div className="mt-8 px-4 mb-2 text-xs font-semibold text-stone-500 uppercase tracking-wider">시스템</div>
+            <div className="mt-8 px-4 mb-2 text-xs font-semibold text-stone-400 uppercase tracking-wider">시스템</div>
           )}
           {collapsed && <div className="mt-4" />}
           <SidebarItem
@@ -130,22 +130,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
           />
         </nav>
 
-        <div className={`${collapsed ? 'p-2' : 'p-4'} border-t border-stone-800 bg-stone-900/50`}>
+        <div className={`${collapsed ? 'p-2' : 'p-4'} border-t border-stone-200 bg-stone-50/50`}>
           <div className={`flex items-center ${collapsed ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold border border-emerald-500/30 shadow-sm flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold border border-emerald-200 shadow-sm flex-shrink-0">
               {user?.displayName?.charAt(0) || 'U'}
             </div>
             {!collapsed && (
               <>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-stone-200">{user?.displayName || '사용자'}</p>
+                  <p className="text-sm font-medium text-stone-800">{user?.displayName || '사용자'}</p>
                   <p className="text-xs text-stone-500">{roleLabel[user?.role || 'manager']}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={logout}
-                  className="ml-auto h-8 w-8 text-stone-500 hover:text-stone-300 transition-colors"
+                  className="ml-auto h-8 w-8 text-stone-400 hover:text-stone-600 transition-colors"
                   title="로그아웃"
                 >
                   <LogOut className="w-5 h-5" />
