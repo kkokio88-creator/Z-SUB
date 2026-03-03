@@ -34,7 +34,7 @@
         "npx vite build passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "MealPlanHistory.tsx에 삭제 UI 추가. HistoricalPlansContext에서 삭제 함수 구현. 잘못 등록된 미래 식단(26년 12월 등)이 0일 전으로 표시되는 문제의 근본 원인."
     },
     {

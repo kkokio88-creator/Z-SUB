@@ -32,3 +32,10 @@
 - 핵심: calcDaysGap(lastDate, deliveryDate).days < threshold → excluded에 추가
 - 학습: 기존 buildExcluded는 new Date() 기준 + cycleType 필터로 부정확했음. allMenuLastUsed가 이미 모든 히스토리에서 최근 사용일을 추적하므로 이를 활용하는 것이 더 정확
 ---
+
+## 2026-03-03 - US-002: P2 히스토리 삭제 기능 추가
+- 구현: HistoricalPlansContext에 deletePlansByMonth(월 단위), deletePlan(개별) 함수 추가
+- MealPlanHistory.tsx에 월 전체 삭제 버튼(Trash2) + 행별 개별 삭제 버튼 추가
+- 삭제 확인 다이얼로그(모달) 구현, 삭제 후 toast 알림
+- 변경 파일: context/HistoricalPlansContext.tsx, components/MealPlanHistory.tsx
+---

@@ -16,6 +16,7 @@ import {
   FileText,
   AlertTriangle,
   FileSpreadsheet,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -746,7 +747,7 @@ const CommentModal: React.FC<{
 // ── 메인 컴포넌트 ──
 
 const MealPlanHistory: React.FC = () => {
-  const { plans: HISTORICAL_MEAL_PLANS, isLoading, refresh } = useHistoricalPlans();
+  const { plans: HISTORICAL_MEAL_PLANS, isLoading, refresh, deletePlansByMonth, deletePlan } = useHistoricalPlans();
   const { menuItems } = useMenu();
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -787,6 +788,33 @@ const MealPlanHistory: React.FC = () => {
     });
     return map;
   }, [editedPlans]);
+
+  // 삭제 확인 다이얼로그 상태
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    type: 'month' | 'single';
+    date: string;
+    cycleType?: string;
+  } | null>(null);
+
+  const handleDeleteMonth = useCallback(() => {
+    const yearMonth = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
+    const count = deletePlansByMonth(yearMonth);
+    addToast({
+      type: 'success',
+      title: '히스토리 삭제',
+      message: `${viewYear}년 ${viewMonth + 1}월 히스토리 ${count}건이 삭제되었습니다.`,
+    });
+    setDeleteConfirm(null);
+  }, [viewYear, viewMonth, deletePlansByMonth, addToast]);
+
+  const handleDeleteSingle = useCallback(
+    (date: string, cycleType: string) => {
+      deletePlan(date, cycleType);
+      addToast({ type: 'success', title: '히스토리 삭제', message: `${date} (${cycleType}) 식단이 삭제되었습니다.` });
+      setDeleteConfirm(null);
+    },
+    [deletePlan, addToast]
+  );
 
   // 액션/교체/코멘트 상태
   const [actionTarget, setActionTarget] = useState<{
@@ -1401,6 +1429,19 @@ const MealPlanHistory: React.FC = () => {
               {monthPlans.length}건
             </Badge>
           )}
+          {allMonthPlans.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setDeleteConfirm({ type: 'month', date: `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}` })
+              }
+              className="ml-2 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50"
+              title={`${viewYear}년 ${viewMonth + 1}월 전체 삭제`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
         {editedPlans.size > 0 && (
           <Badge
@@ -1645,10 +1686,22 @@ const MealPlanHistory: React.FC = () => {
                     return (
                       <tr
                         key={`${plan.date}-${plan.cycleType}`}
-                        className={`border-b border-stone-100 hover:bg-emerald-50/40 ${isCompleted ? 'opacity-60 bg-stone-50/50' : ''}`}
+                        className={`group border-b border-stone-100 hover:bg-emerald-50/40 ${isCompleted ? 'opacity-60 bg-stone-50/50' : ''}`}
                       >
                         <td className="sticky left-0 z-10 bg-white px-2 py-2 border-r border-stone-200 text-xs font-medium text-stone-700 whitespace-nowrap align-top">
-                          {formatDate(plan.date)}
+                          <div className="flex items-center gap-1">
+                            {formatDate(plan.date)}
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                setDeleteConfirm({ type: 'single', date: plan.date, cycleType: plan.cycleType });
+                              }}
+                              className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-stone-300 transition-opacity p-0.5"
+                              title="이 식단 삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </td>
                         <td className="sticky left-[72px] z-10 bg-white px-1.5 py-2 border-r border-stone-200 text-center align-top">
                           <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-600 whitespace-nowrap">
@@ -1957,6 +2010,43 @@ const MealPlanHistory: React.FC = () => {
           onClose={() => setSelectedReview(null)}
           onStatusChange={refreshReviewStatus}
         />
+      )}
+
+      {/* 삭제 확인 다이얼로그 */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl p-6 shadow-2xl max-w-sm w-full mx-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <h3 className="text-base font-bold text-stone-800">히스토리 삭제</h3>
+            </div>
+            <p className="text-sm text-stone-600 mb-4">
+              {deleteConfirm.type === 'month'
+                ? `${viewYear}년 ${viewMonth + 1}월 전체 히스토리(${allMonthPlans.length}건)를 삭제하시겠습니까?`
+                : `${deleteConfirm.date} (${deleteConfirm.cycleType}) 식단을 삭제하시겠습니까?`}
+            </p>
+            <p className="text-xs text-red-500 mb-4">삭제된 데이터는 복구할 수 없습니다.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>
+                취소
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  if (deleteConfirm.type === 'month') {
+                    handleDeleteMonth();
+                  } else if (deleteConfirm.cycleType) {
+                    handleDeleteSingle(deleteConfirm.date, deleteConfirm.cycleType);
+                  }
+                }}
+                className="bg-red-500 hover:bg-red-600 text-white"
+              >
+                삭제
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

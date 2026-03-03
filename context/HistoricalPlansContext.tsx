@@ -87,6 +87,8 @@ interface HistoricalPlansContextType {
   isLoading: boolean;
   refresh: () => Promise<void>;
   registerPlans: (planA: MonthlyMealPlan, planB: MonthlyMealPlan) => number;
+  deletePlansByMonth: (yearMonth: string) => number;
+  deletePlan: (date: string, cycleType: string) => boolean;
 }
 
 const HistoricalPlansContext = createContext<HistoricalPlansContextType | null>(null);
@@ -125,12 +127,39 @@ export const HistoricalPlansProvider: React.FC<{ children: ReactNode }> = ({ chi
     [plans]
   );
 
+  // 월 단위 삭제: yearMonth = "2026-03" 형식
+  const deletePlansByMonth = useCallback(
+    (yearMonth: string): number => {
+      const before = plans.length;
+      const filtered = plans.filter(p => !p.date.startsWith(yearMonth));
+      setPlans(filtered);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      return before - filtered.length;
+    },
+    [plans]
+  );
+
+  // 개별 삭제: date + cycleType 조합
+  const deletePlan = useCallback(
+    (date: string, cycleType: string): boolean => {
+      const idx = plans.findIndex(p => p.date === date && p.cycleType === cycleType);
+      if (idx < 0) return false;
+      const filtered = plans.filter((_, i) => i !== idx);
+      setPlans(filtered);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      return true;
+    },
+    [plans]
+  );
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   return (
-    <HistoricalPlansContext.Provider value={{ plans, isLoading, refresh, registerPlans }}>
+    <HistoricalPlansContext.Provider
+      value={{ plans, isLoading, refresh, registerPlans, deletePlansByMonth, deletePlan }}
+    >
       {children}
     </HistoricalPlansContext.Provider>
   );
