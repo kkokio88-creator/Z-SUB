@@ -17,7 +17,7 @@ import {
 } from 'recharts';
 import { useMenu } from '../context/MenuContext';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
-import { TARGET_CONFIGS } from '../constants';
+import { TARGET_CONFIGS, TARGET_LABELS } from '../constants';
 import { MenuCategory, TargetType } from '../types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,19 +42,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   [MenuCategory.MAIN]: '#f97316',
   [MenuCategory.SIDE]: '#22c55e',
   [MenuCategory.DESSERT]: '#a855f7',
-};
-
-const TARGET_LABELS: Record<string, string> = {
-  [TargetType.VALUE]: '실속',
-  [TargetType.SENIOR_HEALTH]: '건강시니어',
-  [TargetType.SENIOR]: '시니어',
-  [TargetType.YOUTH]: '청소연구소',
-  [TargetType.YOUTH_MAIN]: '청소메인',
-  [TargetType.FAMILY_PLUS]: '든든가족',
-  [TargetType.FAMILY]: '가족',
-  [TargetType.KIDS_PLUS]: '든든아이',
-  [TargetType.KIDS]: '아이',
-  [TargetType.SIDE_ONLY]: '골고루반찬',
 };
 
 const CYCLES_8WEEKS = 16; // 8주 × 2주기(화수목+금토월)

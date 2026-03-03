@@ -1,19 +1,7 @@
 import React, { useMemo } from 'react';
 import type { HistoricalMealPlan } from '../types';
 import { TargetType } from '../types';
-
-const TARGET_LABELS: Record<string, string> = {
-  [TargetType.VALUE]: '실속',
-  [TargetType.SENIOR_HEALTH]: '건강시니어',
-  [TargetType.SENIOR]: '시니어',
-  [TargetType.YOUTH]: '청소연구소',
-  [TargetType.YOUTH_MAIN]: '청소메인',
-  [TargetType.FAMILY_PLUS]: '든든가족',
-  [TargetType.FAMILY]: '가족',
-  [TargetType.KIDS_PLUS]: '든든아이',
-  [TargetType.KIDS]: '아이',
-  [TargetType.SIDE_ONLY]: '골고루반찬',
-};
+import { TARGET_LABELS } from '../constants';
 
 const TARGET_ORDER = Object.values(TargetType);
 
