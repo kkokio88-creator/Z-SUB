@@ -213,6 +213,7 @@ export const DEFAULT_TARGET_TAGS: TargetTagConfig[] = [
 ];
 
 // ── 매운맛 자동 판별 키워드 ──
+// 주의: '불'은 '불고기'(불맛 아님)에 매칭되므로 제외. 구체적 키워드만 사용.
 export const SPICY_KEYWORDS = [
   '고추',
   '매운',
@@ -225,8 +226,7 @@ export const SPICY_KEYWORDS = [
   '닭볶음',
   '마라',
   '칠리',
-  '핫',
-  '불',
+  '핫소스',
   '찜닭매운',
   '카레매운',
 ];

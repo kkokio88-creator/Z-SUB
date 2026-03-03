@@ -23,13 +23,17 @@ export type SyncResult = {
   error?: string;
 };
 
-// ── 메뉴DB ──
+// 원본 시트(읽기 전용)와 앱 전용 사본 시트
+const MENU_ORIGINAL_SHEET = '반찬';
+const MENU_APP_SHEET = '반찬_APP';
+
+// ── 메뉴DB (앱 전용 사본 시트에 저장) ──
 
 export const pushMenuDB = async (menuItems: MenuItem[]): Promise<SyncResult> => {
   try {
     const rows = [MENU_DB_HEADERS, ...menuItems.map(menuItemToRow)];
-    const result = await pushSheetData('반찬', rows);
-    await logSync('push', '반찬', menuItems.length, 'success');
+    const result = await pushSheetData(MENU_APP_SHEET, rows);
+    await logSync('push', MENU_APP_SHEET, menuItems.length, 'success');
     addSyncRecord({
       target: 'SHEETS',
       result: 'success',
@@ -37,7 +41,7 @@ export const pushMenuDB = async (menuItems: MenuItem[]): Promise<SyncResult> => 
     });
     return { success: result.success, rowCount: menuItems.length };
   } catch (err) {
-    await logSync('push', '반찬', 0, 'error', String(err));
+    await logSync('push', MENU_APP_SHEET, 0, 'error', String(err));
     addSyncRecord({
       target: 'SHEETS',
       result: 'error',
@@ -54,29 +58,66 @@ export const pullMenuDB = async (): Promise<{
   error?: string;
 }> => {
   try {
-    const data = await getSheetData('반찬');
-    if (!data.data || data.data.length <= 1) {
+    // 1차: 앱 전용 사본 시트에서 읽기
+    const appData = await getSheetData(MENU_APP_SHEET).catch(() => null);
+    if (appData?.data && appData.data.length > 1) {
+      const items = appData.data
+        .slice(1)
+        .filter(row => row[1] && row[1].trim())
+        .map((row, i) => rowToMenuItem(row, i));
+      await logSync('pull', MENU_APP_SHEET, items.length, 'success');
+      addSyncRecord({ target: 'SHEETS', result: 'success', itemCount: items.length });
+      return { success: true, items };
+    }
+
+    // 2차: 사본이 비어있으면 원본에서 복사 후 반환
+    const copied = await copyOriginalToApp();
+    if (copied.success) {
+      await logSync('pull', MENU_APP_SHEET, copied.items.length, 'success');
+      addSyncRecord({ target: 'SHEETS', result: 'success', itemCount: copied.items.length });
+      return { success: true, items: copied.items };
+    }
+
+    // 3차: 복사 실패 시 원본에서 직접 읽기 (읽기 전용 폴백)
+    const origData = await getSheetData(MENU_ORIGINAL_SHEET);
+    if (!origData.data || origData.data.length <= 1) {
       return { success: true, items: [] };
     }
-    const items = data.data
+    const items = origData.data
       .slice(1)
       .filter(row => row[1] && row[1].trim())
       .map((row, i) => rowToMenuItem(row, i));
-    await logSync('pull', '반찬', items.length, 'success');
-    addSyncRecord({
-      target: 'SHEETS',
-      result: 'success',
-      itemCount: items.length,
-    });
+    await logSync('pull', MENU_ORIGINAL_SHEET, items.length, 'success');
+    addSyncRecord({ target: 'SHEETS', result: 'success', itemCount: items.length });
     return { success: true, items };
   } catch (err) {
-    await logSync('pull', '반찬', 0, 'error', String(err));
+    await logSync('pull', MENU_APP_SHEET, 0, 'error', String(err));
     addSyncRecord({
       target: 'SHEETS',
       result: 'error',
       itemCount: 0,
       errorMessage: String(err),
     });
+    return { success: false, items: [], error: String(err) };
+  }
+};
+
+// 원본 '반찬' 시트 → '반찬_APP' 시트로 초기 복사
+export const copyOriginalToApp = async (): Promise<{ success: boolean; items: MenuItem[]; error?: string }> => {
+  try {
+    const origData = await getSheetData(MENU_ORIGINAL_SHEET);
+    if (!origData.data || origData.data.length <= 1) {
+      return { success: true, items: [] };
+    }
+    // 원본 데이터를 그대로 사본에 저장
+    await pushSheetData(MENU_APP_SHEET, origData.data);
+    const items = origData.data
+      .slice(1)
+      .filter(row => row[1] && row[1].trim())
+      .map((row, i) => rowToMenuItem(row, i));
+    await logSync('push', MENU_APP_SHEET, items.length, 'success');
+    return { success: true, items };
+  } catch (err) {
     return { success: false, items: [], error: String(err) };
   }
 };
