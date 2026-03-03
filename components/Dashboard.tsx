@@ -687,8 +687,11 @@ const Dashboard: React.FC = () => {
                         fill="#f59e0b"
                         radius={[0, 4, 4, 0]}
                         cursor="pointer"
-                        onClick={(data: { name: string }) => {
-                          setExpandedDupMenu(prev => (prev === data.name ? null : data.name));
+                        onClick={data => {
+                          const name = data?.name;
+                          if (typeof name === 'string') {
+                            setExpandedDupMenu(prev => (prev === name ? null : name));
+                          }
                         }}
                       >
                         {duplicationData.map((entry, index) => (
