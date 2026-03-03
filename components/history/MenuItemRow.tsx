@@ -106,4 +106,4 @@ const MenuItemRow: React.FC<{
   );
 };
 
-export default MenuItemRow;
+export default React.memo(MenuItemRow);

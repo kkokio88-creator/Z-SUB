@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { MenuCategory, MenuItem, Season, TargetType, TargetTagConfig } from '../types';
 import { useMenu } from '../context/MenuContext';
 import { useToast } from '../context/ToastContext';
@@ -165,18 +165,24 @@ export function useMenuFilters() {
     setPage(0);
   }, [filterCategory, filterUsage, searchTerm]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortField(field);
-      setSortDir('asc');
-    }
-  };
+  const handleSort = useCallback(
+    (field: SortField) => {
+      if (sortField === field) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+      else {
+        setSortField(field);
+        setSortDir('asc');
+      }
+    },
+    [sortField]
+  );
 
-  const handleUpdateItem = (id: string, field: keyof MenuItem, value: MenuItem[keyof MenuItem]) => {
-    const item = menuItems.find(i => i.id === id);
-    if (item) contextUpdateItem(id, { ...item, [field]: value });
-  };
+  const handleUpdateItem = useCallback(
+    (id: string, field: keyof MenuItem, value: MenuItem[keyof MenuItem]) => {
+      const item = menuItems.find(i => i.id === id);
+      if (item) contextUpdateItem(id, { ...item, [field]: value });
+    },
+    [menuItems, contextUpdateItem]
+  );
 
   const handleCreateNew = () => {
     const newItem: MenuItem = {
@@ -234,19 +240,19 @@ export function useMenuFilters() {
     });
   };
 
-  const toggleSelectItem = (id: string) => {
+  const toggleSelectItem = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     if (selectedIds.size === pageItems.length) setSelectedIds(new Set());
     else setSelectedIds(new Set(pageItems.map(i => i.id)));
-  };
+  }, [selectedIds.size, pageItems]);
 
   const handleBulkApply = (changes: {
     category?: MenuCategory;
@@ -459,46 +465,58 @@ export function useMenuFilters() {
     setShowImportDialog(false);
   };
 
-  const handleTagToggle = (item: MenuItem, tag: string) => {
-    const current = item.tags || [];
-    const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-    contextUpdateItem(item.id, { ...item, tags: next });
-  };
+  const handleTagToggle = useCallback(
+    (item: MenuItem, tag: string) => {
+      const current = item.tags || [];
+      const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
+      contextUpdateItem(item.id, { ...item, tags: next });
+    },
+    [contextUpdateItem]
+  );
 
-  const handleAddNewTag = (item: MenuItem) => {
-    const newTag = prompt('새 태그 이름:');
-    if (!newTag || !newTag.trim()) return;
-    const trimmed = newTag.trim();
-    const current = item.tags || [];
-    if (!current.includes(trimmed)) contextUpdateItem(item.id, { ...item, tags: [...current, trimmed] });
-    try {
-      const raw = localStorage.getItem('zsub_target_tags');
-      const configs: TargetTagConfig[] = raw ? JSON.parse(raw) : [];
-      let changed = false;
-      for (const cfg of configs) {
-        if (!cfg.allowedTags.includes(trimmed)) {
-          cfg.allowedTags.push(trimmed);
-          changed = true;
+  const handleAddNewTag = useCallback(
+    (item: MenuItem) => {
+      const newTag = prompt('새 태그 이름:');
+      if (!newTag || !newTag.trim()) return;
+      const trimmed = newTag.trim();
+      const current = item.tags || [];
+      if (!current.includes(trimmed)) contextUpdateItem(item.id, { ...item, tags: [...current, trimmed] });
+      try {
+        const raw = localStorage.getItem('zsub_target_tags');
+        const configs: TargetTagConfig[] = raw ? JSON.parse(raw) : [];
+        let changed = false;
+        for (const cfg of configs) {
+          if (!cfg.allowedTags.includes(trimmed)) {
+            cfg.allowedTags.push(trimmed);
+            changed = true;
+          }
         }
+        if (changed) {
+          localStorage.setItem('zsub_target_tags', JSON.stringify(configs));
+          setTagVersion(v => v + 1);
+        }
+      } catch {
+        /* ignore */
       }
-      if (changed) {
-        localStorage.setItem('zsub_target_tags', JSON.stringify(configs));
-        setTagVersion(v => v + 1);
-      }
-    } catch {
-      /* ignore */
-    }
-  };
+    },
+    [contextUpdateItem]
+  );
 
-  const handleAgeGroupToggle = (item: MenuItem, tg: TargetType) => {
-    const current = item.targetAgeGroup || [];
-    const next = current.includes(tg) ? current.filter(t => t !== tg) : [...current, tg];
-    contextUpdateItem(item.id, { ...item, targetAgeGroup: next });
-  };
+  const handleAgeGroupToggle = useCallback(
+    (item: MenuItem, tg: TargetType) => {
+      const current = item.targetAgeGroup || [];
+      const next = current.includes(tg) ? current.filter(t => t !== tg) : [...current, tg];
+      contextUpdateItem(item.id, { ...item, targetAgeGroup: next });
+    },
+    [contextUpdateItem]
+  );
 
-  const handleLaunchDateChange = (item: MenuItem, value: string) => {
-    contextUpdateItem(item.id, { ...item, launchDate: value || undefined });
-  };
+  const handleLaunchDateChange = useCallback(
+    (item: MenuItem, value: string) => {
+      contextUpdateItem(item.id, { ...item, launchDate: value || undefined });
+    },
+    [contextUpdateItem]
+  );
 
   return {
     // State

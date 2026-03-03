@@ -267,4 +267,4 @@ const MenuRow: React.FC<MenuRowProps> = ({
   </tr>
 );
 
-export default MenuRow;
+export default React.memo(MenuRow);

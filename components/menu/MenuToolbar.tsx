@@ -172,4 +172,4 @@ const MenuToolbar: React.FC<MenuToolbarProps> = ({
   </div>
 );
 
-export default MenuToolbar;
+export default React.memo(MenuToolbar);
