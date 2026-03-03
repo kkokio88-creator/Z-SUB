@@ -10,6 +10,8 @@ import {
   Users,
   PanelLeftClose,
   PanelLeft,
+  Bell,
+  User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -128,6 +130,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
             collapsed={collapsed}
             onClick={() => onTabChange('settings')}
           />
+          <SidebarItem
+            icon={User}
+            label="마이페이지"
+            active={activeTab === 'mypage'}
+            collapsed={collapsed}
+            onClick={() => onTabChange('mypage')}
+          />
         </nav>
 
         <div className={`${collapsed ? 'p-2' : 'p-4'} border-t border-stone-200 bg-stone-50/50`}>
@@ -186,17 +195,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
                   <Settings className="w-6 h-6 text-stone-400" /> 시스템 설정
                 </>
               )}
+              {activeTab === 'mypage' && (
+                <>
+                  <User className="w-6 h-6 text-stone-400" /> 마이페이지
+                </>
+              )}
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
-              <p className="text-xs font-bold text-stone-800">2024년 3월 5일 (화)</p>
-              <p className="text-[10px] text-stone-500">A조 배송일</p>
-            </div>
-            <Badge variant="success" className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              정상 운영
-            </Badge>
+            <button
+              onClick={() => onTabChange('mypage')}
+              className="relative p-2 rounded-lg hover:bg-stone-100 transition-colors"
+              title="알림"
+            >
+              <Bell className="w-5 h-5 text-stone-500" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            </button>
           </div>
         </header>
 

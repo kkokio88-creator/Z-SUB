@@ -16,6 +16,7 @@ const MasterDataManagement = lazy(() => import('./components/MasterDataManagemen
 const SystemSettings = lazy(() => import('./components/SystemSettings'));
 const MealPlanHistory = lazy(() => import('./components/MealPlanHistory'));
 const SubscriberManagement = lazy(() => import('./components/SubscriberManagement'));
+const MyPage = lazy(() => import('./components/MyPage'));
 
 const TabFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -43,6 +44,8 @@ const App: React.FC = () => {
         return <MealPlanHistory />;
       case 'subscribers':
         return <SubscriberManagement />;
+      case 'mypage':
+        return <MyPage />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-stone-400">

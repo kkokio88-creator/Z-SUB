@@ -135,6 +135,15 @@
 - 변경 파일: components/MenuDatabase.tsx
 ---
 
+## 2026-03-03 - US-017: P16 알림 및 마이페이지
+- 구현: MyPage.tsx 신규 컴포넌트 생성 (프로필 표시 + 알림 목록 + 프로필 설정)
+- Layout.tsx: 사이드바에 마이페이지 탭 추가, 헤더에 알림 벨 아이콘 추가
+- App.tsx: 'mypage' 라우트 추가 (lazy import)
+- 알림 목록: getAllReviews + getReviewComments에서 pending/issue 수집
+- Google 로그인: AuthContext.loginWithGoogle() 연동 (오프라인 모드 시 버튼 표시)
+- 변경 파일: components/MyPage.tsx(신규), components/Layout.tsx, App.tsx
+---
+
 ## 2026-03-03 - US-014: P13 제품 컬러링 통일 (글씨 색만 사용)
 - 구현: PLANNER_INGREDIENT_COLORS에서 bg/borderL/dot 필드 제거, text+label만 유지
 - INGREDIENT_COLORS에서 borderL/dot을 빈 문자열로, text에 실제 주재료별 컬러 적용
