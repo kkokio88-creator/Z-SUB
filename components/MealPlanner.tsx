@@ -762,7 +762,12 @@ const MealPlanner: React.FC = () => {
                         <span className={`font-medium truncate flex-1 ${ingColor.text}`}>
                           {item.name}
                           {lastUsedLabel && (
-                            <span className="ml-1 text-[10px] text-stone-400 font-normal">({lastUsedLabel})</span>
+                            <span
+                              className="ml-1 text-[10px] text-stone-400 font-normal"
+                              title={gapInfo ? `마지막 사용: ${gapInfo.dateStr}` : undefined}
+                            >
+                              ({lastUsedLabel})
+                            </span>
                           )}
                         </span>
                         <div className="flex items-center gap-1 shrink-0">
@@ -1174,6 +1179,7 @@ const MealPlanner: React.FC = () => {
                                     {daysAgo !== null && (
                                       <span
                                         className={`px-1.5 py-0.5 rounded ${daysAgo < 30 ? 'bg-red-50 text-red-500' : daysAgo < 60 ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}
+                                        title={swapGapInfo ? `마지막 사용: ${swapGapInfo.dateStr}` : undefined}
                                       >
                                         {daysAgo}일 전
                                       </span>

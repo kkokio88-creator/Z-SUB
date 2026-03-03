@@ -50,7 +50,7 @@
         "npx vite build passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "MealPlanner.tsx calcDaysGap(lines 76-84), getDeliveryDate(lines 62-73). 현재 배송일 기준 계산 로직은 정상(마파두부 1/24→4/19=86일). 기준 날짜만 '오늘'→'배송일'로 변경하면 됨. 툴팁은 title 속성 또는 Tooltip 컴포넌트 사용."
     },
     {

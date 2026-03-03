@@ -39,3 +39,10 @@
 - 삭제 확인 다이얼로그(모달) 구현, 삭제 후 toast 알림
 - 변경 파일: context/HistoricalPlansContext.tsx, components/MealPlanHistory.tsx
 ---
+
+## 2026-03-03 - US-003: P3 날짜 계산 배송일 기준 + 절대 날짜 툴팁
+- 확인: calcDaysGap(lastUsedDate, deliveryDate) 이미 배송일 기준 구현됨
+- 추가: 스왑 모달 "N일 전" 표시에 title 속성으로 절대 날짜(마지막 사용: YYYY-MM-DD) 추가
+- 추가: 식단표 메뉴 아이템 "(N주 전)" 표시에도 동일 title 속성 추가
+- 변경 파일: components/MealPlanner.tsx
+---
