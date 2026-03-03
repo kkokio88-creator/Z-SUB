@@ -1,6 +1,7 @@
 import { MenuCategory, MenuItem, HistoricalMealPlan, TargetType } from '../types';
 import { SPICY_KEYWORDS, AUTO_TAG_RULES } from '../constants';
 import { isKidFriendly, isSeniorFriendly } from './sheetsSerializer';
+import { normalizeMenuName } from './menuUtils';
 
 // 메뉴명 키워드 → 카테고리 매핑 (SOUP 먼저, CATEGORY_EXCLUSIONS로 오분류 방지)
 const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
@@ -112,13 +113,6 @@ export function autoClassifyMenu(name: string): AutoClassifyResult {
 
   return result;
 }
-
-// 메뉴명 정규화 (태그, 후미 숫자 제거)
-const normalizeMenuName = (name: string): string =>
-  name
-    .replace(/_냉장|_반조리|_냉동/g, '')
-    .replace(/\s+\d+$/, '')
-    .trim();
 
 // 히스토리에서 메뉴별 가격/원가/사용대상 정보 수집
 export interface HistoryMenuInfo {

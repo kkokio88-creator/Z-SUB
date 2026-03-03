@@ -2,6 +2,7 @@
 import { MenuItem, MenuCategory, HistoricalMealPlan, TargetType } from '../types';
 import { KOREAN_BANCHAN_REFERENCE, BanchanReference } from '../constants';
 import { isSimilarMenu } from './engine';
+import { normalizeMenuName } from './menuUtils';
 
 // ── 타입 정의 ──
 
@@ -57,10 +58,7 @@ export function analyzeHistoryForTags(plans: HistoricalMealPlan[], menuItems: Me
       if (!isKidTarget && !isSeniorTarget) continue;
 
       for (const item of target.items) {
-        const name = item.name
-          .replace(/_냉장|_반조리|_냉동/g, '')
-          .replace(/\s+\d+$/, '')
-          .trim();
+        const name = normalizeMenuName(item.name);
         if (!name) continue;
 
         const map = isKidTarget ? kidUsage : seniorUsage;

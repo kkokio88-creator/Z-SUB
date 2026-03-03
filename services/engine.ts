@@ -1,5 +1,6 @@
 import { TARGET_CONFIGS } from '../constants';
 import { WeeklyCyclePlan, MenuCategory, MenuItem, TargetType, MonthlyMealPlan, CycleType } from '../types';
+import { normalizeMenuName } from './menuUtils';
 
 // ── 유사메뉴 감지 ──
 // 한국어 메뉴명에서 핵심 키워드를 추출하여 유사도 판정
@@ -99,13 +100,6 @@ const getWeekDeliveryDate = (monthLabel: string, weekIndex: number): Date | null
 };
 
 // Generate a single week cycle (e.g., Week 1 of Tue-Thu)
-// 메뉴명 정규화: 냉장/반조리/냉동 태그 + 후미 숫자 제거
-const normalizeMenuName = (name: string): string =>
-  name
-    .replace(/_냉장|_반조리|_냉동/g, '')
-    .replace(/\s+\d+$/, '')
-    .trim();
-
 const generateWeeklyCycle = (
   weekIndex: number,
   target: TargetType,
