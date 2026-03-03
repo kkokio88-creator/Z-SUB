@@ -743,7 +743,7 @@ const MenuDatabase: React.FC = () => {
       {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 sticky top-0 z-10">
+          <thead className="bg-stone-50 sticky top-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <tr className="border-b border-stone-200">
               <th className="w-10 px-3 py-2">
                 <Input

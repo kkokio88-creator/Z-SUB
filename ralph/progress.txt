@@ -135,6 +135,13 @@
 - 변경 파일: components/MenuDatabase.tsx
 ---
 
+## 2026-03-03 - US-019: P18 반찬 리스트 테이블 헤더 고정
+- 확인: thead에 이미 sticky top-0 z-10 bg-stone-50 적용됨
+- 추가: 스크롤 시 시각적 구분을 위한 shadow 효과 추가
+- 부모 컨테이너: flex-1 overflow-auto (스크롤 컨텍스트) + 외부 overflow-hidden (경계)
+- 변경 파일: components/MenuDatabase.tsx
+---
+
 ## 2026-03-03 - US-018: P17 검색 기능 강화 (속성 기반 검색)
 - 구현: filteredItems 검색에 tags, mainIngredient(key+MAJOR_INGREDIENTS label), season, category 매칭 추가
 - MAJOR_INGREDIENTS import from constants.ts
