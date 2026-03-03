@@ -134,3 +134,10 @@
 - 메뉴 아이템 카드: border-l-2/bg 제거, 글씨 색만 유지
 - 변경 파일: components/MealPlanner.tsx, components/MealPlanHistory.tsx
 ---
+
+## 2026-03-03 - US-015: P14 주차별 날짜 정보 표시
+- 구현: 주차 헤더에 날짜 범위(월요일~금요일) 표시 추가
+- 형식: '1주차 (4/7 월~4/11 금)' - getDeliveryDate 기반 계산
+- 월이 바뀌는 주(4/28 월~5/2 금)도 자동 처리
+- 변경 파일: components/MealPlanner.tsx
+---

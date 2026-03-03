@@ -626,11 +626,20 @@ const MealPlanner: React.FC = () => {
           const isCostCompliant = targetCostRatio > 0 ? parseFloat(costRatio) <= targetCostRatio : true;
           const costDiff = week.totalCost - currentBudgetCap;
 
+          const weekStart = getDeliveryDate(selectedYear, selectedMonth, week.weekIndex);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 4); // Mon+4=Fri
+          const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+          const fmtDate = (d: Date) => `${d.getMonth() + 1}/${d.getDate()} ${DAY_NAMES[d.getDay()]}`;
+
           return (
             <div key={week.weekIndex} className="p-3 flex flex-col group h-full">
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <span className="text-sm font-bold text-stone-800">{week.weekIndex}주차</span>
+                  <span className="text-[10px] text-stone-400 ml-1">
+                    ({fmtDate(weekStart)}~{fmtDate(weekEnd)})
+                  </span>
                   {/* US-021: 든든 선정 진행률 */}
                   {ddeonddeonCounts && ddeonddeonCounts[`${cycleKey}-${week.weekIndex}`] && (
                     <div className="text-[10px] text-indigo-600 mt-0.5">

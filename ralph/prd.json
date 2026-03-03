@@ -244,8 +244,8 @@
         "npx vite build passes"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": "MealPlanner.tsx getDeliveryDate(lines 62-73). 주차 헤더(line 682) '{week.weekIndex}주차'에 날짜 범위 추가. 주 5일(월~금) 기준 시작일/종료일 계산."
+      "passes": true,
+      "notes": "DONE: 주차 헤더에 날짜 범위 표시 추가. getDeliveryDate(월요일)+4=금요일. 형식: '1주차 (4/7 월~4/11 금)'. 월이 바뀌는 경우도 자동 처리."
     },
     {
       "id": "US-016",
