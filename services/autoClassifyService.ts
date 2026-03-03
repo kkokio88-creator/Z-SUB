@@ -1,5 +1,5 @@
 import { MenuCategory, MenuItem, HistoricalMealPlan, TargetType } from '../types';
-import { SPICY_KEYWORDS, AUTO_TAG_RULES } from '../constants';
+import { SPICY_KEYWORDS, AUTO_TAG_RULES, INGREDIENT_KEYWORDS } from '../constants';
 import { isKidFriendly, isSeniorFriendly } from './sheetsSerializer';
 import { normalizeMenuName } from './menuUtils';
 
@@ -44,44 +44,6 @@ const CATEGORY_EXCLUSIONS: Record<string, string[]> = {
   탕: ['탕수'],
 };
 
-// 메뉴명 키워드 → 주재료 매핑
-const INGREDIENT_KEYWORDS: { ingredient: string; keywords: string[] }[] = [
-  { ingredient: 'beef', keywords: ['소고기', '한우', '불고기', '갈비', '사골', '차돌', '우삼겹', '소불고기'] },
-  {
-    ingredient: 'pork',
-    keywords: ['한돈', '돼지', '제육', '삼겹', '탕수', '돈까스', '수육', '보쌈', '족발', '돈불고기'],
-  },
-  { ingredient: 'chicken', keywords: ['닭', '치킨', '닭볶음', '닭갈비', '닭강정', '닭가슴'] },
-  {
-    ingredient: 'fish',
-    keywords: [
-      '동태',
-      '오징어',
-      '새우',
-      '어묵',
-      '참치',
-      '멸치',
-      '황태',
-      '맛살',
-      '고등어',
-      '꽁치',
-      '갈치',
-      '조기',
-      '연어',
-      '생선',
-    ],
-  },
-  { ingredient: 'tofu', keywords: ['두부', '순두부'] },
-  { ingredient: 'egg', keywords: ['계란', '달걀', '메추리알', '에그'] },
-  { ingredient: 'potato', keywords: ['감자', '고구마'] },
-  { ingredient: 'seaweed', keywords: ['미역', '파래', '김무침', '다시마', '해초'] },
-  { ingredient: 'mushroom', keywords: ['버섯', '표고', '느타리', '팽이', '새송이'] },
-  {
-    ingredient: 'vegetable',
-    keywords: ['나물', '시래기', '애호박', '양배추', '콩나물', '숙주', '브로콜리', '시금치', '깻잎', '상추'],
-  },
-];
-
 export interface AutoClassifyResult {
   category?: MenuCategory;
   mainIngredient?: string;
@@ -104,7 +66,7 @@ export function autoClassifyMenu(name: string): AutoClassifyResult {
     }
   }
 
-  for (const { ingredient, keywords } of INGREDIENT_KEYWORDS) {
+  for (const [ingredient, keywords] of Object.entries(INGREDIENT_KEYWORDS)) {
     if (keywords.some(kw => name.includes(kw))) {
       result.mainIngredient = ingredient;
       break;

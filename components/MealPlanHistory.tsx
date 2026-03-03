@@ -28,7 +28,7 @@ import { useToast } from '../context/ToastContext';
 import { useSheets } from '../context/SheetsContext';
 import { pushSheetData } from '../services/sheetsService';
 import { TargetType, MenuCategory } from '../types';
-import { TARGET_CONFIGS, TARGET_LABELS } from '../constants';
+import { TARGET_CONFIGS, TARGET_LABELS, INGREDIENT_KEYWORDS } from '../constants';
 import type {
   HistoricalMenuItem,
   HistoricalTargetPlan,
@@ -118,19 +118,6 @@ type ColumnDef = { type: 'standalone'; target: TargetType } | { type: 'merged'; 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
 // ── 주재료 감지 ──
-
-const INGREDIENT_KEYWORDS: Record<string, string[]> = {
-  beef: ['소고기', '한우', '불고기', '갈비', '사골', '차돌', '설렁탕'],
-  pork: ['한돈', '돼지', '제육', '삼겹', '탕수', '수육', '족발', '보쌈'],
-  chicken: ['닭', '치킨', '닭볶음', '닭갈비'],
-  fish: ['동태', '오징어', '새우', '어묵', '참치', '멸치', '황태', '맛살', '고등어', '갈치', '조기', '꽁치', '연어'],
-  tofu: ['두부', '순두부'],
-  egg: ['계란', '달걀', '메추리알', '에그'],
-  potato: ['감자', '고구마'],
-  seaweed: ['미역', '파래', '김무침', '다시마', '해초'],
-  mushroom: ['버섯', '표고', '느타리', '팽이', '새송이'],
-  vegetable: ['나물', '시래기', '애호박', '양배추', '콩나물'],
-};
 
 const INGREDIENT_COLORS: Record<string, { bg: string; borderL: string; text: string; dot: string; label: string }> = {
   beef: { bg: 'bg-white', borderL: '', text: 'text-red-600', dot: '', label: '소고기' },
