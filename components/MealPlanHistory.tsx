@@ -145,32 +145,32 @@ const INGREDIENT_KEYWORDS: Record<string, string[]> = {
 };
 
 const INGREDIENT_COLORS: Record<string, { bg: string; borderL: string; text: string; dot: string; label: string }> = {
-  beef: { bg: 'bg-white', borderL: 'border-l-red-400', text: 'text-stone-700', dot: 'bg-red-400', label: '소고기' },
-  pork: { bg: 'bg-white', borderL: 'border-l-rose-400', text: 'text-stone-700', dot: 'bg-rose-400', label: '한돈' },
-  chicken: { bg: 'bg-white', borderL: 'border-l-amber-400', text: 'text-stone-700', dot: 'bg-amber-400', label: '닭' },
-  fish: { bg: 'bg-white', borderL: 'border-l-sky-400', text: 'text-stone-700', dot: 'bg-sky-400', label: '생선' },
-  tofu: { bg: 'bg-white', borderL: 'border-l-yellow-300', text: 'text-stone-700', dot: 'bg-yellow-300', label: '두부' },
-  egg: { bg: 'bg-white', borderL: 'border-l-orange-300', text: 'text-stone-700', dot: 'bg-orange-300', label: '달걀' },
-  potato: { bg: 'bg-white', borderL: 'border-l-stone-400', text: 'text-stone-700', dot: 'bg-stone-400', label: '감자' },
+  beef: { bg: 'bg-white', borderL: '', text: 'text-red-600', dot: '', label: '소고기' },
+  pork: { bg: 'bg-white', borderL: '', text: 'text-rose-600', dot: '', label: '한돈' },
+  chicken: { bg: 'bg-white', borderL: '', text: 'text-amber-600', dot: '', label: '닭' },
+  fish: { bg: 'bg-white', borderL: '', text: 'text-sky-600', dot: '', label: '생선' },
+  tofu: { bg: 'bg-white', borderL: '', text: 'text-yellow-600', dot: '', label: '두부' },
+  egg: { bg: 'bg-white', borderL: '', text: 'text-orange-600', dot: '', label: '달걀' },
+  potato: { bg: 'bg-white', borderL: '', text: 'text-stone-500', dot: '', label: '감자' },
   seaweed: {
     bg: 'bg-white',
-    borderL: 'border-l-teal-400',
-    text: 'text-stone-700',
-    dot: 'bg-teal-400',
+    borderL: '',
+    text: 'text-teal-600',
+    dot: '',
     label: '해조류',
   },
   mushroom: {
     bg: 'bg-white',
-    borderL: 'border-l-violet-300',
-    text: 'text-stone-700',
-    dot: 'bg-violet-300',
+    borderL: '',
+    text: 'text-violet-600',
+    dot: '',
     label: '버섯',
   },
   vegetable: {
     bg: 'bg-white',
-    borderL: 'border-l-green-400',
-    text: 'text-stone-700',
-    dot: 'bg-green-400',
+    borderL: '',
+    text: 'text-green-600',
+    dot: '',
     label: '채소',
   },
   other: { bg: 'bg-white', borderL: 'border-l-stone-300', text: 'text-stone-500', dot: 'bg-stone-300', label: '기타' },
@@ -571,7 +571,7 @@ const SwapModal: React.FC<{
                   variant="outline"
                   size="sm"
                   onClick={() => setIngredientFilter(f => (f === key ? '' : key))}
-                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${ingredientFilter === key ? `${val.bg} ${val.text} border-current font-bold` : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}
+                  className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${ingredientFilter === key ? `bg-stone-100 ${val.text} border-current font-bold` : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}
                 >
                   {val.label}
                 </Button>
@@ -590,11 +590,11 @@ const SwapModal: React.FC<{
                     key={item.id}
                     variant="ghost"
                     onClick={() => onSelect(item.name)}
-                    className={`w-full text-left px-3 py-2 rounded-lg border-l-2 ${colors.borderL} ${colors.bg} hover:ring-1 hover:ring-stone-300 transition-all flex items-center justify-between h-auto`}
+                    className={`w-full text-left px-3 py-2 rounded-lg hover:ring-1 hover:ring-stone-300 transition-all flex items-center justify-between h-auto`}
                   >
-                    <span className="text-sm text-stone-700 truncate">{item.name}</span>
+                    <span className={`text-sm truncate ${colors.text}`}>{item.name}</span>
                     <div className="flex items-center gap-2 text-xs text-stone-400 shrink-0 ml-2">
-                      <span className={`px-1.5 py-0.5 rounded ${colors.bg} ${colors.text} text-[10px] font-medium`}>
+                      <span className={`px-1.5 py-0.5 rounded bg-stone-50 ${colors.text} text-[10px] font-medium`}>
                         {colors.label}
                       </span>
                       <span>
@@ -1731,7 +1731,6 @@ const MealPlanHistory: React.FC = () => {
                                     : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
                                 }`}
                               >
-                                <span className={`w-2 h-2 rounded-full ${val.dot}`} />
                                 {val.label}
                               </button>
                             );

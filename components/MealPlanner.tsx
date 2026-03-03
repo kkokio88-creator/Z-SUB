@@ -14,47 +14,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 // ── 식재료별 컬러 맵 ──
-const PLANNER_INGREDIENT_COLORS: Record<
-  string,
-  { bg: string; borderL: string; text: string; dot: string; label: string }
-> = {
-  beef: { bg: 'bg-red-50', borderL: 'border-l-red-400', text: 'text-red-700', dot: 'bg-red-400', label: '소고기' },
-  pork: { bg: 'bg-pink-50', borderL: 'border-l-pink-400', text: 'text-pink-700', dot: 'bg-pink-400', label: '한돈' },
-  chicken: {
-    bg: 'bg-amber-50',
-    borderL: 'border-l-amber-400',
-    text: 'text-amber-700',
-    dot: 'bg-amber-400',
-    label: '닭',
-  },
-  fish: { bg: 'bg-blue-50', borderL: 'border-l-blue-400', text: 'text-blue-700', dot: 'bg-blue-400', label: '생선' },
-  tofu: {
-    bg: 'bg-yellow-50',
-    borderL: 'border-l-yellow-400',
-    text: 'text-yellow-700',
-    dot: 'bg-yellow-400',
-    label: '두부',
-  },
-  egg: {
-    bg: 'bg-orange-50',
-    borderL: 'border-l-orange-400',
-    text: 'text-orange-700',
-    dot: 'bg-orange-400',
-    label: '달걀',
-  },
-  vegetable: {
-    bg: 'bg-green-50',
-    borderL: 'border-l-green-400',
-    text: 'text-green-700',
-    dot: 'bg-green-400',
-    label: '채소',
-  },
+const PLANNER_INGREDIENT_COLORS: Record<string, { text: string; label: string }> = {
+  beef: { text: 'text-red-700', label: '소고기' },
+  pork: { text: 'text-pink-700', label: '한돈' },
+  chicken: { text: 'text-amber-700', label: '닭' },
+  fish: { text: 'text-blue-700', label: '생선' },
+  tofu: { text: 'text-yellow-700', label: '두부' },
+  egg: { text: 'text-orange-700', label: '달걀' },
+  vegetable: { text: 'text-green-700', label: '채소' },
 };
 const DEFAULT_INGREDIENT_COLOR = {
-  bg: 'bg-stone-50',
-  borderL: 'border-l-stone-300',
   text: 'text-stone-600',
-  dot: 'bg-stone-300',
   label: '기타',
 };
 
@@ -640,8 +610,7 @@ const MealPlanner: React.FC = () => {
         <span className="text-[11px] font-medium text-stone-400">주재료:</span>
         {Object.entries(PLANNER_INGREDIENT_COLORS).map(([key, val]) => (
           <div key={key} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${val.dot}`} />
-            <span className="text-[10px] text-stone-500">{val.label}</span>
+            <span className={`text-[10px] font-bold ${val.text}`}>{val.label}</span>
           </div>
         ))}
       </div>
@@ -772,14 +741,14 @@ const MealPlanner: React.FC = () => {
                             .filter(Boolean)
                             .join('\n') || undefined
                         }
-                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${
+                        className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all ${
                           isHighlighted
-                            ? `${ingColor.bg} ring-2 ring-offset-1 ring-current ${ingColor.text} shadow-md scale-[1.02]`
+                            ? `bg-stone-100 ring-2 ring-offset-1 ring-stone-300 shadow-md scale-[1.02]`
                             : isDimmed
                               ? 'bg-stone-50/50 opacity-40'
                               : 'bg-white'
                         } hover:ring-1 hover:ring-stone-300 ${
-                          isExtra ? 'border border-amber-300 border-l-2' : ''
+                          isExtra ? 'border border-amber-300' : ''
                         } ${isCrossDup ? 'ring-1 ring-orange-400' : ''} ${
                           isFallback ? 'border-r-2 border-r-yellow-400' : ''
                         }`}
@@ -974,11 +943,10 @@ const MealPlanner: React.FC = () => {
                       onClick={() => setHighlightedIngredient(isActive ? null : ing.key)}
                       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                         isActive
-                          ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current shadow-sm font-bold`
+                          ? `bg-stone-100 ${color.text} ring-2 ring-offset-1 ring-stone-300 shadow-sm font-bold`
                           : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full ${color.dot}`} />
                       {ing.label}
                       {total > 0 && (
                         <span className={`text-[10px] ${isActive ? 'opacity-80' : 'opacity-50'}`}>({total})</span>

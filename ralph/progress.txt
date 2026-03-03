@@ -126,3 +126,11 @@
 - 원가 충족/초과 시각적 구분 (초록/빨강 배경)
 - 변경 파일: components/MealPlanner.tsx
 ---
+
+## 2026-03-03 - US-014: P13 제품 컬러링 통일 (글씨 색만 사용)
+- 구현: PLANNER_INGREDIENT_COLORS에서 bg/borderL/dot 필드 제거, text+label만 유지
+- INGREDIENT_COLORS에서 borderL/dot을 빈 문자열로, text에 실제 주재료별 컬러 적용
+- 범례/필터/SwapModal에서 점(dot) 제거, 텍스트 컬러로 대체
+- 메뉴 아이템 카드: border-l-2/bg 제거, 글씨 색만 유지
+- 변경 파일: components/MealPlanner.tsx, components/MealPlanHistory.tsx
+---

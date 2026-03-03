@@ -229,8 +229,8 @@
         "npx vite build passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": "MealPlanner.tsx PLANNER_INGREDIENT_COLORS(lines 17-52): bg, borderL, dot 제거, text만 유지. MealPlanHistory.tsx INGREDIENT_COLORS(lines 146-176): 동일 처리. constants.ts INGREDIENT_COLOR_MAP도 text만 사용하도록 변경."
+      "passes": true,
+      "notes": "DONE: PLANNER_INGREDIENT_COLORS에서 bg/borderL/dot 제거, text+label만 유지. INGREDIENT_COLORS에서 borderL/dot 빈 문자열로 변경, text에 실제 컬러 적용. 범례/필터에서 점 제거, 텍스트 컬러로 대체. 메뉴 카드에서 border-l-2 제거."
     },
     {
       "id": "US-015",
