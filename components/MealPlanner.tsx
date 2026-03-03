@@ -437,43 +437,22 @@ const MealPlanner: React.FC = () => {
     return { A: namesA, B: namesB };
   }, [plans.A, plans.B]);
 
-  // swap용 히스토리 기반 제외 목록 (60일/30일)
-  const swapExcludedNames = useMemo(() => {
-    const buildExcluded = (days: number, cycleType: '화수목' | '금토월') => {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
-      const excluded = new Set<string>();
-      historicalPlans
-        .filter(p => p.date >= cutoffStr && p.cycleType === cycleType)
-        .forEach(p =>
-          p.targets.forEach(t =>
-            t.items.forEach(item => {
-              const clean = item.name
-                .replace(/_냉장|_반조리|_냉동/g, '')
-                .replace(/\s+\d+$/, '')
-                .trim();
-              if (clean) excluded.add(clean);
-            })
-          )
-        );
-      return excluded;
-    };
-    return {
-      A60: buildExcluded(60, '화수목'),
-      A30: buildExcluded(30, '화수목'),
-      B60: buildExcluded(60, '금토월'),
-      B30: buildExcluded(30, '금토월'),
-    };
-  }, [historicalPlans]);
-
+  // swap용 히스토리 기반 제외 목록: 배송일 기준으로 N일 미만 사용 메뉴 제외
   const getExcludedForSwap = useCallback(
-    (cycle: 'A' | 'B', level: DuplicationFilterLevel) => {
+    (_cycle: 'A' | 'B', level: DuplicationFilterLevel, weekIndex: number) => {
       if (level === '전체') return undefined;
-      if (level === '30일') return cycle === 'A' ? swapExcludedNames.A30 : swapExcludedNames.B30;
-      return cycle === 'A' ? swapExcludedNames.A60 : swapExcludedNames.B60;
+      const daysThreshold = level === '30일' ? 30 : 60;
+      const deliveryDate = getDeliveryDate(selectedYear, selectedMonth, weekIndex);
+      const excluded = new Set<string>();
+      allMenuLastUsed.forEach((lastDate, name) => {
+        const gap = calcDaysGap(lastDate, deliveryDate);
+        if (gap.days < daysThreshold) {
+          excluded.add(name);
+        }
+      });
+      return excluded;
     },
-    [swapExcludedNames]
+    [allMenuLastUsed, selectedYear, selectedMonth]
   );
 
   // 메뉴 클릭 시 직접 대체메뉴 모달 열기
@@ -487,7 +466,7 @@ const MealPlanner: React.FC = () => {
       const plan = plans[cycle];
       if (!plan) return;
       const activeMenu = menuItems.filter(m => !m.isUnused);
-      const excluded = getExcludedForSwap(cycle, '60일');
+      const excluded = getExcludedForSwap(cycle, '60일', weekIndex);
       const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일');
       setSwapTarget({ cycle, weekIndex, item });
       setSwapCandidates(candidates);
@@ -521,7 +500,7 @@ const MealPlanner: React.FC = () => {
     const plan = plans[cycle];
     if (!plan) return;
     const activeMenu = menuItems.filter(m => !m.isUnused);
-    const excluded = getExcludedForSwap(cycle, '60일');
+    const excluded = getExcludedForSwap(cycle, '60일', weekIndex);
     const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일');
     setSwapTarget({ cycle, weekIndex, item });
     setSwapCandidates(candidates);
@@ -538,7 +517,7 @@ const MealPlanner: React.FC = () => {
       const plan = plans[swapTarget.cycle];
       if (!plan) return;
       const activeMenu = menuItems.filter(m => !m.isUnused);
-      const excluded = getExcludedForSwap(swapTarget.cycle, level);
+      const excluded = getExcludedForSwap(swapTarget.cycle, level, swapTarget.weekIndex);
       const candidates = getSwapCandidates(plan, swapTarget.item, swapTarget.weekIndex, activeMenu, excluded, level);
       setSwapCandidates(candidates);
       setSwapFilterLevel(level);

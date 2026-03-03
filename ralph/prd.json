@@ -1,652 +1,376 @@
 {
   "project": "Z-SUB",
-  "branchName": "ralph/z-sub-full",
-  "description": "Z-SUB - Intelligent meal plan auto-generation and integrated operations management system for subscription meal services. AI-powered meal generation for 15 targets, Google Sheets bidirectional sync, MIS/ZPPS integration, subscriber CRM, and financial dashboard.",
+  "branchName": "ralph/v3-full-plan",
+  "description": "3차 전체 개발 계획 P1-P22: 버그 수정 9건(🔴), 기능 개선 11건(🟡), 정리 2건(🟢)",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Project scaffolding with Vite + React + TypeScript + Tailwind",
-      "description": "As a developer, I need the base project setup so all subsequent features have a working build environment.",
+      "title": "P1: 대체 메뉴 30일/60일 필터 오류 수정",
+      "description": "As a nutritionist, 대체 메뉴 선택 시 30일/60일 필터를 적용하면 해당 기간 미만 사용 메뉴가 정확히 제외되어야 한다.",
       "acceptanceCriteria": [
-        "Initialize Vite 6 project with React 19 and TypeScript template",
-        "Install and configure Tailwind CSS 4 with base styles in index.css",
-        "Install Recharts 3, @google/genai, @supabase/supabase-js, html2pdf.js",
-        "Configure vite.config.ts with React plugin",
-        "Create index.html with root div and index.tsx entry point rendering App.tsx",
-        "Create env.d.ts with ImportMetaEnv type declarations for VITE_* env vars",
-        "App.tsx renders a placeholder div",
-        "Typecheck passes"
+        "30일 필터 선택 시 29일 이하(마지막 사용일 < 30일) 메뉴가 목록에 미노출",
+        "60일 필터 선택 시 59일 이하(마지막 사용일 < 60일) 메뉴가 미노출",
+        "0일 전 메뉴가 필터 적용 시 제외됨",
+        "필터 해제('전체') 시 전체 메뉴 정상 노출",
+        "필터 기준일은 P3(배송일 기준)과 연동",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Tech stack: React 19, TypeScript, Tailwind CSS 4, Vite 6, Recharts 3, Gemini API, Supabase | Verified: file exists, typecheck passes, build succeeds"
+      "notes": "DONE: swapExcludedNames useMemo 제거, getExcludedForSwap를 allMenuLastUsed + 배송일 기반 직접 비교로 변경. calcDaysGap(lastDate, deliveryDate).days < threshold 시 제외. 3개 호출부에 weekIndex 파라미터 추가."
     },
     {
       "id": "US-002",
-      "title": "Core type definitions",
-      "description": "As a developer, I need shared TypeScript types so all modules use consistent data structures.",
+      "title": "P2: 히스토리 삭제 기능 추가 (월 단위 + 개별)",
+      "description": "As a manager, 잘못 등록된 미래 식단 등 히스토리를 월 단위 또는 개별로 삭제할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Create types.ts at project root with all domain types",
-        "Define MenuItem interface with: id, code, name, category, cost, recommendedPrice, tastes[], season, tags[], isSpicy, mainIngredient, process, weight, isUnused, imageUrl",
-        "Define MenuCategory enum: 'soup' | 'main' | 'side' | 'dessert'",
-        "Define TargetType with 15 values including kids/senior/family variants",
-        "Define MealPlanConfig with: target, budgetCap, targetPrice, targetCostRatio, composition, bannedTags[], requiredTags[], parentTarget",
-        "Define WeeklyPlan with: weekIndex, items (MenuItem arrays by category), totalCost, totalPrice, isValid, warnings[]",
-        "Define MonthlyMealPlan with: id, monthLabel, cycleType, target, weeks[], status, version, createdBy",
-        "Define ExpertReview with: overallScore, nutritionistComment, processComment, costComment, flaggedItemIds[]",
-        "Define SubscriberSnapshot, MonthlyFinancial, AuditLogEntry, SystemSetting types",
-        "Define HistoricalMealPlan, HistoricalTargetPlan, HistoricalMenuItem types",
-        "Typecheck passes"
+        "히스토리 탭에서 특정 월 선택 후 전체 삭제 가능",
+        "월 내 개별 식단 선택 삭제 가능",
+        "삭제 전 확인 다이얼로그 표시",
+        "삭제 후 대체 메뉴 목록에서 해당 데이터 반영(0일 전 메뉴 제거 등)",
+        "삭제 후 목록 즉시 갱신",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "This is the single source of truth for all TypeScript interfaces used across the app | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanHistory.tsx에 삭제 UI 추가. HistoricalPlansContext에서 삭제 함수 구현. 잘못 등록된 미래 식단(26년 12월 등)이 0일 전으로 표시되는 문제의 근본 원인."
     },
     {
       "id": "US-003",
-      "title": "Constants, config maps, and mock data",
-      "description": "As a developer, I need constants and seed data so the app can function without external backends.",
+      "title": "P3: 날짜 계산 기준을 배송일로 변경 + 절대 날짜 툴팁",
+      "description": "As a nutritionist, 마지막 사용일 계산 기준을 '오늘 날짜'에서 '해당 식단의 배송일'로 변경하고, 마우스 오버 시 절대 날짜를 표시한다.",
       "acceptanceCriteria": [
-        "Create constants.ts with CATEGORY_OPTIONS, SEASON_OPTIONS, TASTE_OPTIONS, MAIN_INGREDIENTS (10 types), TAG_OPTIONS",
-        "Define TARGET_CONFIGS array with 15 target configurations including composition (soup/main/side counts), pricing, and tag filters",
-        "Define parentTarget inheritance: base targets (가족식단, 시니어식단, etc.) with option children",
-        "Include MOCK_MENU_DB with at least 40 sample menu items across all categories",
-        "Include mock subscriber snapshots for 10 targets with realistic data",
-        "Include mock monthly financials (12 months)",
-        "Typecheck passes"
+        "4월 3주차 식단 구성 시 '며칠 전'이 4월 3주차 배송일 기준으로 계산됨",
+        "마우스 오버 시 마지막 사용 절대 날짜(예: 2026.01.24) 표시",
+        "대체 메뉴 선택 화면에서도 동일 기준 적용",
+        "AI 식단 구성 결과에서도 동일 기준 적용",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Mock data serves as fallback when Supabase/Sheets are not connected | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanner.tsx calcDaysGap(lines 76-84), getDeliveryDate(lines 62-73). 현재 배송일 기준 계산 로직은 정상(마파두부 1/24→4/19=86일). 기준 날짜만 '오늘'→'배송일'로 변경하면 됨. 툴팁은 title 속성 또는 Tooltip 컴포넌트 사용."
     },
     {
       "id": "US-004",
-      "title": "Supabase database schema - 12 tables",
-      "description": "As a developer, I need the database schema so data can be persisted in Supabase PostgreSQL.",
+      "title": "P4: 반찬 리스트 중복 데이터 정리 + 중복 방지",
+      "description": "As a nutritionist, 동일 품목코드+메뉴명의 중복 레코드를 정리하고 향후 중복 등록을 방지한다.",
       "acceptanceCriteria": [
-        "Create supabase/migrations/001_initial_schema.sql",
-        "Create profiles table (id UUID FK auth.users, display_name, role, avatar_url)",
-        "Create menu_items table with all fields from types.ts, code as UNIQUE",
-        "Create meal_plan_configs table with target as UNIQUE, composition as JSONB",
-        "Create monthly_meal_plans table with status enum (draft/reviewed/published/finalized)",
-        "Create weekly_cycle_plans table with FK to monthly_meal_plans",
-        "Create week_plan_items table with FK to weekly_cycle_plans and menu_items",
-        "Create expert_reviews table with FK to monthly_meal_plans",
-        "Create subscriber_snapshots, monthly_financials, revenue_by_target tables",
-        "Create system_settings table (key VARCHAR PK, value TEXT)",
-        "Create audit_logs table with before_data/after_data JSONB",
-        "Add indexes on frequently queried columns (category, target, month_label, timestamp)",
-        "Create handle_new_user() trigger function for profiles auto-creation",
-        "Create update_updated_at() trigger function for timestamp maintenance",
-        "SQL syntax is valid PostgreSQL"
+        "영양과채사라다 검색 시 1건만 표시",
+        "기존 중복 데이터 전부 정리 확인",
+        "동일 품목코드 신규 등록 시 중복 방지 처리",
+        "정리 후 식단 구성에 영향 없음 확인",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "12 tables total. Run via Supabase dashboard or CLI migration | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MenuDatabase.tsx 또는 MenuContext에서 중복 탐지/제거 로직 추가. data/realMenuDB.ts에서 중복 레코드 직접 정리. 신규 등록 시 code+name unique check 추가."
     },
     {
       "id": "US-005",
-      "title": "Supabase RLS policies for role-based access",
-      "description": "As a developer, I need row-level security so each role (Manager/Nutritionist/Operator) has appropriate access.",
+      "title": "P5: 자동 분류 기능 전면 수정",
+      "description": "As a nutritionist, 자동 분류 시 실제 히스토리 데이터만 참조하여 정확한 식단 태깅/맛 속성/카테고리 분류가 되어야 한다.",
       "acceptanceCriteria": [
-        "Create supabase/migrations/002_rls_policies.sql",
-        "Create get_user_role() helper function that reads role from profiles table",
-        "Enable RLS on all 12 tables",
-        "Manager role: full CRUD on all tables",
-        "Nutritionist role: CRUD on menu_items, read+write on meal plans, read-only on settings",
-        "Operator role: read-only on menu_items/meal_plans/settings, full read on subscribers/audit_logs",
-        "All authenticated users can read subscriber_snapshots and audit_logs",
-        "SQL syntax is valid PostgreSQL"
+        "자동 분류 실행 후 각 메뉴의 태깅이 실제 히스토리와 일치",
+        "맛 속성 자동 분류 정상 동작",
+        "카테고리 필터 시 올바른 분류 결과 표시 (국/찌개에 탕수류 미포함 등)",
+        "자동 분류 전/후 비교 가능",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "Matches permission matrix from feature-spec.md section 7 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "autoClassifyService.ts autoClassifyFull. 히스토리 기반 식단 태깅: 실제 historicalPlans에서 해당 메뉴가 어떤 target에 사용되었는지 추출하여 태그. 카테고리 분류: CATEGORY_KEYWORDS 정확도 개선(탕수=메인, 국이 들어가지만 탕수육은 국이 아님). 맛 속성: SPICY_KEYWORDS 이미 수정됨."
     },
     {
       "id": "US-006",
-      "title": "Meal plan generation engine",
-      "description": "As a nutritionist, I want to auto-generate A/B cycle meal plans so I don't have to manually compose menus for each target.",
+      "title": "P6: 카테고리 필터 오류 수정",
+      "description": "As a nutritionist, 반찬 리스트에서 카테고리 필터 적용 시 해당 카테고리 메뉴만 정확히 필터링되어야 한다.",
       "acceptanceCriteria": [
-        "Create services/engine.ts with generateMealPlan() function",
-        "Accept parameters: target config, menu DB, month, cycle type (A=화수목/B=금토월), options",
-        "Generate 4 weeks of meals respecting composition rules (soup/main/side counts per target)",
-        "Implement 60-day dedup: no same menu within 60 days if toggle enabled",
-        "Minimize consecutive-week main ingredient repetition",
-        "Respect bannedTags/requiredTags filters from target config",
-        "Implement parent-child target inheritance: child derives subset from parent plan",
-        "Calculate totalCost and totalPrice per week, flag isValid and warnings",
-        "Export getSwapCandidates() that returns same-category non-duplicate alternatives with cost diff",
-        "Typecheck passes"
+        "냉장국 필터 시 냉장국 메뉴만 표시",
+        "밑반찬 필터 시 밑반찬 메뉴만 표시",
+        "반조리 필터 시 반조리 메뉴만 표시",
+        "각 카테고리 간 메뉴 중복 표시 없음",
+        "저당아몬드표고버섯탕수 등 오분류 항목 정정 확인",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Core business logic. Covers FR-012 to FR-016 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MenuDatabase.tsx filteredItems(lines 142-154). autoClassifyService.ts CATEGORY_KEYWORDS: '탕'이 국/찌개에 포함되어 '탕수'도 국으로 분류되는 문제. 키워드 우선순위 또는 제외 패턴 추가 필요."
     },
     {
       "id": "US-007",
-      "title": "AI expert review service via Gemini API",
-      "description": "As a nutritionist, I want AI-powered 3-expert review so meal plans are validated for nutrition, process, and cost.",
+      "title": "P7-a: 히스토리 뷰 레이아웃 정비 (재료검토/현장배포/생산통합)",
+      "description": "As a user, 재료검토/현장배포/생산통합 뷰의 레이아웃을 기존 엑셀 시트 형태와 동일하게 정비한다.",
       "acceptanceCriteria": [
-        "Create services/geminiService.ts wrapping @google/genai",
-        "Accept meal plan data and optional custom AI manual (prompt) from system settings",
-        "Call Gemini API with structured prompt for 3-expert review (nutritionist, process engineer, cost analyst)",
-        "Parse response into ExpertReview type: overallScore (0-100), 3 comments, flaggedItemIds[]",
-        "Handle API errors gracefully with fallback error messages",
-        "API key read from VITE_GEMINI_API_KEY env var (never exposed to client bundle in production)",
-        "Typecheck passes"
+        "식단표 뷰: 현재 형태 유지",
+        "재료 검토 뷰: 엑셀 시트 레이아웃에 맞춤",
+        "현장 배포 뷰: 엑셀 시트 레이아웃에 맞춤",
+        "생산 통합 뷰: 엑셀 시트 레이아웃에 맞춤",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "Covers FR-018, FR-019. FR-020 (custom AI manual) handled in SystemSettings | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanHistory.tsx의 viewMode별 렌더링 로직. 기존 엑셀 시트 구조를 참조하여 열 순서, 그룹핑, 소계 등을 맞춤. 레이아웃 정비가 CSV/PDF 내보내기의 선행 조건."
     },
     {
       "id": "US-008",
-      "title": "Audit, history, and validation services",
-      "description": "As a developer, I need supporting services for audit trails, meal plan history, and data validation.",
+      "title": "P7-b: CSV/PDF 다운로드 기능 수정",
+      "description": "As a user, 히스토리 각 뷰에서 CSV 다운로드와 PDF 내보내기가 현재 화면 그대로(WYSIWYG) 정상 동작해야 한다.",
       "acceptanceCriteria": [
-        "Create services/auditService.ts: logAction(action, entityType, entityId, before, after) storing to audit_logs",
-        "Create services/historyService.ts: savePlan(), loadPlans(), getPlanById() for meal plan versioning",
-        "Create services/validationService.ts: validateMenuItem(), validateMealPlanConfig(), validateWeeklyPlan()",
-        "Audit service records timestamp, userId, action type, entity details, before/after JSONB diffs",
-        "History service supports localStorage fallback when Supabase is unavailable",
-        "Validation service returns { isValid, errors[] } with specific field-level error messages",
-        "Typecheck passes"
+        "CSV 다운로드 정상 동작 + 열린 파일 내용 정확",
+        "PDF 내보내기 정상 동작 + 화면 뷰와 동일",
+        "4개 뷰(식단표/재료검토/현장배포/생산통합) 각각에서 다운로드 테스트 완료",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "Covers FR-006, FR-031, FR-032 foundations | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanHistory.tsx exportToHistoryCSV(lines 1090-1156), exportToHistoryPDF(lines 1159-1222). exportService.ts. US-007(레이아웃 정비) 완료 후 진행. viewMode별 데이터 구조에 맞게 내보내기 로직 수정."
     },
     {
       "id": "US-009",
-      "title": "Export service - Print, CSV, and PDF",
-      "description": "As a user, I want to export meal plans in multiple formats so I can share and archive them.",
+      "title": "P8: 생산 한도 초과 경고 표시",
+      "description": "As a nutritionist, 냉장국/반조리 카테고리가 1일 생산 한도를 초과할 때 해당 위치에 경고를 표시한다.",
       "acceptanceCriteria": [
-        "Create services/exportService.ts with three export functions",
-        "exportToPrint(): opens browser print dialog with formatted meal plan layout",
-        "exportToCSV(): generates CSV file with all week/menu data, triggers download",
-        "exportToPDF(): uses html2pdf.js (dynamic import) to generate PDF from meal plan DOM",
-        "PDF includes meal plan header (target, month, cycle), weekly grids, cost summaries",
-        "All functions accept the current meal plan data as parameter",
-        "Typecheck passes"
+        "냉장국 11개 이상 배정 시 경고 표시",
+        "반조리 11개 이상 배정 시 경고 표시",
+        "시스템 설정에서 한도 변경 시 즉시 반영",
+        "한도 이내일 때는 경고 미표시",
+        "경고에 카테고리명/현재수량/한도수량 표시",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 9,
-      "passes": true,
-      "notes": "Covers FR-033. html2pdf.js should be dynamically imported for bundle optimization | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanHistory.tsx productionLimits(lines 1077-1088). localStorage zsub_production_limits. 현재 행 단위 bg-red-50 + AlertTriangle 존재하나 정상 동작 안 함. 한도 비교 로직 점검."
     },
     {
       "id": "US-010",
-      "title": "CSV import service for menu bulk import",
-      "description": "As a nutritionist, I want to import menus from CSV so I can bulk-load menu data.",
+      "title": "P9: 재검토 요청 시 상태 초기화 오류 수정",
+      "description": "As a manager, 재검토 요청 시 반려한 검토자만 '재검토 요청' 상태로 변경하고, 승인한 검토자는 유지한다.",
       "acceptanceCriteria": [
-        "Create services/importService.ts with parseCSV() and validateImportData() functions",
-        "Parse CSV with column mapping: code, name, category, cost, recommendedPrice, etc.",
-        "Validate each row: required fields present, numeric fields are numbers, category is valid",
-        "Return { validItems[], invalidItems[], errors[] } for preview before committing",
-        "Support UTF-8 and EUC-KR encoded files (Korean content)",
-        "Typecheck passes"
+        "검토자 A 승인 + 검토자 B 반려 상태에서 재검토 요청",
+        "검토자 A는 '승인 완료' 상태 유지 확인",
+        "검토자 B만 '재검토 요청' 상태로 변경 확인",
+        "재검토 요청 시 코멘트 입력 가능",
+        "재검토 요청 후 상태 변경 이력 정상 기록",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 10,
-      "passes": true,
-      "notes": "Covers FR-005. UI wizard component is separate story (US-028) | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "HistoryReviewModal.tsx handleReReview. reviewService.ts requestReReview 또는 유사 함수. 현재 모든 검토자 상태를 '대기'로 리셋하는 로직을 '반려' 검토자만 변경하도록 수정."
     },
     {
       "id": "US-011",
-      "title": "Context providers - Auth, Toast, Menu, Sheets",
-      "description": "As a developer, I need React contexts for global state management across the app.",
+      "title": "P10: 댓글 기능 고도화 (메뉴 연결 + 대댓글 + 논의완료)",
+      "description": "As a user, 검토 댓글에 특정 메뉴를 연결하고, 대댓글과 논의완료 기능을 사용할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Create context/AuthContext.tsx: currentUser, role, login(), logout(), isAuthenticated",
-        "Create context/ToastContext.tsx: showToast(message, type), toast queue management",
-        "Create context/MenuContext.tsx: menuItems[], addItem(), updateItem(), deleteItem(), toggleUnused()",
-        "Create context/SheetsContext.tsx: syncStatus, lastSyncTime, pushToSheets(), pullFromSheets()",
-        "AuthContext integrates with Supabase Auth, falls back to mock auth for dev",
-        "MenuContext initializes from constants.ts mock data, syncs with Supabase when available",
-        "All contexts use React.createContext with proper TypeScript typing",
-        "Typecheck passes"
+        "댓글 작성 시 특정 메뉴 선택/연결 가능",
+        "댓글에 대댓글 작성 가능",
+        "'논의 완료' 버튼 클릭 시 상태 변경",
+        "논의 완료된 댓글 시각적 구분 (회색 처리 등)",
+        "기존 댓글 삭제 기능 유지",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 11,
-      "passes": true,
-      "notes": "State management layer between services and UI components | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "HistoryReviewModal.tsx comments(lines 372-469). reviewService.ts addReviewComment, resolveComment. 이미 parentId 기반 대댓글과 resolveComment 존재 여부 확인. 메뉴 연결은 comment에 menuItemId 필드 추가."
     },
     {
       "id": "US-012",
-      "title": "Layout with dark sidebar navigation",
-      "description": "As a user, I want a sidebar navigation so I can switch between all application tabs.",
+      "title": "P11: 원가 정보 표시 추가",
+      "description": "As a nutritionist, 히스토리/검토 화면에서 각 제품의 원가와 식단별 합산 원가, 원가율을 확인할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Create components/Layout.tsx with fixed left sidebar and main content area",
-        "Dark-themed sidebar (stone palette) with app logo/title at top",
-        "Navigation items: 대시보드, 식단 생성, 기준정보 관리, 식단 히스토리, 감사 로그, 시스템 설정",
-        "Active tab highlighted with distinct style",
-        "Main content area renders selected tab component",
-        "Responsive: minimum 1280px width support",
+        "각 제품 옆에 원가 금액 표시",
+        "식단별 합산 원가 표시",
+        "판매가 옆에 원가 함께 표시",
+        "원가율 표시 위치가 식단 판매가 옆에 위치",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 12,
-      "passes": true,
-      "notes": "7 sidebar tabs total. Uses React.lazy for code splitting | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanHistory.tsx 식단표 뷰에서 각 메뉴 셀에 cost 표시 추가. 주차 합계 행에 totalCost + 원가율(totalCost/targetPrice*100) 표시. MealPlanner.tsx에서도 동일 패턴."
     },
     {
       "id": "US-013",
-      "title": "Shared UI components - Toast, ConfirmDialog, ErrorBoundary, AuthGate",
-      "description": "As a developer, I need reusable UI primitives for notifications, confirmations, error handling, and auth gating.",
+      "title": "P12: 식단 구성 원가 필터 추가",
+      "description": "As a nutritionist, 식단 구성 탭에서 원가 충족/미달 여부를 확인할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Create components/Toast.tsx: animated toast stack with success/error/info variants, auto-dismiss",
-        "Create components/ConfirmDialog.tsx: modal with title, message, confirm/cancel buttons",
-        "Create components/ErrorBoundary.tsx: React error boundary with fallback UI and retry button",
-        "Create components/AuthGate.tsx: login form UI, wraps app content requiring authentication",
-        "Toast uses ToastContext, positioned at top-right with slide animation",
-        "ConfirmDialog blocks interaction with overlay backdrop",
-        "No window.alert() usage anywhere (NFR-009)",
+        "식단 구성 탭에서 원가 충족/미달 표시",
+        "판매가 검토와 원가 검토가 함께 표시",
+        "원가 기준 변경 시 즉시 반영",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 13,
-      "passes": true,
-      "notes": "Covers NFR-009 (toast only), NFR-010 (confirm dialog for destructive actions) | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanner.tsx 검토 영역. 기존 가격 퍼센트/미달 표시에 원가 검토 병렬 추가. TARGET_CONFIGS의 budgetCap과 비교."
     },
     {
       "id": "US-014",
-      "title": "Menu Database page - list, filter, search, and detail editor",
-      "description": "As a nutritionist, I want to browse, search, and edit menu items so I can maintain the menu library.",
+      "title": "P13: 제품 컬러링 통일 (글씨 색만 사용)",
+      "description": "As a user, 식단 구성 제품의 테두리/점 색을 제거하고 글씨 색만 주재료 컬러에 맞춰 적용한다.",
       "acceptanceCriteria": [
-        "Create components/MenuDatabase.tsx with split-panel layout (list left, detail right)",
-        "Left panel: scrollable menu list with item name, category badge, cost display",
-        "Category filter dropdown: 전체, 국/찌개, 메인요리, 밑반찬, 디저트/간식",
-        "Search input filtering by name or item code (FR-003)",
-        "Add new menu button at top of list",
-        "Right panel: full detail editor with fields - category, name, code, cost, recommendedPrice, weight, process",
-        "Attribute toggles: season selector, mainIngredient selector, 5 taste toggles (단맛/짠맛/매운맛/신맛/감칠맛)",
-        "Tag management: add/remove tags with chip UI",
-        "Save button persists changes, unused toggle marks menu as inactive (FR-004)",
-        "Changes trigger audit log via auditService (FR-006)",
+        "제품 카드에 테두리 색 없음",
+        "제품 카드에 점 색 없음",
+        "제품명 글씨 색이 주재료 컬러 기준으로 적용",
+        "시스템 설정 주재료 컬러 변경 시 연동",
+        "냉장국/반조리 체크 표시 유지",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 14,
-      "passes": true,
-      "notes": "Covers FR-001 to FR-004, FR-006. Part of MasterDataManagement sub-tab | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanner.tsx PLANNER_INGREDIENT_COLORS(lines 17-52): bg, borderL, dot 제거, text만 유지. MealPlanHistory.tsx INGREDIENT_COLORS(lines 146-176): 동일 처리. constants.ts INGREDIENT_COLOR_MAP도 text만 사용하도록 변경."
     },
     {
       "id": "US-015",
-      "title": "Plan Management page - target policies and composition",
-      "description": "As a manager, I want to configure meal plan policies per target so the engine generates plans according to business rules.",
+      "title": "P14: 주차별 날짜 정보 표시",
+      "description": "As a nutritionist, AI 식단 구성 결과에서 각 주차에 실제 배송 날짜 범위가 표시되어야 한다.",
       "acceptanceCriteria": [
-        "Create components/PlanManagement.tsx with policy group cards",
-        "Display base targets and their option children in grouped card layout",
-        "Each card shows: target name, composition steppers (soup/main/side count), price fields",
-        "Editable fields: targetPrice, targetCostRatio, budgetCap (auto-calculated from price * ratio)",
-        "Tag filter section: required tags (blue chips) and banned tags (red chips) with add/remove",
-        "Bulk cost ratio tool at top: set ratio for all targets at once (FR-011)",
-        "Parent-child inheritance visualization: option targets show inherited from parent",
-        "Save changes per target group",
+        "각 주차에 시작일~종료일 표시 (예: '1주차 (4/7 월~4/11 금)')",
+        "요일 정보 포함",
+        "월이 바뀌는 경우 양쪽 월 모두 표시",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 15,
-      "passes": true,
-      "notes": "Covers FR-007 to FR-011. Part of MasterDataManagement sub-tab | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MealPlanner.tsx getDeliveryDate(lines 62-73). 주차 헤더(line 682) '{week.weekIndex}주차'에 날짜 범위 추가. 주 5일(월~금) 기준 시작일/종료일 계산."
     },
     {
       "id": "US-016",
-      "title": "Meal Planner - control bar and A/B cycle grid generation",
-      "description": "As a nutritionist, I want to select a target and month then generate A/B cycle meal plans displayed in a weekly grid.",
+      "title": "P15: 태그 관리 확장 (양방향 연동)",
+      "description": "As a manager, 시스템 설정 태그와 반찬 리스트 태그가 양방향으로 연동되어야 한다.",
       "acceptanceCriteria": [
-        "Create components/MealPlanner.tsx with control bar and dual grid layout",
-        "Control bar: target dropdown (15 options), month selector, 60-day dedup toggle, history button, generate button",
-        "Generate button calls engine.generateMealPlan() for both A-cycle (화수목) and B-cycle (금토월)",
-        "A-cycle grid: 4 weeks x 3 days, each cell showing menu items by category with cost subtotals",
-        "B-cycle grid: same structure for 금토월",
-        "Each week row shows totalCost, totalPrice, cost ratio, validity indicator",
-        "Integration center: MIS register button, ZPPS sync button with change count badge",
-        "Loading state during generation",
+        "시스템 설정에서 태그 추가 후 반찬 리스트에서 선택 가능",
+        "반찬 리스트에서 '+ 신규 추가'로 태그 생성 가능",
+        "양방향 연동 확인 (설정↔리스트)",
+        "기존 3개 태그(부드러움, 시니어, 아이선호) 정상 유지",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 16,
-      "passes": true,
-      "notes": "Covers FR-012 to FR-015. Core meal planner UI | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "SystemSettings.tsx targetTags(line 66), tag 관리 함수들(lines 308-353). MenuDatabase.tsx 태그 드롭다운(openTagDropdown). 현재 하드코딩된 3개 태그를 localStorage zsub_target_tags에서 동적으로 로드하도록 변경."
     },
     {
       "id": "US-017",
-      "title": "Meal Planner - menu swap modal",
-      "description": "As a nutritionist, I want to swap individual menu items with suitable alternatives so I can fine-tune the plan.",
+      "title": "P16: 알림 및 마이페이지 (구글 로그인 연동 후)",
+      "description": "As a manager, 구글 로그인 후 담당자 태깅, 마이페이지, 알림 기능을 사용할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Add click handler on each menu item in the meal plan grid to open swap modal",
-        "Swap modal shows: current menu item details (name, category, cost)",
-        "Candidate list: same-category items not already in the plan, sorted by cost similarity",
-        "Each candidate shows: name, cost, cost difference from current item",
-        "Selecting a candidate replaces the item and recalculates week totals",
-        "Swap is logged via auditService with before/after data",
-        "Modal closes after successful swap with toast confirmation",
+        "구글 계정으로 로그인 가능",
+        "댓글 작성 시 다른 사용자 태그 가능",
+        "마이페이지에서 미확인 사항 목록 확인 가능",
+        "태그/검토 요청 시 알림 수신",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 17,
-      "passes": true,
-      "notes": "Covers FR-016 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "중장기 과제. 구글 로그인은 호연 직접 개발 예정이므로 AuthContext 기반 마이페이지 + 알림 UI 프레임 구현. googleChatService.ts 연동."
     },
     {
       "id": "US-018",
-      "title": "Meal Planner - AI expert review modal",
-      "description": "As a nutritionist, I want AI-powered review of the generated meal plan so I can identify issues before finalizing.",
+      "title": "P17: 검색 기능 강화 (속성 기반 검색)",
+      "description": "As a nutritionist, 메뉴 DB에서 이름/코드 외에 계절성, 주재료, 맛 속성, 카테고리로도 검색할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Add 'AI 검수' button to meal planner that triggers geminiService review",
-        "Review modal displays: overall score (0-100) with color coding (green/yellow/red)",
-        "Three expert sections: nutritionist opinion, process engineer opinion, cost analyst opinion",
-        "Flagged menu items highlighted in the modal with specific concerns",
-        "Loading spinner during API call",
-        "Error state if Gemini API fails with retry option",
+        "'된장' 검색 시 된장 관련 메뉴 표시",
+        "'여름' 검색 시 여름 계절 메뉴 표시",
+        "'감자' 검색 시 감자 주재료 메뉴 표시",
+        "기존 품목코드/메뉴명 검색 유지",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 18,
-      "passes": true,
-      "notes": "Covers FR-018, FR-019 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MenuDatabase.tsx searchTerm(line 69), filteredItems(lines 147-150). 현재 name/code만 매칭. tags, mainIngredient(MAJOR_INGREDIENTS 라벨), season, category 매칭 추가."
     },
     {
       "id": "US-019",
-      "title": "Ingredient distribution matrix visualization",
-      "description": "As a nutritionist, I want to see ingredient usage distribution so I can ensure variety across weeks.",
+      "title": "P18: 반찬 리스트 테이블 헤더 고정",
+      "description": "As a user, 반찬 리스트를 스크롤해도 테이블 헤더가 항상 보여야 한다.",
       "acceptanceCriteria": [
-        "Add ingredient distribution section below the meal plan grids",
-        "Display top 7+ main ingredients with usage count across all generated weeks",
-        "Color coding: green (적정 1-3), yellow (주의 4-5), red (과다 6+)",
-        "Horizontal bar chart or matrix grid showing per-ingredient breakdown",
-        "Updates automatically when meal plan is generated or items are swapped",
+        "반찬 리스트 하단까지 스크롤해도 헤더 표시",
+        "헤더 고정 시 레이아웃 깨짐 없음",
+        "가로 스크롤이 있는 경우에도 정상 동작",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 19,
-      "passes": true,
-      "notes": "Covers FR-017 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MenuDatabase.tsx 테이블 thead에 sticky top-0 z-10 추가. 부모 컨테이너에 overflow-auto 확인."
     },
     {
       "id": "US-020",
-      "title": "Dashboard - operations and financial tabs",
-      "description": "As a manager, I want a dashboard with KPI cards and charts so I can monitor operations and finances at a glance.",
+      "title": "P19: 태그 초기화 시 중복 데이터 태그 잔존 버그",
+      "description": "As a nutritionist, 태그 초기화 실행 시 자동 생성된 중복 레코드의 태그도 모두 초기화되어야 한다.",
       "acceptanceCriteria": [
-        "Create components/Dashboard.tsx with two tabs: 운영 현황 and 재무 성과",
-        "Operations tab: 4 KPI cards (배송 예정, 활성 구독자, 만족도, 주간 매출)",
-        "Operations tab: anomaly alert banner for churn rate > 5%",
-        "Operations tab: weekly workload bar chart (by day of week)",
-        "Operations tab: growth vs health scatter chart (new subscribers vs churn rate per target)",
-        "Operations tab: subscription trend line chart (top targets over 4 weeks)",
-        "Financial tab: 4 KPI cards (예상매출, 영업이익, ARPU, 원가율)",
-        "Financial tab: monthly revenue/cost/profit composed chart",
-        "Financial tab: revenue share pie chart by target",
-        "All charts use Recharts (BarChart, LineChart, ScatterChart, PieChart, ComposedChart)",
+        "태그 초기화 후 영양과채사라다 태그 비어 있음",
+        "자동 생성된 레코드 태그도 모두 초기화됨",
+        "초기화 후 수동 태그 재설정 정상 동작",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 20,
-      "passes": true,
-      "notes": "Covers FR-028 to FR-030 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "MenuDatabase.tsx 태그 초기화 로직. P4(중복 데이터 정리)와 연관. 중복 레코드가 존재할 때 일부만 초기화되는 문제. 전체 menuItems 순회 확인."
     },
     {
       "id": "US-021",
-      "title": "Subscriber CRM page",
-      "description": "As a manager, I want to view subscriber metrics per meal plan target so I can make data-driven decisions.",
+      "title": "P20: 신제품 출시일 연/월/일 입력 + 출시 전 자동 배제",
+      "description": "As a nutritionist, 출시일을 연/월/일로 입력하고, 출시일 이전 식단에서 해당 메뉴를 자동 배제한다.",
       "acceptanceCriteria": [
-        "Create components/SubscriberManagement.tsx (or integrate into Dashboard)",
-        "3 KPI cards at top: total subscribers, new signups, average satisfaction",
-        "Left section: sortable table with columns - target, subscribers, new, churnRate, satisfaction, revenue contribution",
-        "Row click selects target for detail view on right",
-        "Right section: membership tier pie chart (VIP/골드/일반) for selected target (FR-026)",
-        "Right section: age demographics analysis for selected target (FR-027)",
-        "Right section: manager notes textarea for selected target",
+        "출시일에 연/월/일 모두 입력 가능",
+        "출시일 이전 날짜 식단에 해당 메뉴 미포함",
+        "출시일 당일부터 식단 구성에 포함 가능",
+        "기존 등록된 메뉴의 출시일 수정 가능",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "npx vite build passes"
       ],
       "priority": 21,
-      "passes": true,
-      "notes": "Implemented: SubscriberManagement.tsx with 10 targets, KPI cards, performance table, tier pie chart, demographics, manager notes. Routed via App.tsx + Layout sidebar."
+      "passes": false,
+      "notes": "types.ts launchDate(line 58) 현재 YYYY-MM → YYYY-MM-DD로 변경. MenuDetailModal.tsx 입력 필드를 date input으로 변경. engine.ts baseFilter에서 launchDate > deliveryDate인 메뉴 제외 로직 추가."
     },
     {
       "id": "US-022",
-      "title": "MIS and ZPPS API integration services",
-      "description": "As a developer, I need API services for MIS meal plan registration and ZPPS menu change sync.",
+      "title": "P21: 대시보드 중복 위험 분석 기간 설정 + 확대",
+      "description": "As a manager, 중복 위험 분석의 기간을 설정하고, 주재료 클릭 시 메뉴 리스트를 확인할 수 있어야 한다.",
       "acceptanceCriteria": [
-        "Create services/misService.ts: registerMealPlan() POSTs to MIS endpoint",
-        "Create services/zppsService.ts: syncMenuChanges() PUTs to ZPPS endpoint",
-        "Both services implement retry logic (2 retries with exponential backoff)",
-        "Both services have 15-second timeout",
-        "Both services log actions to auditService on success/failure",
-        "Both services have healthCheck() function for connection testing",
-        "API endpoints configurable via system_settings",
-        "Typecheck passes"
+        "시작일~종료일 직접 입력 가능",
+        "프리셋 옵션 정상 동작 (2주/30일/60일)",
+        "주재료 클릭 시 메뉴 리스트 팝업/펼침 표시",
+        "테이블 세로 높이 충분히 확대됨",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 22,
-      "passes": true,
-      "notes": "Covers FR-021, FR-022 | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "Dashboard.tsx. 기존 30일 고정을 동적 기간 선택으로 변경. 날짜 피커 UI 추가. 주재료별 expandedIngredient 구현(이미 존재 여부 확인). max-h 확대."
     },
     {
       "id": "US-023",
-      "title": "Google Sheets authentication and middleware",
-      "description": "As a developer, I need Sheets auth and request middleware so the app can sync data with Google Sheets.",
+      "title": "P22: 상단 고정 바 UI 정리",
+      "description": "As a user, 상단 고정 바 오른쪽의 날짜/배송일/정상 운영 등 불필요 정보를 삭제하여 깔끔하게 유지한다.",
       "acceptanceCriteria": [
-        "Create server/sheetsAuth.ts: JWT-based Google service account auth using googleapis",
-        "Implement token caching with configHash for credential rotation detection",
-        "Export testSheetsConnection() for connectivity verification",
-        "Create server/sheetsMiddleware.ts: Express-compatible middleware for Sheets API proxy",
-        "Middleware handles: GET (read sheet), POST (overwrite sheet), PUT /append (add rows)",
-        "Request logging with timestamp, method, sheet name",
-        "Body validation and 5MB payload limit",
-        "Typecheck passes"
+        "상단 고정 바 오른쪽에 날짜/배송일 정보 없음",
+        "'정상 운영' 등 불필요 표시 제거",
+        "레이아웃 정상 유지",
+        "Typecheck passes",
+        "npx vite build passes"
       ],
       "priority": 23,
-      "passes": true,
-      "notes": "Server-side code for Sheets API proxy. Covers FR-023 infrastructure | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-024",
-      "title": "Sync manager and sheets serializer",
-      "description": "As a developer, I need sync logic to push/pull data between the app and 7 Google Sheets tabs.",
-      "acceptanceCriteria": [
-        "Create services/syncManager.ts with push() and pull() for each of 7 sheets",
-        "Sheets: 메뉴DB, 식단정책, 식단데이터, 구독자현황, 재무데이터, 매출비중, 동기화로그",
-        "Push direction: App→Sheets for 메뉴DB, 식단정책, 식단데이터",
-        "Pull direction: Sheets→App for 구독자현황, 재무데이터",
-        "Create services/sheetsSerializer.ts: serialize/deserialize between app types and sheet row format",
-        "Array fields (tastes, tags) stored as comma-separated strings in sheets",
-        "Create services/changeTracker.ts: track dirty records for selective sync",
-        "Log all sync events to 동기화로그 sheet",
-        "Typecheck passes"
-      ],
-      "priority": 24,
-      "passes": true,
-      "notes": "Covers FR-023. Matches sync strategy from feature-spec.md section 6 | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-025",
-      "title": "System Settings page - AI manual and integrations",
-      "description": "As a manager, I want to configure AI review prompts and test external system connections.",
-      "acceptanceCriteria": [
-        "Create components/SystemSettings.tsx with two sections",
-        "AI Manual section: large textarea for custom AI review prompt (FR-020)",
-        "Save prompt to system_settings store",
-        "Integration section: 4 connection cards - Gemini API, Google Sheets, MIS API, ZPPS API",
-        "Each card shows: status indicator (connected/disconnected), config fields, 'Test Connection' button",
-        "Gemini: shows API key status (from env var), test calls a simple Gemini request",
-        "Sheets: spreadsheet URL input, test calls testSheetsConnection()",
-        "MIS: endpoint URL input, test calls misService.healthCheck()",
-        "ZPPS: endpoint URL input, test calls zppsService.healthCheck()",
-        "Connection test results shown as success/error toast",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 25,
-      "passes": true,
-      "notes": "Covers FR-020, FR-024 | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-026",
-      "title": "Audit log viewer",
-      "description": "As a manager, I want to view audit logs so I can track all changes made to menus and meal plans.",
-      "acceptanceCriteria": [
-        "Create components/AuditLog.tsx with searchable, filterable log table",
-        "Columns: timestamp, user, action type, entity type, entity name/id",
-        "Filter by action type (create/update/delete/sync/generate/swap)",
-        "Filter by entity type (menu_item/meal_plan/config/sync)",
-        "Search by entity name or user",
-        "Click row to expand: show before/after JSON diff with highlighted changes",
-        "Pagination or virtual scrolling for large log sets",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 26,
-      "passes": true,
-      "notes": "Covers FR-031 | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-027",
-      "title": "Plan version diff view",
-      "description": "As a nutritionist, I want to compare meal plan versions so I can see what changed between iterations.",
-      "acceptanceCriteria": [
-        "Create components/PlanDiffView.tsx showing side-by-side version comparison",
-        "Load two versions of the same target/month meal plan from history",
-        "Highlight added items (green), removed items (red), unchanged items (gray)",
-        "Show cost difference summary per week",
-        "Accessible from meal plan history or meal planner",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 27,
-      "passes": true,
-      "notes": "Covers FR-032 | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-028",
-      "title": "CSV import dialog - 4-step wizard",
-      "description": "As a nutritionist, I want a guided CSV import wizard so I can bulk-load menus with validation.",
-      "acceptanceCriteria": [
-        "Create components/ImportDialog.tsx as a modal with 4 steps",
-        "Step 1: File upload - drag-and-drop or file picker for CSV",
-        "Step 2: Column mapping - map CSV columns to MenuItem fields with auto-detect",
-        "Step 3: Preview and validation - show valid items (green) and invalid items (red) with error details",
-        "Step 4: Confirm import - summary of items to add, button to execute",
-        "Uses importService.ts for parsing and validation",
-        "Success toast with count of imported items",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 28,
-      "passes": true,
-      "notes": "Covers FR-005. Depends on US-010 (import service) | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-029",
-      "title": "Real menu database - 215 items with 15 target types",
-      "description": "As a developer, I need production menu data so the app uses real Korean meal service menus.",
-      "acceptanceCriteria": [
-        "Create data/realMenuDB.ts with 215 real menu items",
-        "Items span 11 Korean meal categories mapped to 4 MenuCategory types",
-        "Category mapping: 무침/볶음/조림/김치/장아찌→side, 국/시즌국→soup, 메인/밥류/전/협업→main, 디저트→dessert",
-        "Each item has: code, name, category, cost, recommendedPrice, tastes, season, tags, mainIngredient",
-        "Update constants.ts to import from realMenuDB instead of mock data",
-        "Extend MAIN_INGREDIENTS to 10 types (add 달걀, 버섯, 채소, 기타)",
-        "Add 5 new TARGET_CONFIGS for extended targets (첫만남, 유아, 든든한유아, 어린이, 든든한어린이)",
-        "Typecheck passes"
-      ],
-      "priority": 29,
-      "passes": true,
-      "notes": "Recovered from git history (8c9bb04), adapted TasteProfile enum. 215 real menu items in data/realMenuDB.ts with 4 MenuCategory types."
-    },
-    {
-      "id": "US-030",
-      "title": "Historical meal plan calendar view",
-      "description": "As a nutritionist, I want a calendar view of past meal plans so I can reference previous plans when creating new ones.",
-      "acceptanceCriteria": [
-        "Create components/MealPlanHistory.tsx with monthly calendar grid (6 weeks x 7 days)",
-        "Each date cell shows: meal plan preview (top 3 menu names), target count, item count",
-        "화수목/금토월 cycle type badges on date cells",
-        "Month navigation (prev/next) with year display",
-        "Target filter dropdown to show specific target's plans",
-        "Click date to expand: detail view with target cards showing full menu lists",
-        "Detail view has prev/next date navigation",
-        "Create data/historicalMealPlans.ts with historical data (100+ dates)",
-        "Add to Layout sidebar as '식단 히스토리' tab with lazy loading",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 30,
-      "passes": true,
-      "notes": "Historical data spans 2024-11 to 2026-12, parsed from actual Sheets data | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-031",
-      "title": "Unit tests for engine and services",
-      "description": "As a developer, I need unit tests to verify core business logic works correctly.",
-      "acceptanceCriteria": [
-        "Configure Vitest in vitest.config.ts",
-        "Create tests/engine.test.ts: test meal plan generation, dedup, swap candidates, parent-child inheritance",
-        "Create tests for sheetsSerializer: serialize/deserialize round-trip for all entity types",
-        "Create tests for validationService: valid and invalid menu items, configs",
-        "Create tests for importService: CSV parsing, validation, edge cases",
-        "Create tests for auditService: log creation, retrieval",
-        "Create tests for context providers: state updates, CRUD operations",
-        "All tests pass with 'npx vitest run'",
-        "Typecheck passes"
-      ],
-      "priority": 31,
-      "passes": true,
-      "notes": "Target: 100+ unit tests across 7 test files | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-032",
-      "title": "E2E tests with Playwright",
-      "description": "As a developer, I need E2E tests to verify user flows work end-to-end in the browser.",
-      "acceptanceCriteria": [
-        "Configure Playwright in playwright.config.ts with Vite dev server",
-        "Create e2e/app.spec.ts with 15 test scenarios",
-        "Test navigation between all 7 tabs",
-        "Test meal plan generation for a target",
-        "Test menu search and filter",
-        "Test menu detail editing and save",
-        "Test dashboard chart rendering",
-        "Test audit log display",
-        "All tests pass with 'npx playwright test'",
-        "Typecheck passes"
-      ],
-      "priority": 32,
-      "passes": true,
-      "notes": "15 E2E scenarios covering core user flows | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-033",
-      "title": "Code splitting and bundle optimization",
-      "description": "As a developer, I need optimized bundles so the app loads fast with efficient code splitting.",
-      "acceptanceCriteria": [
-        "Configure React.lazy() for all tab-level components in App.tsx",
-        "Add Suspense with TabFallback loading spinner",
-        "Configure vite.config.ts manualChunks as function to split: vendor-react, vendor-charts, menu-data, history-data, vendor-pdf",
-        "html2pdf.js loaded via dynamic import only when PDF export is triggered",
-        "No empty chunk warnings in build output",
-        "Maximum chunk size under 500KB (except lazy-loaded data chunks)",
-        "Build completes in under 5 seconds",
-        "LCP under 2 seconds on standard connection (NFR-002)",
-        "Typecheck passes"
-      ],
-      "priority": 33,
-      "passes": true,
-      "notes": "Target: largest chunk ~406KB (vendor-charts) | Verified: file exists, typecheck passes, build succeeds"
-    },
-    {
-      "id": "US-034",
-      "title": "Vercel deployment configuration",
-      "description": "As a developer, I need Vercel config so the app can be deployed to production with serverless API routes.",
-      "acceptanceCriteria": [
-        "Create vercel.json with build command, output directory, and API rewrites",
-        "Create api/sheets.ts as Vercel serverless function proxying Google Sheets API",
-        "Serverless function reads credentials from Vercel environment variables",
-        "Configure rewrites: /api/sheets/* routes to serverless function",
-        "Static assets served from dist/ directory",
-        "SPA fallback: all non-API routes serve index.html",
-        "Build succeeds with 'vite build'",
-        "Typecheck passes"
-      ],
-      "priority": 34,
-      "passes": true,
-      "notes": "Final deployment step. Env vars set manually in Vercel dashboard | Verified: file exists, typecheck passes, build succeeds"
+      "passes": false,
+      "notes": "Layout.tsx header(line 161). 오른쪽 영역의 날짜/배송일/상태 배지 div 전체 제거. 단순 삭제 작업."
     }
   ]
 }
