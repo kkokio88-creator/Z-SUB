@@ -86,9 +86,11 @@ const MenuDatabase: React.FC = () => {
   const [openTagDropdown, setOpenTagDropdown] = useState<string | null>(null);
   // US-012: Open targetAgeGroup dropdowns per row
   const [openAgeDropdown, setOpenAgeDropdown] = useState<string | null>(null);
+  const [tagVersion, setTagVersion] = useState(0);
 
   // US-010: Available tags from localStorage zsub_target_tags
   const availableTags = useMemo<string[]>(() => {
+    void tagVersion; // dependency to force re-read
     try {
       const raw = localStorage.getItem('zsub_target_tags');
       if (!raw) return [];
@@ -101,7 +103,7 @@ const MenuDatabase: React.FC = () => {
     } catch {
       return [];
     }
-  }, []);
+  }, [tagVersion]);
 
   // US-010: One-time tag reset on mount
   useEffect(() => {
@@ -905,7 +907,7 @@ const MenuDatabase: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      {openTagDropdown === item.id && availableTags.length > 0 && (
+                      {openTagDropdown === item.id && (
                         <div
                           className="absolute left-0 top-full mt-1 z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-2 min-w-[140px] max-h-48 overflow-y-auto"
                           onClick={e => e.stopPropagation()}
@@ -931,6 +933,41 @@ const MenuDatabase: React.FC = () => {
                               </label>
                             );
                           })}
+                          <div className="border-t border-stone-100 mt-1 pt-1">
+                            <button
+                              onClick={() => {
+                                const newTag = prompt('새 태그 이름:');
+                                if (!newTag || !newTag.trim()) return;
+                                const trimmed = newTag.trim();
+                                // Add to item tags
+                                const current = item.tags || [];
+                                if (!current.includes(trimmed)) {
+                                  contextUpdateItem(item.id, { ...item, tags: [...current, trimmed] });
+                                }
+                                // Sync to zsub_target_tags: add to all configs' allowedTags
+                                try {
+                                  const raw = localStorage.getItem('zsub_target_tags');
+                                  const configs: TargetTagConfig[] = raw ? JSON.parse(raw) : [];
+                                  let changed = false;
+                                  for (const cfg of configs) {
+                                    if (!cfg.allowedTags.includes(trimmed)) {
+                                      cfg.allowedTags.push(trimmed);
+                                      changed = true;
+                                    }
+                                  }
+                                  if (changed) {
+                                    localStorage.setItem('zsub_target_tags', JSON.stringify(configs));
+                                    setTagVersion(v => v + 1);
+                                  }
+                                } catch {
+                                  /* ignore */
+                                }
+                              }}
+                              className="w-full text-left px-1.5 py-1 text-[11px] text-blue-600 hover:bg-blue-50 rounded font-medium"
+                            >
+                              + 신규 추가
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

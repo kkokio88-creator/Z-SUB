@@ -260,8 +260,8 @@
         "npx vite build passes"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": "SystemSettings.tsx targetTags(line 66), tag 관리 함수들(lines 308-353). MenuDatabase.tsx 태그 드롭다운(openTagDropdown). 현재 하드코딩된 3개 태그를 localStorage zsub_target_tags에서 동적으로 로드하도록 변경."
+      "passes": true,
+      "notes": "DONE: MenuDatabase 태그 드롭다운에 '+ 신규 추가' 버튼 추가. 신규 태그 생성 시 zsub_target_tags에 동기화 (모든 config의 allowedTags에 추가). tagVersion 상태로 즉시 드롭다운 갱신. 양방향 연동: 설정→리스트(기존), 리스트→설정(신규)."
     },
     {
       "id": "US-017",
