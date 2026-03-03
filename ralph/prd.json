@@ -197,8 +197,8 @@
         "npx vite build passes"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": "MealPlanHistory.tsx 식단표 뷰에서 각 메뉴 셀에 cost 표시 추가. 주차 합계 행에 totalCost + 원가율(totalCost/targetPrice*100) 표시. MealPlanner.tsx에서도 동일 패턴."
+      "passes": true,
+      "notes": "DONE: MenuItemRow에 개별 원가 표시 추가. discountSummary 렌더링에 원가 합계 + 원가율(%) 표시. 목표 원가율 초과 시 빨간색 경고. standalone/merged 양쪽 모두 적용."
     },
     {
       "id": "US-013",

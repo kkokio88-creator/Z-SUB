@@ -109,3 +109,12 @@
 - 연결 메뉴명 배지(🍽) 표시 추가
 - 변경 파일: types.ts, components/HistoryReviewModal.tsx
 ---
+
+## 2026-03-03 - US-012: P11 원가 정보 표시 추가
+- 구현: MenuItemRow에 개별 메뉴 원가(cost) 표시 추가 (item.cost > 0일 때)
+- 식단별 합산 원가 + 원가율(%) 표시: discountSummary 렌더링 영역에 추가
+- 원가율 = totalCost / targetPrice * 100, 목표 원가율(targetCostRatio) 초과 시 빨간색 경고
+- standalone 열과 merged(부모-자식) 열 양쪽 모두 동일 패턴 적용
+- 변경 파일: components/MealPlanHistory.tsx
+- 학습: discountSummary useMemo가 이미 totalCost와 targetCostRatio를 계산하고 있어 렌더링만 추가하면 됨
+---

@@ -318,6 +318,9 @@ const MenuItemRow: React.FC<{
       >
         {cleanName}
       </span>
+      {item.cost > 0 && (
+        <span className="text-[9px] text-stone-400 tabular-nums shrink-0">{item.cost.toLocaleString()}</span>
+      )}
       {quantity !== null && (
         <span className="px-1 py-0 text-[9px] font-bold text-stone-400 bg-stone-50 rounded shrink-0">{quantity}</span>
       )}
@@ -1931,17 +1934,37 @@ const MealPlanHistory: React.FC = () => {
                                 {dInfo &&
                                   (() => {
                                     const priceDiff = dInfo.sumRecPrice - dInfo.targetPrice;
-                                    if (priceDiff === 0) return null;
+                                    const costRatio =
+                                      dInfo.targetPrice > 0
+                                        ? Math.round((dInfo.totalCost / dInfo.targetPrice) * 100)
+                                        : 0;
+                                    const isOverCostRatio =
+                                      dInfo.targetCostRatio > 0 && costRatio > dInfo.targetCostRatio;
+                                    if (priceDiff === 0 && !dInfo.totalCost) return null;
                                     return (
-                                      <div className="mb-1 px-1 py-0.5 rounded text-[9px]">
-                                        <div className={`${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                          <span className="text-stone-500">
-                                            판매가 {dInfo.sumRecPrice.toLocaleString()}원
-                                          </span>{' '}
-                                          <span className="font-bold tabular-nums">
-                                            ({Math.abs(priceDiff).toLocaleString()}원 {priceDiff > 0 ? '초과' : '미달'})
-                                          </span>
-                                        </div>
+                                      <div className="mb-1 px-1 py-0.5 rounded text-[9px] space-y-0.5">
+                                        {priceDiff !== 0 && (
+                                          <div className={`${priceDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                            <span className="text-stone-500">
+                                              판매가 {dInfo.sumRecPrice.toLocaleString()}원
+                                            </span>{' '}
+                                            <span className="font-bold tabular-nums">
+                                              ({Math.abs(priceDiff).toLocaleString()}원{' '}
+                                              {priceDiff > 0 ? '초과' : '미달'})
+                                            </span>
+                                          </div>
+                                        )}
+                                        {dInfo.totalCost > 0 && (
+                                          <div className={isOverCostRatio ? 'text-red-500' : 'text-stone-500'}>
+                                            원가 {dInfo.totalCost.toLocaleString()}원{' '}
+                                            <span
+                                              className={`font-bold tabular-nums ${isOverCostRatio ? 'text-red-600' : 'text-emerald-600'}`}
+                                            >
+                                              ({costRatio}%
+                                              {dInfo.targetCostRatio > 0 ? `/${dInfo.targetCostRatio}%` : ''})
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })()}
@@ -1983,18 +2006,33 @@ const MealPlanHistory: React.FC = () => {
                                 const renderDiscBadge = (dI: typeof baseDInfo, label?: string) => {
                                   if (!dI) return null;
                                   const pDiff = dI.sumRecPrice - dI.targetPrice;
-                                  if (pDiff === 0) return null;
+                                  const costRatio =
+                                    dI.targetPrice > 0 ? Math.round((dI.totalCost / dI.targetPrice) * 100) : 0;
+                                  const isOverCostRatio = dI.targetCostRatio > 0 && costRatio > dI.targetCostRatio;
+                                  if (pDiff === 0 && !dI.totalCost) return null;
                                   return (
-                                    <div className="px-1 py-0.5 rounded text-[9px]">
+                                    <div className="px-1 py-0.5 rounded text-[9px] space-y-0.5">
                                       {label && <span className="text-stone-400 text-[8px]">{label} </span>}
-                                      <div className={`${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        <span className="text-stone-500">
-                                          판매가 {dI.sumRecPrice.toLocaleString()}원
-                                        </span>{' '}
-                                        <span className="font-bold tabular-nums">
-                                          ({Math.abs(pDiff).toLocaleString()}원 {pDiff > 0 ? '초과' : '미달'})
-                                        </span>
-                                      </div>
+                                      {pDiff !== 0 && (
+                                        <div className={`${pDiff > 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                          <span className="text-stone-500">
+                                            판매가 {dI.sumRecPrice.toLocaleString()}원
+                                          </span>{' '}
+                                          <span className="font-bold tabular-nums">
+                                            ({Math.abs(pDiff).toLocaleString()}원 {pDiff > 0 ? '초과' : '미달'})
+                                          </span>
+                                        </div>
+                                      )}
+                                      {dI.totalCost > 0 && (
+                                        <div className={isOverCostRatio ? 'text-red-500' : 'text-stone-500'}>
+                                          원가 {dI.totalCost.toLocaleString()}원{' '}
+                                          <span
+                                            className={`font-bold tabular-nums ${isOverCostRatio ? 'text-red-600' : 'text-emerald-600'}`}
+                                          >
+                                            ({costRatio}%{dI.targetCostRatio > 0 ? `/${dI.targetCostRatio}%` : ''})
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 };
