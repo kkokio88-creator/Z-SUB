@@ -32,7 +32,7 @@ import { MAJOR_INGREDIENTS } from '../constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const PAGE_SIZE = 9999;
+const PAGE_SIZE = 50;
 
 const INGREDIENT_LABELS: Record<string, string> = {
   beef: '소고기',
