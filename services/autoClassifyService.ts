@@ -1,4 +1,6 @@
-import { MenuCategory, MenuItem, HistoricalMealPlan } from '../types';
+import { MenuCategory, MenuItem, HistoricalMealPlan, TargetType } from '../types';
+import { SPICY_KEYWORDS, AUTO_TAG_RULES } from '../constants';
+import { isKidFriendly, isSeniorFriendly } from './sheetsSerializer';
 
 // 메뉴명 키워드 → 카테고리 매핑
 const CATEGORY_KEYWORDS: { category: MenuCategory; keywords: string[] }[] = [
@@ -81,7 +83,6 @@ export interface AutoClassifyResult {
 export function autoClassifyMenu(name: string): AutoClassifyResult {
   const result: AutoClassifyResult = {};
 
-  // 카테고리 추천
   for (const { category, keywords } of CATEGORY_KEYWORDS) {
     if (keywords.some(kw => name.includes(kw))) {
       result.category = category;
@@ -89,7 +90,6 @@ export function autoClassifyMenu(name: string): AutoClassifyResult {
     }
   }
 
-  // 주재료 추천
   for (const { ingredient, keywords } of INGREDIENT_KEYWORDS) {
     if (keywords.some(kw => name.includes(kw))) {
       result.mainIngredient = ingredient;
@@ -111,7 +111,7 @@ const normalizeMenuName = (name: string): string =>
 export interface HistoryMenuInfo {
   price: number;
   cost: number;
-  count: number; // 출현 횟수
+  count: number;
 }
 
 export function buildHistoryLookup(historicalPlans: HistoricalMealPlan[]): Map<string, HistoryMenuInfo> {
@@ -133,7 +133,6 @@ export function buildHistoryLookup(historicalPlans: HistoricalMealPlan[]): Map<s
   const result = new Map<string, HistoryMenuInfo>();
   for (const [name, data] of lookup) {
     if (data.prices.length === 0 && data.costs.length === 0) continue;
-    // 가장 최근 값(마지막)을 기본으로, 여러번 나왔으면 중앙값 사용
     const median = (arr: number[]) => {
       if (arr.length === 0) return 0;
       const sorted = [...arr].sort((a, b) => a - b);
@@ -150,13 +149,67 @@ export function buildHistoryLookup(historicalPlans: HistoricalMealPlan[]): Map<s
   return result;
 }
 
-// 전체 자동분류: 카테고리 + 주재료 + 원가/가격 (히스토리 기반)
+// 맵기 자동 판별
+function detectSpicy(name: string): boolean {
+  return SPICY_KEYWORDS.some(kw => name.includes(kw));
+}
+
+// 태그 자동 분류 (AUTO_TAG_RULES + 아이선호/시니어)
+function detectTags(name: string, isSpicy: boolean, existingTags: string[]): string[] {
+  const tags = new Set(existingTags);
+
+  // AUTO_TAG_RULES (원더스푼, 유기농, 무항생제, 국내산)
+  for (const rule of AUTO_TAG_RULES) {
+    if (name.includes(rule.keyword)) {
+      tags.add(rule.tag);
+    }
+  }
+
+  // 아이선호 태그
+  if (isKidFriendly(name, isSpicy) && !tags.has('아이선호')) {
+    tags.add('아이선호');
+  }
+
+  // 시니어 태그
+  if (isSeniorFriendly(name, isSpicy) && !tags.has('시니어')) {
+    tags.add('시니어');
+  }
+
+  return [...tags];
+}
+
+// 대상식단 자동 분류 (메뉴명 + 맵기 기반)
+function detectTargetAgeGroups(name: string, isSpicy: boolean): TargetType[] {
+  const targets: TargetType[] = [];
+
+  // 아이 식단 적합
+  if (isKidFriendly(name, isSpicy)) {
+    targets.push(TargetType.KIDS, TargetType.KIDS_PLUS);
+  }
+
+  // 시니어 식단 적합
+  if (isSeniorFriendly(name, isSpicy)) {
+    targets.push(TargetType.SENIOR, TargetType.SENIOR_HEALTH);
+  }
+
+  // 매운 음식이 아니면 가족/실속/청소연구소에도 적합
+  if (!isSpicy) {
+    targets.push(TargetType.FAMILY, TargetType.FAMILY_PLUS, TargetType.VALUE);
+  }
+
+  return targets;
+}
+
+// 전체 자동분류
 export interface FullAutoClassifyChange {
   id: string;
   category?: MenuCategory;
   mainIngredient?: string;
   cost?: number;
   recommendedPrice?: number;
+  isSpicy?: boolean;
+  tags?: string[];
+  targetAgeGroup?: TargetType[];
   fieldsChanged: string[];
 }
 
@@ -196,37 +249,32 @@ export function autoClassifyFull(
       change.fieldsChanged.push('판매가');
     }
 
+    // 맵기: 키워드 기반 자동 판별 (현재 false인데 매운 메뉴인 경우)
+    const shouldBeSpicy = detectSpicy(item.name);
+    if (shouldBeSpicy !== item.isSpicy) {
+      change.isSpicy = shouldBeSpicy;
+      change.fieldsChanged.push('맵기');
+    }
+
+    // 태그: 자동 태그 적용 (아이선호, 시니어, 원더스푼 등)
+    const currentSpicy = change.isSpicy !== undefined ? change.isSpicy : item.isSpicy;
+    const newTags = detectTags(item.name, currentSpicy, item.tags);
+    if (newTags.length !== item.tags.length || newTags.some(t => !item.tags.includes(t))) {
+      change.tags = newTags;
+      change.fieldsChanged.push('태그');
+    }
+
+    // 대상식단: 비어있으면 자동 분류
+    if (!item.targetAgeGroup || item.targetAgeGroup.length === 0) {
+      const detectedTargets = detectTargetAgeGroups(item.name, currentSpicy);
+      if (detectedTargets.length > 0) {
+        change.targetAgeGroup = detectedTargets;
+        change.fieldsChanged.push('대상식단');
+      }
+    }
+
     if (change.fieldsChanged.length > 0) {
       results.push(change);
-    }
-  }
-
-  return results;
-}
-
-// 기존 호환용 (레거시)
-export function autoClassifyBatch(
-  items: { id: string; name: string; mainIngredient: string; category: MenuCategory }[]
-): { id: string; category?: MenuCategory; mainIngredient?: string }[] {
-  const results: { id: string; category?: MenuCategory; mainIngredient?: string }[] = [];
-
-  for (const item of items) {
-    const classified = autoClassifyMenu(item.name);
-    const changes: { id: string; category?: MenuCategory; mainIngredient?: string } = { id: item.id };
-    let hasChange = false;
-
-    if (item.mainIngredient === 'vegetable' && classified.mainIngredient && classified.mainIngredient !== 'vegetable') {
-      changes.mainIngredient = classified.mainIngredient;
-      hasChange = true;
-    }
-
-    if (classified.category && classified.category !== item.category) {
-      changes.category = classified.category;
-      hasChange = true;
-    }
-
-    if (hasChange) {
-      results.push(changes);
     }
   }
 

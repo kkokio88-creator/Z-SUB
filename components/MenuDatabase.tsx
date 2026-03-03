@@ -27,6 +27,7 @@ import { validateMenuItem, type ValidationError } from '../services/validationSe
 import { addAuditEntry } from '../services/auditService';
 import { autoClassifyFull, buildHistoryLookup } from '../services/autoClassifyService';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
+import { pushMenuDB } from '../services/syncManager';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -387,8 +388,8 @@ const MenuDatabase: React.FC = () => {
     });
   };
 
-  // 자동 분류 (전체 메뉴 대상 + 히스토리 기반 세부정보 자동 입력)
-  const handleAutoClassify = () => {
+  // 자동 분류 (전체 메뉴 대상 + 히스토리 기반 세부정보 자동 입력 + Sheets 동기화)
+  const handleAutoClassify = async () => {
     const targets = menuItems.filter(item => !item.isUnused);
     const historyLookup = buildHistoryLookup(historicalPlans);
     const results = autoClassifyFull(targets, historyLookup);
@@ -418,6 +419,7 @@ const MenuDatabase: React.FC = () => {
     )
       return;
 
+    const updatedItems: MenuItem[] = [];
     for (const change of results) {
       const item = menuItems.find(i => i.id === change.id);
       if (!item) continue;
@@ -426,14 +428,52 @@ const MenuDatabase: React.FC = () => {
       if (change.category) updated.category = change.category;
       if (change.cost !== undefined) updated.cost = change.cost;
       if (change.recommendedPrice !== undefined) updated.recommendedPrice = change.recommendedPrice;
-      contextUpdateItem(item.id, { ...item, ...updated });
+      if (change.isSpicy !== undefined) updated.isSpicy = change.isSpicy;
+      if (change.tags) updated.tags = change.tags;
+      if (change.targetAgeGroup) updated.targetAgeGroup = change.targetAgeGroup;
+      const merged = { ...item, ...updated };
+      contextUpdateItem(item.id, merged);
+      updatedItems.push(merged);
     }
     saveToStorage();
-    addToast({
-      type: 'success',
-      title: '자동 분류 완료',
-      message: `${results.length}개 메뉴 업데이트 (${summaryText})`,
+
+    // Google Sheets DB에 동기화
+    const allUpdated = menuItems.map(item => {
+      const change = results.find(r => r.id === item.id);
+      if (!change) return item;
+      const updated: Partial<MenuItem> = {};
+      if (change.mainIngredient) updated.mainIngredient = change.mainIngredient;
+      if (change.category) updated.category = change.category;
+      if (change.cost !== undefined) updated.cost = change.cost;
+      if (change.recommendedPrice !== undefined) updated.recommendedPrice = change.recommendedPrice;
+      if (change.isSpicy !== undefined) updated.isSpicy = change.isSpicy;
+      if (change.tags) updated.tags = change.tags;
+      if (change.targetAgeGroup) updated.targetAgeGroup = change.targetAgeGroup;
+      return { ...item, ...updated };
     });
+
+    try {
+      const syncResult = await pushMenuDB(allUpdated);
+      if (syncResult.success) {
+        addToast({
+          type: 'success',
+          title: '자동 분류 + DB 동기화 완료',
+          message: `${results.length}개 메뉴 업데이트 (${summaryText}) → Sheets 반영 완료`,
+        });
+      } else {
+        addToast({
+          type: 'warning',
+          title: '자동 분류 완료 (DB 동기화 실패)',
+          message: `로컬 ${results.length}개 업데이트 완료. Sheets 동기화 실패: ${syncResult.error}`,
+        });
+      }
+    } catch {
+      addToast({
+        type: 'success',
+        title: '자동 분류 완료',
+        message: `${results.length}개 메뉴 업데이트 (${summaryText})`,
+      });
+    }
   };
 
   // 태그 전체 초기화
