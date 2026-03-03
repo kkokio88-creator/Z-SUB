@@ -292,8 +292,8 @@
         "npx vite build passes"
       ],
       "priority": 18,
-      "passes": false,
-      "notes": "MenuDatabase.tsx searchTerm(line 69), filteredItems(lines 147-150). 현재 name/code만 매칭. tags, mainIngredient(MAJOR_INGREDIENTS 라벨), season, category 매칭 추가."
+      "passes": true,
+      "notes": "DONE: filteredItems 검색에 tags, mainIngredient(key+label), season, category 매칭 추가. MAJOR_INGREDIENTS import 추가. '된장' 검색 → 태그 매칭, '여름' → 시즌 매칭, '감자' → 주재료 라벨 매칭."
     },
     {
       "id": "US-019",

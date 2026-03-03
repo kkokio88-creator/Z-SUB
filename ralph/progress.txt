@@ -135,6 +135,14 @@
 - 변경 파일: components/MenuDatabase.tsx
 ---
 
+## 2026-03-03 - US-018: P17 검색 기능 강화 (속성 기반 검색)
+- 구현: filteredItems 검색에 tags, mainIngredient(key+MAJOR_INGREDIENTS label), season, category 매칭 추가
+- MAJOR_INGREDIENTS import from constants.ts
+- '된장' → 태그 매칭, '여름' → 시즌 매칭, '감자' → 주재료 라벨 매칭
+- 기존 name/code 검색 유지
+- 변경 파일: components/MenuDatabase.tsx
+---
+
 ## 2026-03-03 - US-017: P16 알림 및 마이페이지
 - 구현: MyPage.tsx 신규 컴포넌트 생성 (프로필 표시 + 알림 목록 + 프로필 설정)
 - Layout.tsx: 사이드바에 마이페이지 탭 추가, 헤더에 알림 벨 아이콘 추가

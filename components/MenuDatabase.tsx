@@ -28,6 +28,7 @@ import { addAuditEntry } from '../services/auditService';
 import { autoClassifyFull, buildHistoryLookup } from '../services/autoClassifyService';
 import { useHistoricalPlans } from '../context/HistoricalPlansContext';
 import { pushMenuDB } from '../services/syncManager';
+import { MAJOR_INGREDIENTS } from '../constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -146,10 +147,17 @@ const MenuDatabase: React.FC = () => {
       menuItems.filter(item => {
         const matchesCategory = filterCategory === 'ALL' || item.category === filterCategory;
         const matchesUsage = filterUsage === 'ALL' || (filterUsage === 'active' ? !item.isUnused : item.isUnused);
+        const s = searchTerm.toLowerCase();
+        const ingredientLabel = MAJOR_INGREDIENTS.find(m => m.key === item.mainIngredient)?.label || '';
         const matchesSearch =
           !searchTerm ||
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
+          item.name.toLowerCase().includes(s) ||
+          (item.code || '').toLowerCase().includes(s) ||
+          item.tags.some(t => t.toLowerCase().includes(s)) ||
+          ingredientLabel.includes(s) ||
+          item.mainIngredient.toLowerCase().includes(s) ||
+          (item.season || '').includes(s) ||
+          (item.category || '').includes(s);
         return matchesCategory && matchesSearch && matchesUsage;
       }),
     [menuItems, filterCategory, filterUsage, searchTerm]
