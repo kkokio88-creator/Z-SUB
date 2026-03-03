@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   LayoutDashboard,
   Utensils,
@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getAllReviews, getReviewComments } from '../services/reviewService';
 import { Button } from '@/components/ui/button';
 
 interface LayoutProps {
@@ -48,6 +49,21 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
   const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const roleLabel: Record<string, string> = { manager: '최고 관리자', nutritionist: '영양사', operator: '운영자' };
+
+  const pendingCount = useMemo(() => {
+    let count = 0;
+    const reviews = getAllReviews();
+    for (const review of reviews) {
+      for (const dept of review.departments) {
+        if (dept.status === 'pending') count++;
+      }
+      const comments = getReviewComments(review.planId);
+      for (const comment of comments) {
+        if (comment.status === 'issue') count++;
+      }
+    }
+    return count;
+  }, []);
 
   return (
     <div className="flex h-screen bg-stone-50 overflow-hidden">
@@ -208,7 +224,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               title="알림"
             >
               <Bell className="w-5 h-5 text-stone-500" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              {pendingCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                  {pendingCount > 99 ? '99+' : pendingCount}
+                </span>
+              )}
             </button>
           </div>
         </header>
