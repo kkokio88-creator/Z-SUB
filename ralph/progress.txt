@@ -94,3 +94,10 @@
 - 변경 파일: components/MealPlanHistory.tsx
 - 학습: 생산 한도는 개별 품목 수량이 아닌 공정 그룹의 품목 건수 기준으로 체크해야 함
 ---
+
+## 2026-03-03 - US-010: P9 재검토 요청 시 상태 초기화 오류 수정
+- requestReReviewAll: rejected 상태만 pending으로 변경 (approved 유지)
+- 코멘트: [재검토] → [재검토 요청] 접두사로 변경
+- 변경 파일: services/reviewService.ts
+- 학습: resetDepartmentsForReReview는 메뉴 변경 시 특정 검토자 리셋 (별도 함수)
+---

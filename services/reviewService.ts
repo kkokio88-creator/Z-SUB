@@ -169,21 +169,25 @@ export const resetDepartmentsForReReview = (planId: string, reviewerNames: strin
   return review;
 };
 
-// 전체 부서 재검토 요청 (모든 부서 → pending 리셋)
+// 재검토 요청: 반려한 부서만 재검토 요청 상태로 변경 (승인 부서는 유지)
 export const requestReReviewAll = (planId: string): PlanReviewRecord | null => {
   const reviews = loadReviews();
   const review = reviews.find(r => r.planId === planId);
   if (!review) return null;
 
+  let changed = false;
   for (const dept of review.departments) {
-    if (dept.status !== 'pending') {
+    if (dept.status === 'rejected') {
       dept.status = 'pending';
-      dept.comment = dept.comment ? `[재검토] ${dept.comment}` : '';
+      dept.comment = dept.comment ? `[재검토 요청] ${dept.comment}` : '';
       dept.reviewedAt = null;
+      changed = true;
     }
   }
-  review.status = 'review_requested';
-  saveReviews(reviews);
+  if (changed) {
+    review.status = 'review_requested';
+    saveReviews(reviews);
+  }
   return review;
 };
 

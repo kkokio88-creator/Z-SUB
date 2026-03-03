@@ -164,8 +164,8 @@
         "npx vite build passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": "HistoryReviewModal.tsx handleReReview. reviewService.ts requestReReview 또는 유사 함수. 현재 모든 검토자 상태를 '대기'로 리셋하는 로직을 '반려' 검토자만 변경하도록 수정."
+      "passes": true,
+      "notes": "DONE: requestReReviewAll에서 rejected 상태만 pending으로 변경, approved는 유지. 코멘트에 [재검토 요청] 접두사 추가."
     },
     {
       "id": "US-011",
