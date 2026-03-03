@@ -58,6 +58,31 @@ const DEFAULT_INGREDIENT_COLOR = {
   label: '기타',
 };
 
+// 식단 배송 날짜 계산: 해당 월의 N번째 주 월요일 기준
+const getDeliveryDate = (year: number, month: number, weekIndex: number): Date => {
+  // 해당 월 1일
+  const firstDay = new Date(year, month - 1, 1);
+  // 첫째 주 월요일 (1일이 속한 주의 월요일)
+  const dayOfWeek = firstDay.getDay(); // 0=일 ~ 6=토
+  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  const firstMonday = new Date(year, month - 1, 1 + daysToMonday);
+  // weekIndex번째 주 (1-based)
+  const deliveryDate = new Date(firstMonday);
+  deliveryDate.setDate(firstMonday.getDate() + (weekIndex - 1) * 7);
+  return deliveryDate;
+};
+
+// 식단 배송일 기준 경과일 계산 + 라벨 생성
+const calcDaysGap = (lastUsedDate: string, deliveryDate: Date): { days: number; label: string; dateStr: string } => {
+  const used = new Date(lastUsedDate);
+  used.setHours(0, 0, 0, 0);
+  const delivery = new Date(deliveryDate);
+  delivery.setHours(0, 0, 0, 0);
+  const days = Math.max(0, Math.floor((delivery.getTime() - used.getTime()) / 86400000));
+  const label = days < 7 ? `${days}일` : days < 60 ? `${Math.floor(days / 7)}주` : `${Math.floor(days / 30)}개월`;
+  return { days, label, dateStr: lastUsedDate };
+};
+
 const MealPlanner: React.FC = () => {
   const { menuItems } = useMenu();
   const { addToast } = useToast();
@@ -668,22 +693,11 @@ const MealPlanner: React.FC = () => {
                   const isFallback = week.fallbackItems?.includes(cleanName);
                   const isHighlighted = highlightedIngredient === item.mainIngredient;
                   const isDimmed = highlightedIngredient !== null && !isHighlighted;
-                  // 마지막 사용일 계산
+                  // 마지막 사용일 계산 (배송일 기준 GAP)
                   const lastUsed = allMenuLastUsed.get(cleanName);
-                  const lastUsedLabel = lastUsed
-                    ? (() => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const used = new Date(lastUsed);
-                        used.setHours(0, 0, 0, 0);
-                        const days = Math.max(0, Math.floor((today.getTime() - used.getTime()) / 86400000));
-                        return days < 7
-                          ? `${days}일 전`
-                          : days < 60
-                            ? `${Math.floor(days / 7)}주 전`
-                            : `${Math.floor(days / 30)}개월 전`;
-                      })()
-                    : null;
+                  const deliveryDate = getDeliveryDate(selectedYear, selectedMonth, week.weekIndex);
+                  const gapInfo = lastUsed ? calcDaysGap(lastUsed, deliveryDate) : null;
+                  const lastUsedLabel = gapInfo ? `${gapInfo.label} 전` : null;
 
                   return (
                     <div key={item.id}>
@@ -691,12 +705,16 @@ const MealPlanner: React.FC = () => {
                         onClick={() => handleMenuItemClick(cycleKey, week.weekIndex, item)}
                         title={
                           [
-                            isCrossDup ? '다른 주기에도 사용됨' : '',
-                            isFallback ? '2차 필터(30일)로 선택됨' : '',
-                            lastUsed ? `마지막 사용: ${lastUsed}` : '',
+                            `배송일: ${deliveryDate.toISOString().slice(0, 10)}`,
+                            gapInfo ? `마지막 사용: ${gapInfo.dateStr} (${gapInfo.days}일 전)` : '사용 이력 없음',
+                            `원가: ${item.cost.toLocaleString()}원 / 판매가: ${item.recommendedPrice.toLocaleString()}원`,
+                            `주재료: ${PLANNER_INGREDIENT_COLORS[item.mainIngredient]?.label || item.mainIngredient}`,
+                            item.tags.length > 0 ? `태그: ${item.tags.join(', ')}` : '',
+                            isCrossDup ? '⚠ 다른 주기에도 사용됨' : '',
+                            isFallback ? '⚠ 2차 필터(30일)로 선택됨' : '',
                           ]
                             .filter(Boolean)
-                            .join(' | ') || undefined
+                            .join('\n') || undefined
                         }
                         className={`flex items-center gap-2 text-xs p-2 rounded cursor-pointer transition-all border-l-2 ${ingColor.borderL} ${
                           isHighlighted
@@ -1081,15 +1099,9 @@ const MealPlanner: React.FC = () => {
                             .trim();
                           const isNextMonthDup = nextMonthMenuNames.has(cleanCandidate);
                           const lastUsed = allMenuLastUsed.get(cleanCandidate);
-                          const daysAgo = lastUsed
-                            ? (() => {
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                const used = new Date(lastUsed);
-                                used.setHours(0, 0, 0, 0);
-                                return Math.max(0, Math.floor((today.getTime() - used.getTime()) / 86400000));
-                              })()
-                            : null;
+                          const swapDeliveryDate = getDeliveryDate(selectedYear, selectedMonth, swapTarget.weekIndex);
+                          const swapGapInfo = lastUsed ? calcDaysGap(lastUsed, swapDeliveryDate) : null;
+                          const daysAgo = swapGapInfo?.days ?? null;
                           const isNewProduct = (() => {
                             if (!candidate.launchDate) return false;
                             const cutoff = new Date();
