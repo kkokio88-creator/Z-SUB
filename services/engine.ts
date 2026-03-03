@@ -82,6 +82,22 @@ const shuffle = <T>(array: T[]): T[] => {
   return result;
 };
 
+// 배송일 계산: monthLabel(YYYY-MM) + weekIndex → Date
+const getWeekDeliveryDate = (monthLabel: string, weekIndex: number): Date | null => {
+  const parts = monthLabel.split('-');
+  if (parts.length < 2) return null;
+  const year = parseInt(parts[0]);
+  const month = parseInt(parts[1]);
+  if (isNaN(year) || isNaN(month)) return null;
+  const firstDay = new Date(year, month - 1, 1);
+  const dayOfWeek = firstDay.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  const firstMonday = new Date(year, month - 1, 1 + daysToMonday);
+  const delivery = new Date(firstMonday);
+  delivery.setDate(firstMonday.getDate() + (weekIndex - 1) * 7);
+  return delivery;
+};
+
 // Generate a single week cycle (e.g., Week 1 of Tue-Thu)
 // 메뉴명 정규화: 냉장/반조리/냉동 태그 + 후미 숫자 제거
 const normalizeMenuName = (name: string): string =>
@@ -104,7 +120,8 @@ const generateWeeklyCycle = (
     excludedNames30?: Set<string>;
   },
   otherCycleIngredients?: Map<number, string[]>,
-  otherTargetIngredients?: Map<number, string[]>
+  otherTargetIngredients?: Map<number, string[]>,
+  deliveryDate?: Date | null
 ): WeeklyCyclePlan => {
   const excludedNames = historyContext?.excludedNames;
   const excludedNames30 = historyContext?.excludedNames30;
@@ -123,9 +140,14 @@ const generateWeeklyCycle = (
   const otherTargetIngs = otherTargetIngredients?.get(weekIndex) || [];
   const otherTargetIngsSet = new Set(otherTargetIngs);
 
-  // 기본 필터 (60일 제외 + bannedTags + requiredTags + spicy)
+  // 기본 필터 (60일 제외 + bannedTags + requiredTags + spicy + 출시일)
   const baseFilter = (item: MenuItem, skipHistoryExclude: boolean = false): boolean => {
     if (enableDuplicationCheck && usedItemIds.has(item.id)) return false;
+    // 출시일 이전 메뉴 배제: launchDate > deliveryDate이면 아직 미출시
+    if (item.launchDate && deliveryDate) {
+      const launch = new Date(item.launchDate);
+      if (launch.getTime() > deliveryDate.getTime()) return false;
+    }
     if (!skipHistoryExclude && excludedNames && excludedNames.has(normalizeMenuName(item.name))) return false;
     if (config.bannedTags.length > 0) {
       const hasBannedTag = item.tags.some(tag => config.bannedTags.includes(tag));
@@ -145,6 +167,11 @@ const generateWeeklyCycle = (
   const availableMenu30 = excludedNames30
     ? menuDB.filter(item => {
         if (enableDuplicationCheck && usedItemIds.has(item.id)) return false;
+        // 출시일 이전 메뉴 배제
+        if (item.launchDate && deliveryDate) {
+          const launch = new Date(item.launchDate);
+          if (launch.getTime() > deliveryDate.getTime()) return false;
+        }
         // 30일 제외 목록에 있으면 제외
         if (excludedNames30.has(normalizeMenuName(item.name))) return false;
         if (config.bannedTags.length > 0) {
@@ -267,6 +294,11 @@ const generateWeeklyCycle = (
         if (m.category !== category) return false;
         if (selectedIds.has(m.id)) return false;
         if (enableDuplicationCheck && usedItemIds.has(m.id)) return false;
+        // 출시일 이전 메뉴 배제
+        if (m.launchDate && deliveryDate) {
+          const launch = new Date(m.launchDate);
+          if (launch.getTime() > deliveryDate.getTime()) return false;
+        }
         if (config.bannedTags.length > 0 && m.tags.some(tag => config.bannedTags.includes(tag))) return false;
         if ((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy) return false;
         if (config.requiredTags.length > 0 && !m.tags.some(tag => config.requiredTags.includes(tag))) return false;
@@ -400,7 +432,8 @@ const boostWeekPrice = (
   plan: WeeklyCyclePlan,
   target: TargetType,
   menuDB: MenuItem[],
-  usedItemIds: Set<string>
+  usedItemIds: Set<string>,
+  deliveryDate?: Date | null
 ): WeeklyCyclePlan => {
   const config = TARGET_CONFIGS[target];
   const items = [...plan.items];
@@ -428,7 +461,8 @@ const boostWeekPrice = (
           m.recommendedPrice <= maxReplacementPrice &&
           !config.bannedTags.some(t => m.tags.includes(t)) &&
           (config.requiredTags.length === 0 || m.tags.some(t => config.requiredTags.includes(t))) &&
-          !((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy)
+          !((target === TargetType.KIDS || target === TargetType.KIDS_PLUS) && m.isSpicy) &&
+          !(m.launchDate && deliveryDate && new Date(m.launchDate).getTime() > deliveryDate.getTime())
       )
       .sort((a, b) => b.recommendedPrice - a.recommendedPrice)[0];
 
@@ -506,6 +540,7 @@ export const generateMonthlyMealPlan = (
       : undefined;
 
   for (let i = 1; i <= 4; i++) {
+    const weekDeliveryDate = getWeekDeliveryDate(monthLabel, i);
     let weekPlan = generateWeeklyCycle(
       i,
       target,
@@ -516,12 +551,13 @@ export const generateMonthlyMealPlan = (
       prevWeekMenuNames,
       historyCtx,
       otherCycleIngredients,
-      otherTargetIngredients
+      otherTargetIngredients,
+      weekDeliveryDate
     );
 
     // 가격 미달 시 boostWeekPrice로 보정
     if (weekPlan.totalPrice < config.targetPrice) {
-      weekPlan = boostWeekPrice(weekPlan, target, menuDB, usedItemIds);
+      weekPlan = boostWeekPrice(weekPlan, target, menuDB, usedItemIds, weekDeliveryDate);
     }
 
     weekPlan.items.forEach(item => usedItemIds.add(item.id));
@@ -548,7 +584,8 @@ export const getSwapCandidates = (
   menuDB: MenuItem[],
   excludedNames?: Set<string>,
   filterLevel?: '60일' | '30일' | '전체',
-  _nextMonthMenuNames?: Set<string>
+  _nextMonthMenuNames?: Set<string>,
+  deliveryDate?: Date
 ): MenuItem[] => {
   const allUsedIds = new Set<string>();
   currentPlan.weeks.forEach(w => w.items.forEach(i => allUsedIds.add(i.id)));
@@ -562,6 +599,8 @@ export const getSwapCandidates = (
     if (item.id === itemToSwap.id) return false; // self
     if (item.category !== itemToSwap.category) return false; // same category
     if (allUsedIds.has(item.id)) return false; // 현재 식단 내 중복 방지
+    // 출시일 이전 메뉴 배제
+    if (item.launchDate && deliveryDate && new Date(item.launchDate).getTime() > deliveryDate.getTime()) return false;
 
     // filterLevel에 따른 히스토리 제외 처리
     if (filterLevel !== '전체' && excludedNames) {

@@ -338,8 +338,8 @@
         "npx vite build passes"
       ],
       "priority": 21,
-      "passes": false,
-      "notes": "types.ts launchDate(line 58) 현재 YYYY-MM → YYYY-MM-DD로 변경. MenuDetailModal.tsx 입력 필드를 date input으로 변경. engine.ts baseFilter에서 launchDate > deliveryDate인 메뉴 제외 로직 추가."
+      "passes": true,
+      "notes": "DONE: types.ts launchDate 코멘트 YYYY-MM→YYYY-MM-DD 변경. MenuDatabase.tsx input type='month'→'date' 변경. engine.ts에 getWeekDeliveryDate 헬퍼 추가 + baseFilter/availableMenu30/3차 fallback/boostWeekPrice/getSwapCandidates 모두에 launchDate>deliveryDate 배제 로직 추가. MealPlanner.tsx에서 getSwapCandidates 호출 시 deliveryDate 전달."
     },
     {
       "id": "US-022",

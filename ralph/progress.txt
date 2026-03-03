@@ -180,3 +180,14 @@
 - 월이 바뀌는 주(4/28 월~5/2 금)도 자동 처리
 - 변경 파일: components/MealPlanner.tsx
 ---
+
+## 2026-03-03 - US-021: P20 신제품 출시일 연/월/일 입력 + 출시 전 자동 배제
+- 구현: types.ts launchDate 코멘트 YYYY-MM→YYYY-MM-DD 변경
+- MenuDatabase.tsx: input type="month"→"date" 변경 (연/월/일 입력)
+- engine.ts: getWeekDeliveryDate(monthLabel, weekIndex) 헬퍼 추가
+- baseFilter/availableMenu30/3차 fallback/boostWeekPrice에 launchDate > deliveryDate 배제 추가
+- getSwapCandidates에도 deliveryDate 파라미터 + 배제 로직 추가
+- MealPlanner.tsx: getSwapCandidates 3개 호출부에 deliveryDate 전달
+- 변경 파일: types.ts, services/engine.ts, components/MenuDatabase.tsx, components/MealPlanner.tsx
+- 학습: engine.ts의 필터 로직이 baseFilter, availableMenu30, 3차 fallback, boostWeekPrice, getSwapCandidates 5곳에 분산. 모든 필터 경로에 동일 조건 추가 필요
+---

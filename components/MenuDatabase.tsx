@@ -989,7 +989,7 @@ const MenuDatabase: React.FC = () => {
                   {/* US-011: Launch date column */}
                   <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
                     <input
-                      type="month"
+                      type="date"
                       value={item.launchDate || ''}
                       onChange={e => contextUpdateItem(item.id, { ...item, launchDate: e.target.value || undefined })}
                       className="text-[10px] bg-transparent border border-transparent hover:border-stone-200 focus:border-stone-300 rounded px-1 py-0.5 w-full focus:outline-none text-stone-600"

@@ -437,14 +437,15 @@ const MealPlanner: React.FC = () => {
       if (!plan) return;
       const activeMenu = menuItems.filter(m => !m.isUnused);
       const excluded = getExcludedForSwap(cycle, '60일', weekIndex);
-      const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일');
+      const delivery = getDeliveryDate(selectedYear, selectedMonth, weekIndex);
+      const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일', undefined, delivery);
       setSwapTarget({ cycle, weekIndex, item });
       setSwapCandidates(candidates);
       setSwapFilterLevel('60일');
       setSwapSearchQuery('');
       setSwapCycleFilter('all');
     },
-    [plans, menuItems, getExcludedForSwap, integrationGroup]
+    [plans, menuItems, getExcludedForSwap, integrationGroup, selectedYear, selectedMonth]
   );
 
   // US-020: 든든 옵션 선정 핸들러
@@ -471,14 +472,15 @@ const MealPlanner: React.FC = () => {
     if (!plan) return;
     const activeMenu = menuItems.filter(m => !m.isUnused);
     const excluded = getExcludedForSwap(cycle, '60일', weekIndex);
-    const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일');
+    const delivery = getDeliveryDate(selectedYear, selectedMonth, weekIndex);
+    const candidates = getSwapCandidates(plan, item, weekIndex, activeMenu, excluded, '60일', undefined, delivery);
     setSwapTarget({ cycle, weekIndex, item });
     setSwapCandidates(candidates);
     setSwapFilterLevel('60일');
     setSwapSearchQuery('');
     setSwapCycleFilter('all');
     setDdeonddeonPrompt(null);
-  }, [ddeonddeonPrompt, plans, menuItems, getExcludedForSwap]);
+  }, [ddeonddeonPrompt, plans, menuItems, getExcludedForSwap, selectedYear, selectedMonth]);
 
   // 필터 레벨 변경 시 후보 재계산
   const handleSwapFilterChange = useCallback(
@@ -488,11 +490,21 @@ const MealPlanner: React.FC = () => {
       if (!plan) return;
       const activeMenu = menuItems.filter(m => !m.isUnused);
       const excluded = getExcludedForSwap(swapTarget.cycle, level, swapTarget.weekIndex);
-      const candidates = getSwapCandidates(plan, swapTarget.item, swapTarget.weekIndex, activeMenu, excluded, level);
+      const delivery = getDeliveryDate(selectedYear, selectedMonth, swapTarget.weekIndex);
+      const candidates = getSwapCandidates(
+        plan,
+        swapTarget.item,
+        swapTarget.weekIndex,
+        activeMenu,
+        excluded,
+        level,
+        undefined,
+        delivery
+      );
       setSwapCandidates(candidates);
       setSwapFilterLevel(level);
     },
-    [swapTarget, plans, menuItems, getExcludedForSwap]
+    [swapTarget, plans, menuItems, getExcludedForSwap, selectedYear, selectedMonth]
   );
 
   const performSwap = (newItem: MenuItem) => {

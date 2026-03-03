@@ -55,7 +55,7 @@ export interface MenuItem {
   weight?: number; // 용량 (g)
   isUnused?: boolean; // 미사용 여부
   imageUrl?: string;
-  launchDate?: string; // 출시월 (YYYY-MM) - 신제품 판별용
+  launchDate?: string; // 출시일 (YYYY-MM-DD) - 신제품 판별용
   targetAgeGroup?: TargetType[]; // 대상 식단 (비어있으면 전체 사용 가능)
 }
 
