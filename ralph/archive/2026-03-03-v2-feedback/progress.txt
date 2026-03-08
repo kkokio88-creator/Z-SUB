@@ -1,0 +1,44 @@
+# Ralph Progress - Z-SUB v2 Feedback
+# Branch: ralph/v2-feedback
+# Started: 2026-02-26
+# Stories: 17 total
+
+## Codebase Patterns
+- 프로젝트 루트에 src/ 없음. App.tsx, types.ts, constants.ts 등 루트 레벨
+- 컴포넌트: components/, 서비스: services/, 컨텍스트: context/, 훅: hooks/
+- UI: shadcn/ui + Tailwind CSS 4 + lucide-react 아이콘
+- 상태: React Context (MenuContext, AuthContext, ToastContext, SheetsContext, HistoricalPlansContext)
+- 빌드: Vite 6, TypeScript, npx vite build로 검증
+- 테스트: vitest (98 unit), playwright (13 e2e)
+- 히스토리 데이터: data/historicalMealPlans.ts (100+ dates)
+- 메뉴 DB: data/realMenuDB.ts (215 items)
+- 주재료 컬러: MealPlanHistory.tsx INGREDIENT_COLORS + MealPlanner.tsx PLANNER_INGREDIENT_COLORS
+- 냉장국 분류: MealPlanHistory.tsx detectProcess 함수 (이름 기반)
+- 스왑 모달: MealPlanner.tsx getSwapCandidates + allMenuLastUsed map
+- 검토 시스템: HistoryReviewModal.tsx + reviewService.ts + googleChatService.ts
+- 태그 관리: SystemSettings.tsx + localStorage zsub_target_tags
+- 생산 한도: localStorage zsub_production_limits
+
+## 이미 구현 확인된 항목 (PRD 제외)
+- MealPlanner 버튼: 조회/생성/저장만 존재 (MIS/GPPS/내보내기 등 없음)
+- 버전 기록: 이미 단순 임시 저장 (saveTempSnapshot/loadSnapshot)
+- 배포/내보내기: 히스토리 전용 (MealPlanner에 export 없음)
+- 든든 옵션 UX: 완전 구현 (ddeonddeonPrompt 모달 + 카운터)
+- 가격 표시: 이미 절대값만 (퍼센테이지 없음)
+- 반려 사유: textarea 존재 (HistoryReviewModal lines 329-335)
+- 대댓글: 스레드 답글 구현됨 (parentId 기반)
+- 재검토 요청: 버튼 + 구글 챗 알림 구현됨
+- 코멘트 삭제: X 버튼 존재
+- 감사 로그 탭: 이미 삭제됨
+- 카테고리 기타: MenuCategory.DESSERT = '기타'
+- 맛 프로필 장류: TasteProfile = 간장/고추장/된장
+- 활성 메뉴 기본: filterUsage default 'active'
+- 페이지 갯수 해제: PAGE_SIZE = 9999
+- 중복 위험 필터: dupTargetFilter 구현됨
+- 주재료 클릭 펼침: expandedIngredient 구현됨
+- 태그 선택 열: openTagDropdown 구현됨
+- 타겟 연령대: types.ts targetAgeGroup 필드 존재
+- 신제품 출시일: types.ts launchDate 필드 존재
+- 구글 로그인: 호연 직접 개발 예정 (PRD 제외)
+
+---

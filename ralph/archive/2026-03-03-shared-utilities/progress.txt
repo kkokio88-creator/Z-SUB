@@ -1,0 +1,83 @@
+# Ralph Progress - Z-SUB Shared Utilities
+# Branch: ralph/shared-utilities
+# Started: 2026-03-03
+# Stories: 7 total (US-001 ~ US-007)
+
+## Codebase Patterns
+- 프로젝트 루트에 src/ 없음. App.tsx, types.ts, constants.ts 등 루트 레벨
+- 컴포넌트: components/, 서비스: services/, 컨텍스트: context/, 훅: hooks/
+- UI: shadcn/ui + Tailwind CSS 4 + lucide-react 아이콘
+- 상태: React Context (MenuContext, AuthContext, ToastContext, SheetsContext, HistoricalPlansContext)
+- 빌드: Vite 6, TypeScript, npx vite build로 검증
+- 중앙 상수: constants.ts (MAJOR_INGREDIENTS, TARGET_CONFIGS, MEAL_PLAN_INTEGRATION_GROUPS 등)
+- 타입 정의: types.ts (TargetType enum, MenuItem interface 등)
+- 메뉴명 정규화: /_냉장|_반조리|_냉동/g 제거 + /\s+\d+$/ 후미 숫자 제거 + trim
+- engine.ts에 normalizeMenuName 로컬 정의(미export), 나머지 파일은 인라인 정규식 사용
+- INGREDIENT_KEYWORDS 3곳 분산: autoClassifyService(최완전), sheetsSerializer, MealPlanHistory
+- TARGET_LABELS 4곳 중복: Dashboard, MealPlanHistory, HistoryDistributionView, HistoryIngredientView
+- 알림: MyPage.tsx의 pendingItems useMemo가 getAllReviews+getReviewComments로 미확인 건수 계산
+- 페이지네이션: MenuDatabase.tsx에 PAGE_SIZE=9999로 사실상 비활성화
+- lint-staged: 커밋 시 eslint --fix + prettier --write 자동 실행
+
+---
+
+## 2026-03-03 - US-001: TARGET_LABELS를 constants.ts로 통합
+- constants.ts 끝에 TARGET_LABELS export 추가 (Record<string, string>, 10개 항목)
+- Dashboard.tsx: import 추가 + 로컬 정의 제거
+- MealPlanHistory.tsx: import 추가 + 로컬 정의 제거
+- HistoryDistributionView.tsx: import 추가 + 로컬 정의 제거
+- HistoryIngredientView.tsx: import 추가 + 로컬 정의 제거
+- 변경 파일: constants.ts, components/Dashboard.tsx, components/MealPlanHistory.tsx, components/HistoryDistributionView.tsx, components/HistoryIngredientView.tsx
+---
+
+## 2026-03-03 - US-002: normalizeMenuName 공유 유틸 추출 (Part 1: services)
+- services/menuUtils.ts 신규 생성: export const normalizeMenuName
+- engine.ts: 로컬 normalizeMenuName 제거 + import { normalizeMenuName } from './menuUtils' 추가
+- autoClassifyService.ts: 로컬 normalizeMenuName 제거 + import 추가 (사용처 2곳 변경 없음)
+- tagAnalysisService.ts: 인라인 .replace(/_냉장|_반조리|_냉동/g, '').replace(/\s+\d+$/, '').trim()을 normalizeMenuName(item.name) 호출로 교체
+- 변경 파일: services/menuUtils.ts(신규), services/engine.ts, services/autoClassifyService.ts, services/tagAnalysisService.ts
+---
+
+## 2026-03-03 - US-003: normalizeMenuName 공유 유틸 추출 (Part 2: components)
+- menuUtils.ts에 stripProcessSuffix 추가 (공정 접미사만 제거, 후미 숫자 보존)
+- MealPlanner.tsx: 10곳 인라인 → normalizeMenuName (3개 로컬 normalize 함수 제거)
+- MealPlanHistory.tsx: parseMenuItem·detectProcess → stripProcessSuffix, 나머지 2곳 → normalizeMenuName
+- HistoryReviewModal.tsx: 2곳 교체 (1곳 normalizeMenuName, 1곳 normalizeMenuName)
+- Dashboard.tsx: 1곳 → normalizeMenuName
+- HistoryDistributionView.tsx: 1곳 → normalizeMenuName
+- HistoryIngredientView.tsx: 1곳 → normalizeMenuName
+- 패턴 발견: 후미 숫자가 수량 정보인 경우 stripProcessSuffix 사용 필요 (parseMenuItem)
+- 변경 파일: services/menuUtils.ts, 6개 컴포넌트 파일
+---
+
+## 2026-03-03 - US-004: INGREDIENT_KEYWORDS 단일 소스 통합
+- constants.ts에 INGREDIENT_KEYWORDS 추가 (Record<string, string[]>, 10개 재료)
+- autoClassifyService 기준 + sheetsSerializer '설렁탕' 병합 = 최완전 버전
+- autoClassifyService.ts: 배열 형식({ingredient, keywords}[]) → Object.entries() 순회로 변경
+- sheetsSerializer.ts: 로컬 정의 제거 + import 추가 (vegetable 카테고리 추가됨 = 버그 수정)
+- MealPlanHistory.tsx: 로컬 정의 제거 + import 추가 (닭강정/닭가슴/돈까스 등 키워드 추가 = 분류 개선)
+- 변경 파일: constants.ts, services/autoClassifyService.ts, services/sheetsSerializer.ts, components/MealPlanHistory.tsx
+---
+
+## 2026-03-03 - US-005: 알림 벨 red dot 조건부 표시
+- Layout.tsx에 useMemo + getAllReviews/getReviewComments import 추가
+- pendingCount: pending departments + issue comments 합산
+- 하드코딩 red dot 제거 → pendingCount > 0일 때만 빨간 배지 + 숫자 표시 (99+ 캡)
+- 변경 파일: components/Layout.tsx
+---
+
+## 2026-03-03 - US-006: PAGE_SIZE 정상화 + 페이지네이션 활성화
+- MenuDatabase.tsx: PAGE_SIZE 9999 → 50
+- 기존 pagination UI(이전/다음 버튼, 페이지 카운트) + setPage(0) 리셋 이미 구현 확인
+- 변경 파일: components/MenuDatabase.tsx
+---
+
+## 2026-03-03 - US-007: 미사용 import 및 dead code 정리
+- HistoryIngredientView.tsx: MenuCategory import 제거
+- MealPlanner.tsx: Input import 제거
+- MyPage.tsx: PlanReviewRecord, ReviewComment type import 제거
+- eslint 경고 0건 확인 (변경 파일 한정)
+- 변경 파일: components/HistoryIngredientView.tsx, components/MealPlanner.tsx, components/MyPage.tsx
+---
+
+## COMPLETE: 7/7 stories passed

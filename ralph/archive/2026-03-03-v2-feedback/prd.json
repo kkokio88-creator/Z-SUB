@@ -1,0 +1,280 @@
+{
+  "project": "Z-SUB",
+  "branchName": "ralph/v2-feedback",
+  "description": "2차 회의 피드백 반영: 버그 수정 4건, 주재료 시각화 통일 3건, DB 정리 2건, 히스토리/레이아웃 3건, 검토 알림 1건, UI 개선 3건, 연동 1건",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "대체 메뉴 마지막 사용일 계산 버그 수정",
+      "description": "As a nutritionist, 대체 메뉴의 마지막 사용일이 '마이너스 306일 전' 등 비정상 값으로 표시되는 버그를 수정한다.",
+      "acceptanceCriteria": [
+        "MealPlanner.tsx의 allMenuLastUsed 맵 구성 로직 점검: historicalPlans의 date 필드가 올바르게 파싱되는지 확인",
+        "날짜 계산에서 음수/비정상 값이 발생하지 않음",
+        "대체 메뉴 목록에서 '3일 전', '2주 전', '2개월 전' 등 정상 값만 표시",
+        "히스토리 데이터가 없는 메뉴는 사용일 정보를 표시하지 않음",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Bug location: MealPlanner.tsx lines 339-356 (allMenuLastUsed map), lines 671-686 (display label). 날짜 비교 시 Date 파싱 문제 또는 히스토리 date 형식 불일치 가능성 조사. Math.max(0, ...) 사용 확인."
+    },
+    {
+      "id": "US-002",
+      "title": "30일/60일 필터 동작 버그 수정",
+      "description": "As a nutritionist, 대체 메뉴 선택 시 30일/60일 필터를 적용하면 해당 기간 내 사용 메뉴가 후보 목록에서 제외되어야 한다.",
+      "acceptanceCriteria": [
+        "스왑 모달에서 '60일' 필터 선택 시 최근 60일 내 사용 메뉴가 후보 목록에서 제외됨",
+        "스왑 모달에서 '30일' 필터 선택 시 최근 30일 내 사용 메뉴가 후보 목록에서 제외됨",
+        "'전체' 선택 시 모든 메뉴 표시",
+        "필터 변경 시 후보 목록이 즉시 갱신됨",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Bug location: MealPlanner.tsx lines 372-408 (swapExcludedNames), lines 1014-1028 (filter tabs). getSwapCandidates에 excluded set이 제대로 전달되는지 확인. getExcludedForSwap 함수의 반환값 검증."
+    },
+    {
+      "id": "US-003",
+      "title": "영양과채사라다 데이터 복제 버그 수정",
+      "description": "As a nutritionist, 반찬 리스트에서 필터를 조작할 때 '영양과채사라다' 데이터가 자동으로 복제되어 삽입되는 버그를 수정한다.",
+      "acceptanceCriteria": [
+        "필터(카테고리, 사용상태, 검색어) 변경 시 메뉴 아이템이 복제되지 않음",
+        "어떤 필터 조합을 적용해도 동일 메뉴가 중복 표시되지 않음",
+        "MenuContext의 menuItems 상태가 필터 조작으로 변형되지 않음",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Bug location: MenuDatabase.tsx. 필터 변경 핸들러(filterCategory, filterUsage, searchTerm)가 menuItems 원본 배열을 변형(mutate)하는지 점검. useMemo 의존성 또는 상태 업데이트 부작용 확인. handleCleanup(lines 433-486)의 중복 제거 로직도 참조."
+    },
+    {
+      "id": "US-004",
+      "title": "냉장국/반조리 분류 로직 수정",
+      "description": "As a nutritionist, 히스토리 생산수량에서 냉장국으로 잘못 분류된 메뉴를 바로잡는다.",
+      "acceptanceCriteria": [
+        "detectProcess 함수가 실제 냉장국만 '냉장국'으로 분류",
+        "_냉장 접미사 + 국/탕/찌개 카테고리인 메뉴만 냉장국으로 분류",
+        "반조리는 _반조리 접미사가 있는 메뉴만 해당",
+        "분류 결과가 실제 DB의 process 번호와 일치하는지 교차 검증",
+        "생산 통합 뷰에서 냉장국 목록이 정확함",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Bug location: MealPlanHistory.tsx detectProcess 함수 (lines 233-258). 이름 기반 분류 로직의 허점 점검. DB의 process 필드(11=반조리, 22=냉장 등)를 우선 참조하고, 이름 기반은 fallback으로만 사용하도록 개선 권장."
+    },
+    {
+      "id": "US-005",
+      "title": "주재료 시각화 — 글씨 색만 사용",
+      "description": "As a user, 식단표 내 메뉴의 주재료 시각 표시를 글씨 색 하나로 통일한다. 테두리 색과 점 색은 삭제한다.",
+      "acceptanceCriteria": [
+        "MealPlanHistory의 INGREDIENT_COLORS에서 borderL, dot 속성 제거, text만 사용",
+        "MealPlanner의 PLANNER_INGREDIENT_COLORS에서 bg, borderL, dot 속성 제거, text만 사용",
+        "주재료 필터에서 선택한 재료에 해당하는 메뉴의 글씨 색만 변경됨",
+        "선택하지 않은 메뉴는 기본 text-stone-700 유지",
+        "메뉴 아이템에 좌측 테두리선(border-l) 없음",
+        "메뉴 아이템 앞에 색상 점(dot) 없음",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Files: MealPlanHistory.tsx INGREDIENT_COLORS(lines 146-175), INGREDIENT_HIGHLIGHT_TEXT(lines 262-273), 렌더링 로직(line 315-317). MealPlanner.tsx PLANNER_INGREDIENT_COLORS(lines 17-59), DEFAULT_INGREDIENT_COLOR(lines 53-59). 두 파일 모두 수정 필요."
+    },
+    {
+      "id": "US-006",
+      "title": "주재료 필터 위치를 식단표 내 주재료에 반영",
+      "description": "As a user, 주재료 필터를 별도 하단 영역이 아닌 요일별 식단표의 주재료 부분에 직접 반영한다.",
+      "acceptanceCriteria": [
+        "기존 별도 행(thead 내 sub-header row)의 주재료 필터 버튼 제거",
+        "각 요일 열 헤더 또는 식단표 상단에 주재료 필터 통합",
+        "필터 선택/해제 시 해당 주재료 메뉴의 글씨 색이 즉시 변경",
+        "필터 UI가 식단표와 시각적으로 자연스럽게 통합",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Current location: MealPlanHistory.tsx lines 1603-1636 (thead 내 별도 tr). 이를 식단표 열 헤더 영역으로 이동하거나, 각 요일 헤더 아래 인라인 필터로 변경."
+    },
+    {
+      "id": "US-007",
+      "title": "주재료 컬러링 설정에서 식재료 추가/변경",
+      "description": "As a manager, 주재료 컬러링 설정에서 신규 식재료를 추가하거나 기존 텍스트를 변경할 수 있다.",
+      "acceptanceCriteria": [
+        "SystemSettings의 주재료 컬러링 섹션에서 '추가' 버튼으로 새 식재료 등록 가능",
+        "기존 식재료의 label(한글명) 수정 가능",
+        "기존 식재료의 color(색상) 변경 가능",
+        "추가/변경된 설정이 localStorage에 저장되고 식단표에 즉시 반영",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "SystemSettings.tsx의 IngredientColorConfig 관리 섹션 확인. 현재 편집 UI가 toggle/color만 지원하면 label 수정 + 신규 추가 기능 구현. types.ts IngredientColorConfig 참조."
+    },
+    {
+      "id": "US-008",
+      "title": "반찬 DB 태그 초기화 + 없어진 식단 태그 삭제",
+      "description": "As a manager, 반찬 DB의 기존 태그(비고란 자동 가져온 것)를 전부 초기화하고, 없어진 식단(첫만남, 든든한유아, 유아, 든든한어린이, 어린이)을 태그 관리에서 삭제한다.",
+      "acceptanceCriteria": [
+        "모든 메뉴 아이템의 tags 배열이 빈 배열([])로 초기화됨",
+        "data/realMenuDB.ts의 모든 항목에서 기존 tags 제거",
+        "SystemSettings 태그 관리에서 '첫만남 식단', '든든한 유아 식단', '유아 식단', '든든한 어린이 식단', '어린이 식단' 삭제",
+        "태그는 SystemSettings > 태그 관리에서만 생성/관리",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Files: data/realMenuDB.ts (tags 필드 초기화), constants.ts (DEFAULT_TARGET_TAGS에서 없어진 식단 제거), SystemSettings.tsx (태그 관리 UI). localStorage의 zsub_target_tags도 정리 필요."
+    },
+    {
+      "id": "US-009",
+      "title": "주재료 분류 세분화",
+      "description": "As a nutritionist, 주재료 분류를 '채소/생선' 등 대분류 대신 '시금치, 콩나물, 감자, 오징어, 닭' 등 구체적 원재료 수준으로 변경한다.",
+      "acceptanceCriteria": [
+        "MAJOR_INGREDIENTS에서 'vegetable'(채소) 대분류를 구체적 채소류로 분리 (시금치, 콩나물, 배추, 브로콜리 등)",
+        "MAJOR_INGREDIENTS에서 'fish'(생선)를 유지하되 구체적 어류 추가 가능",
+        "realMenuDB.ts의 각 메뉴 mainIngredient 값을 세분화된 분류로 업데이트",
+        "MenuDatabase의 INGREDIENT_LABELS 업데이트",
+        "autoClassifyService의 INGREDIENT_KEYWORDS 업데이트",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "현재 MAJOR_INGREDIENTS에 16개 항목 존재 (beef, pork, chicken, duck, fish, squid, shrimp, shellfish, tofu, egg, potato, sweetpotato, seaweed, mushroom, bean, vegetable). 'vegetable'을 구체적으로 분리하고 realMenuDB의 215개 메뉴 재분류 필요. KOREAN_BANCHAN_REFERENCE 참조 가능."
+    },
+    {
+      "id": "US-010",
+      "title": "Layout 헤더 날짜/배송일 삭제",
+      "description": "As a user, 히스토리 상단의 하드코딩된 날짜와 배송일 정보를 삭제한다.",
+      "acceptanceCriteria": [
+        "Layout.tsx 헤더에서 '2024년 3월 5일 (화)' 텍스트 제거",
+        "Layout.tsx 헤더에서 'A조 배송일' 텍스트 제거",
+        "헤더에 탭 제목과 운영 상태 배지만 남음",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Layout.tsx lines 192-195. 단순 삭제. 해당 div 블록 전체 제거."
+    },
+    {
+      "id": "US-011",
+      "title": "생산 한도 경고를 생산 수량 열에 직접 표시",
+      "description": "As a nutritionist, 냉장국/반조리 생산 한도 초과 경고가 생산 수량 열의 해당 메뉴에 직접 표시되어야 한다.",
+      "acceptanceCriteria": [
+        "생산 통합 뷰에서 한도 초과 메뉴의 수량 셀에 경고 아이콘 + 한도 정보 직접 표시",
+        "어떤 메뉴가 어떤 한도를 초과했는지 한눈에 파악 가능",
+        "주재료 필터 하단이나 별도 영역에 경고를 표시하지 않음",
+        "비초과 메뉴는 정상 표시",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "현재 위치: MealPlanHistory.tsx lines 1526-1551. 이미 행 단위로 bg-red-50 + AlertTriangle 표시 중. 주재료 필터 하단에 별도 경고가 있는지 확인하고 있다면 제거. 생산 수량 열에 경고가 명확하게 표시되는지 검증."
+    },
+    {
+      "id": "US-012",
+      "title": "히스토리 뷰별 다운로드",
+      "description": "As a user, 히스토리에서 다운로드 시 현재 보고 있는 화면 뷰 그대로 다운로드한다.",
+      "acceptanceCriteria": [
+        "식단표 뷰에서 다운로드 시 식단표 레이아웃 그대로 내보내기",
+        "재료 검토 뷰에서 다운로드 시 재료 검토 레이아웃 그대로 내보내기",
+        "현장 배포 뷰에서 다운로드 시 현장 배포 레이아웃 그대로 내보내기",
+        "생산 통합 뷰에서 다운로드 시 생산 통합 레이아웃 그대로 내보내기",
+        "CSV/PDF 각각 현재 뷰에 맞는 데이터 구조로 내보내기",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "현재 MealPlanHistory.tsx lines 1460-1488에 CSV/PDF/시트 버튼 존재. exportToHistoryCSV, exportToHistoryPDF 함수가 현재 viewMode를 반영하는지 확인. 뷰모드: 'table'(식단표), 'ingredient'(재료검토), 'distribution'(현장배포), 'production'(생산통합). exportService.ts 수정 필요할 수 있음."
+    },
+    {
+      "id": "US-013",
+      "title": "검토 상태 변경 시 전체 직원 구글 챗 알림",
+      "description": "As a manager, 검토 상태가 승인/반려로 변경될 때 전체 관련 직원에게 구글 챗 알림을 발송한다. 메뉴 변경 시에는 알림을 보내지 않는다.",
+      "acceptanceCriteria": [
+        "검토 상태가 'approved'로 변경될 때 관련 직원에게 구글 챗 알림 발송",
+        "검토 상태가 'rejected'로 변경될 때 관련 직원에게 구글 챗 알림 발송",
+        "메뉴 교체/변경 시에는 알림을 보내지 않음",
+        "'재검토 요청' 버튼 클릭 시에만 반려한 담당자에게 알림 발송 (기존 기능 유지)",
+        "알림 메시지에 식단 정보(타겟, 날짜)와 상태 포함",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "현재: HistoryReviewModal.tsx handleReReview에서 재검토 요청 시 구글 챗 알림 전송 구현됨. 추가 필요: handleDeptReview (승인/반려) 시에도 googleChatService 호출. reviewService.ts의 submitDepartmentReview, googleChatService.ts 수정."
+    },
+    {
+      "id": "US-014",
+      "title": "중복 위험 테이블 높이 확대",
+      "description": "As a user, 중복 위험 분석 테이블의 세로 높이를 확대하여 메뉴명이 잘리지 않도록 한다.",
+      "acceptanceCriteria": [
+        "중복 위험 분석 영역의 max-height 또는 높이 제한 확대",
+        "메뉴명이 2줄 이상이어도 완전히 표시됨",
+        "스크롤 없이 더 많은 항목 확인 가능",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Dashboard.tsx lines 594-643. 바 차트 또는 테이블 컨테이너의 max-h, h 값 조정. 메뉴명 text-truncate 제거."
+    },
+    {
+      "id": "US-015",
+      "title": "식단 생성 가이드라인 입력 높이 확대",
+      "description": "As a manager, 식단 생성 가이드라인 입력 영역의 높이를 확대하여 긴 내용을 편하게 작성할 수 있도록 한다.",
+      "acceptanceCriteria": [
+        "가이드라인 textarea의 최소 높이를 현재보다 2배 이상으로 확대",
+        "내용이 많아도 스크롤 없이 충분히 보임",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "가이드라인 입력은 SystemSettings.tsx의 AI Manual 섹션 또는 MealPlanner의 생성 옵션에 있을 수 있음. textarea 요소를 찾아서 rows 또는 min-h 값 확대."
+    },
+    {
+      "id": "US-016",
+      "title": "신제품 출시일 기준 메뉴 우선 표시",
+      "description": "As a nutritionist, 메뉴 선택(대체) 화면 상단에 최근 출시된 메뉴를 우선 표시한다.",
+      "acceptanceCriteria": [
+        "MenuDetailModal에서 launchDate(출시월) 필드 편집 가능",
+        "대체 메뉴 선택 모달에서 launchDate가 있는 메뉴를 상단에 우선 표시",
+        "최근 출시순으로 정렬 (가장 최근이 맨 위)",
+        "출시일 없는 메뉴는 기존 정렬 순서 유지",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "types.ts에 launchDate?: string 이미 존재. MenuDetailModal.tsx에 입력 필드 확인/추가. MealPlanner.tsx 스왑 모달(lines 1096-1160)에서 candidates 정렬 시 launchDate 우선."
+    },
+    {
+      "id": "US-017",
+      "title": "구글 시트 양방향 동기화 — 식단 내보내기",
+      "description": "As a user, 시스템에서 작업한 식단을 연동된 구글 시트로 내보내는 기능이 동작한다.",
+      "acceptanceCriteria": [
+        "히스토리에서 '시트 내보내기' 버튼 클릭 시 연동된 구글 시트에 식단 데이터 전송",
+        "내보내기 대상: 현재 보고 있는 날짜의 식단 데이터",
+        "시트 구조가 기존 구글 시트 형식과 호환",
+        "성공/실패 토스트 알림 표시",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "MealPlanHistory.tsx에 exportToGoogleSheets 함수 존재 (line 1486). sheetsService.ts pushSheetData 확인. 실제로 데이터가 올바르게 직렬화되어 전송되는지 검증. SheetsContext 연동 상태 확인."
+    }
+  ]
+}

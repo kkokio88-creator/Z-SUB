@@ -1,0 +1,121 @@
+{
+  "project": "Z-SUB",
+  "branchName": "ralph/shared-utilities",
+  "description": "코드 중복 제거 + 공유 유틸리티 추출: TARGET_LABELS 4곳 통합, normalizeMenuName 23곳 추출, INGREDIENT_KEYWORDS 3곳 통합, 알림 벨 조건부 표시, PAGE_SIZE 정상화",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "TARGET_LABELS를 constants.ts로 통합",
+      "description": "As a developer, 식단 타입 라벨을 한 곳에서 관리하여 신규 타입 추가 시 누락을 방지한다.",
+      "acceptanceCriteria": [
+        "constants.ts에 TARGET_LABELS: Record<TargetType, string> export 추가 (10개 항목: VALUE→실속, SENIOR_HEALTH→건강시니어, SENIOR→시니어, YOUTH→청소연구소, YOUTH_MAIN→청소메인, FAMILY_PLUS→든든가족, FAMILY→가족, KIDS_PLUS→든든아이, KIDS→아이, SIDE_ONLY→골고루반찬)",
+        "Dashboard.tsx의 로컬 TARGET_LABELS(lines 47-58) 제거, import { TARGET_LABELS } from '../constants'로 교체",
+        "MealPlanHistory.tsx의 로컬 TARGET_LABELS(lines 59-70) 제거, import 교체",
+        "HistoryDistributionView.tsx의 로컬 TARGET_LABELS(lines 5-16) 제거, import 교체",
+        "HistoryIngredientView.tsx의 로컬 TARGET_LABELS(lines 6-17) 제거, import 교체",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "DONE: constants.ts에 TARGET_LABELS export 추가. Dashboard, MealPlanHistory, HistoryDistributionView, HistoryIngredientView 4곳의 로컬 정의 제거 + import 교체."
+    },
+    {
+      "id": "US-002",
+      "title": "normalizeMenuName 공유 유틸 추출 (Part 1: 정의 + services)",
+      "description": "As a developer, 메뉴명 정규화 유틸을 services/menuUtils.ts에 정의하고 services 내부 파일에서 사용한다.",
+      "acceptanceCriteria": [
+        "services/menuUtils.ts 신규 파일: export const normalizeMenuName = (name: string): string => name.replace(/_냉장|_반조리|_냉동/g, '').replace(/\\s+\\d+$/, '').trim()",
+        "engine.ts의 로컬 normalizeMenuName(lines 103-107) 제거, import { normalizeMenuName } from './menuUtils'로 교체",
+        "autoClassifyService.ts의 인라인 정규식을 normalizeMenuName import로 교체",
+        "tagAnalysisService.ts의 인라인 정규식을 normalizeMenuName import로 교체",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "DONE: services/menuUtils.ts 신규 생성. engine.ts·autoClassifyService.ts의 로컬 정의 제거 + import 교체. tagAnalysisService.ts의 인라인 정규식을 normalizeMenuName 호출로 교체. 빌드 통과."
+    },
+    {
+      "id": "US-003",
+      "title": "normalizeMenuName 공유 유틸 추출 (Part 2: components)",
+      "description": "As a developer, 나머지 컴포넌트 파일의 인라인 정규식을 normalizeMenuName import로 교체한다.",
+      "acceptanceCriteria": [
+        "MealPlanner.tsx의 인라인 .replace(/_냉장|_반조리|_냉동/g, '') 패턴을 normalizeMenuName import로 교체 (약 10곳)",
+        "MealPlanHistory.tsx의 인라인 정규식을 normalizeMenuName import로 교체 (약 4곳)",
+        "Dashboard.tsx의 인라인 정규식(line 243 부근)을 import로 교체",
+        "HistoryReviewModal.tsx의 인라인 정규식(2곳)을 import로 교체",
+        "HistoryDistributionView.tsx의 인라인 정규식(1곳)을 import로 교체",
+        "HistoryIngredientView.tsx의 인라인 정규식(1곳)을 import로 교체",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "DONE: menuUtils.ts에 stripProcessSuffix 추가. MealPlanner.tsx 10곳(전부 normalizeMenuName), MealPlanHistory.tsx 4곳(parseMenuItem·detectProcess → stripProcessSuffix, 나머지 2곳 → normalizeMenuName), HistoryReviewModal.tsx 2곳, Dashboard.tsx 1곳, HistoryDistributionView.tsx 1곳, HistoryIngredientView.tsx 1곳 교체. 빌드 통과."
+    },
+    {
+      "id": "US-004",
+      "title": "INGREDIENT_KEYWORDS 단일 소스 통합",
+      "description": "As a developer, 주재료 키워드 매핑을 한 곳에서 관리하여 '닭강정'이 경로에 따라 다르게 분류되는 버그를 수정한다.",
+      "acceptanceCriteria": [
+        "constants.ts에 INGREDIENT_KEYWORDS: Record<string, string[]> export 추가 (autoClassifyService.ts 기준 최완전 버전)",
+        "sheetsSerializer.ts의 로컬 INGREDIENT_KEYWORDS 제거, import { INGREDIENT_KEYWORDS } from '../constants'로 교체",
+        "autoClassifyService.ts의 로컬 INGREDIENT_KEYWORDS 제거, import 교체",
+        "MealPlanHistory.tsx의 로컬 INGREDIENT_KEYWORDS 제거, import 교체 (변수명 다를 수 있음 - detectIngredient 등)",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "DONE: constants.ts에 INGREDIENT_KEYWORDS 추가 (autoClassifyService 기준 + sheetsSerializer '설렁탕' 병합, Record<string, string[]> 형식). autoClassifyService.ts의 배열 형식 → Object.entries() 순회로 변경. sheetsSerializer.ts·MealPlanHistory.tsx 로컬 정의 제거. 빌드 통과."
+    },
+    {
+      "id": "US-005",
+      "title": "알림 벨 red dot 조건부 표시",
+      "description": "As a user, 미확인 알림이 있을 때만 red dot이 표시되어 알림의 의미가 정확해야 한다.",
+      "acceptanceCriteria": [
+        "Layout.tsx에서 getAllReviews, getReviewComments, DEPARTMENT_LABELS import 추가",
+        "useMemo로 미확인 건수(pending reviews + issue comments) 계산 로직 추가 (MyPage.tsx의 pendingItems 패턴 참조)",
+        "미확인 건수 > 0일 때만 red dot 렌더링",
+        "red dot 안에 미확인 건수 숫자 표시 (예: 빨간 원 안에 '3')",
+        "미확인 건수 0일 때 dot 완전 미표시",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "DONE: Layout.tsx에 useMemo + getAllReviews/getReviewComments import 추가. pendingCount 계산 (pending dept + issue comments). 조건부 렌더링: pendingCount > 0일 때만 빨간 배지 + 숫자 표시 (99+). 빌드 통과."
+    },
+    {
+      "id": "US-006",
+      "title": "PAGE_SIZE 정상화 + 페이지네이션 활성화",
+      "description": "As a user, 반찬 리스트가 적절한 페이지 크기로 표시되어 대량 데이터 시 성능이 유지된다.",
+      "acceptanceCriteria": [
+        "MenuDatabase.tsx의 PAGE_SIZE를 9999에서 50으로 변경",
+        "검색/필터 변경 시 setPage(1) 호출 확인 (이미 존재하면 유지)",
+        "페이지네이션 UI(이전/다음 버튼, 현재페이지/총페이지 표시)가 정상 동작",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "DONE: PAGE_SIZE 9999→50 변경. 기존 pagination UI + setPage(0) 리셋 useEffect 이미 존재 확인. 빌드 통과."
+    },
+    {
+      "id": "US-007",
+      "title": "미사용 import 및 dead code 정리",
+      "description": "As a developer, 리팩토링으로 발생한 미사용 import와 dead code를 제거하여 빌드를 깨끗하게 유지한다.",
+      "acceptanceCriteria": [
+        "US-001~006에서 제거된 로컬 상수로 인해 불필요해진 import 정리",
+        "eslint --fix로 미사용 변수/import 자동 정리",
+        "npx vite build 경고 최소화",
+        "Typecheck passes",
+        "npx vite build passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "DONE: HistoryIngredientView(MenuCategory), MealPlanner(Input), MyPage(PlanReviewRecord/ReviewComment) 미사용 import 3곳 제거. eslint 경고 0건 확인. 빌드 통과."
+    }
+  ]
+}

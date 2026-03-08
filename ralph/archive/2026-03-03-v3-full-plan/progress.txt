@@ -1,0 +1,209 @@
+# Ralph Progress - Z-SUB v3 Full Plan
+# Branch: ralph/v3-full-plan
+# Started: 2026-03-03
+# Stories: 23 total (P1-P22, P7 split into 7-a/7-b)
+
+## Codebase Patterns
+- 프로젝트 루트에 src/ 없음. App.tsx, types.ts, constants.ts 등 루트 레벨
+- 컴포넌트: components/, 서비스: services/, 컨텍스트: context/, 훅: hooks/
+- UI: shadcn/ui + Tailwind CSS 4 + lucide-react 아이콘
+- 상태: React Context (MenuContext, AuthContext, ToastContext, SheetsContext, HistoricalPlansContext)
+- 빌드: Vite 6, TypeScript, npx vite build로 검증
+- 테스트: vitest (98 unit), playwright (13 e2e)
+- 히스토리 데이터: data/historicalMealPlans.ts (100+ dates)
+- 메뉴 DB: data/realMenuDB.ts (215 items)
+- 주재료 컬러: MealPlanHistory.tsx INGREDIENT_COLORS + MealPlanner.tsx PLANNER_INGREDIENT_COLORS
+- 냉장국 분류: MealPlanHistory.tsx detectProcess 함수 (이름 기반)
+- 스왑 모달: MealPlanner.tsx getSwapCandidates + allMenuLastUsed map
+- 검토 시스템: HistoryReviewModal.tsx + reviewService.ts + googleChatService.ts
+- 태그 관리: SystemSettings.tsx + localStorage zsub_target_tags
+- 생산 한도: localStorage zsub_production_limits
+- 시트 동기화: syncManager.ts (반찬_APP 사본 시트 사용, 원본 반찬 시트 보호)
+- SPICY_KEYWORDS: '불' 제거됨 (불고기 오탐 방지), '핫'→'핫소스' 변경 완료
+- 날짜 계산: calcDaysGap(lastUsedDate, deliveryDate) - 배송일 기준 계산 함수 존재
+- 내보내기: exportService.ts (CSV/PDF), MealPlanHistory.tsx (exportToHistoryCSV/PDF)
+- 뷰 모드: table/ingredient/distribution/production (MealPlanHistory)
+
+---
+
+## 2026-03-03 - US-001: P1 대체 메뉴 30일/60일 필터 오류 수정
+- 구현: swapExcludedNames useMemo 제거, getExcludedForSwap를 allMenuLastUsed + 배송일(getDeliveryDate) 기반으로 변경
+- 변경 파일: components/MealPlanner.tsx
+- 핵심: calcDaysGap(lastDate, deliveryDate).days < threshold → excluded에 추가
+- 학습: 기존 buildExcluded는 new Date() 기준 + cycleType 필터로 부정확했음. allMenuLastUsed가 이미 모든 히스토리에서 최근 사용일을 추적하므로 이를 활용하는 것이 더 정확
+---
+
+## 2026-03-03 - US-002: P2 히스토리 삭제 기능 추가
+- 구현: HistoricalPlansContext에 deletePlansByMonth(월 단위), deletePlan(개별) 함수 추가
+- MealPlanHistory.tsx에 월 전체 삭제 버튼(Trash2) + 행별 개별 삭제 버튼 추가
+- 삭제 확인 다이얼로그(모달) 구현, 삭제 후 toast 알림
+- 변경 파일: context/HistoricalPlansContext.tsx, components/MealPlanHistory.tsx
+---
+
+## 2026-03-03 - US-003: P3 날짜 계산 배송일 기준 + 절대 날짜 툴팁
+- 확인: calcDaysGap(lastUsedDate, deliveryDate) 이미 배송일 기준 구현됨
+- 추가: 스왑 모달 "N일 전" 표시에 title 속성으로 절대 날짜(마지막 사용: YYYY-MM-DD) 추가
+- 추가: 식단표 메뉴 아이템 "(N주 전)" 표시에도 동일 title 속성 추가
+- 변경 파일: components/MealPlanner.tsx
+---
+
+## 2026-03-03 - US-004: P4 반찬 리스트 중복 데이터 정리 + 중복 방지
+- 구현: MenuContext에 deduplicateItems(code+name 기준) 유틸 함수 추가
+- loadMenuFromStorage, refreshFromSheet에서 자동 dedup 적용 (로드 시 중복 자동 정리)
+- addItem에 중복 방지 로직 추가 (동일 code+name 존재 시 무시)
+- MenuDatabase CSV import에서 중복 건너뛰기 + 카운트 리포트
+- 변경 파일: context/MenuContext.tsx, components/MenuDatabase.tsx
+- 학습: 기존 handleCleanup (MenuDatabase.tsx:500)은 수동 정리. 이번에 추가한 로직은 로드/추가 시 자동 방지
+---
+
+## 2026-03-03 - US-005: P5 자동 분류 기능 전면 수정
+- 구현: CATEGORY_KEYWORDS 순서 변경 (MAIN→SOUP) + CATEGORY_EXCLUSIONS 추가 ('탕'→'탕수' 제외)
+- buildHistoryLookup에 targetTypes(Set) 필드 추가: 히스토리에서 실제 사용된 대상 타입 수집
+- autoClassifyFull 대상식단 분류: 히스토리 기반 우선, 없으면 키워드 기반 폴백
+- 변경 파일: services/autoClassifyService.ts
+- 학습: 카테고리 키워드 순서가 중요. 더 구체적인 키워드(MAIN:탕수)를 일반 키워드(SOUP:탕)보다 먼저 체크해야 함
+---
+
+## 2026-03-03 - US-006: P6 카테고리 필터 오류 수정
+- SOUP 순서 복원(갈비탕→SOUP 정확 분류 유지) + CATEGORY_EXCLUSIONS로 탕수→MAIN 보장
+- 흐름: '탕수육'→'탕' SOUP매칭→제외규칙 차단→'탕수' MAIN매칭 ✓
+- detectProcess는 /국$|탕$|찌개$/ 앵커 사용으로 이미 정확 (탕수 미해당)
+- 변경 파일: services/autoClassifyService.ts
+- 학습: SOUP을 먼저 체크하되 exclusion으로 예외 처리하는 것이 안전. MAIN 먼저 체크하면 갈비탕이 갈비→MAIN으로 오분류됨
+---
+
+## 2026-03-03 - US-007: P7-a 히스토리 뷰 레이아웃 정비
+- IngredientView: 행번호(#) 열 추가, sticky left 3열(#, 날짜, 주기), 공정 배지(냉장/반조리/냉동) 추가
+- DistributionView: 메뉴명 옆 공정 배지 추가 (현장 작업자가 공정 구분 가능)
+- ProductionView: 공정별 정렬(PROCESS_ORDER 기준) + 각 그룹 소계 행 추가
+- 변경 파일: HistoryIngredientView.tsx, HistoryDistributionView.tsx, MealPlanHistory.tsx
+- 학습: PROCESS_COLORS 객체에 '반조리' 색상은 있지만 PROCESS_ORDER에는 없었음. 공정 배지는 이름 접미사(_냉장, _반조리, _냉동) 기반 감지
+---
+
+## 2026-03-03 - US-008: P7-b CSV/PDF 다운로드 기능 수정
+- ingredient/distribution CSV: 공정 열 추가, 메뉴명에서 접미사(_냉장 등) 제거
+- production CSV: 공정별 소계 행 + 최종 합계 행 추가
+- PDF: html2pdf WYSIWYG 방식으로 US-007 레이아웃 개선 그대로 반영
+- 변경 파일: components/MealPlanHistory.tsx
+---
+
+## 2026-03-03 - US-009: P8 생산 한도 초과 경고 표시
+- 기본 한도: 냉장국/반조리 각 10개 (기존 500/300에서 변경)
+- 소계행에 품목수 기반 한도 초과 경고 추가 (AlertTriangle + 빨간 배경)
+- 경고 표시: "{공정명} 한도 초과 (현재수/{한도수})"
+- 변경 파일: components/MealPlanHistory.tsx
+- 학습: 생산 한도는 개별 품목 수량이 아닌 공정 그룹의 품목 건수 기준으로 체크해야 함
+---
+
+## 2026-03-03 - US-010: P9 재검토 요청 시 상태 초기화 오류 수정
+- requestReReviewAll: rejected 상태만 pending으로 변경 (approved 유지)
+- 코멘트: [재검토] → [재검토 요청] 접두사로 변경
+- 변경 파일: services/reviewService.ts
+- 학습: resetDepartmentsForReReview는 메뉴 변경 시 특정 검토자 리셋 (별도 함수)
+---
+
+## 2026-03-03 - US-011: P10 댓글 기능 고도화
+- ReviewComment에 menuName 옵셔널 필드 추가 (types.ts)
+- 댓글 입력 폼에 메뉴 연결 select 추가 (plan의 메뉴 목록에서 선택)
+- 대댓글(parentId+Reply 버튼), 논의완료(resolveComment+해결 버튼) 이미 구현 확인
+- 연결 메뉴명 배지(🍽) 표시 추가
+- 변경 파일: types.ts, components/HistoryReviewModal.tsx
+---
+
+## 2026-03-03 - US-012: P11 원가 정보 표시 추가
+- 구현: MenuItemRow에 개별 메뉴 원가(cost) 표시 추가 (item.cost > 0일 때)
+- 식단별 합산 원가 + 원가율(%) 표시: discountSummary 렌더링 영역에 추가
+- 원가율 = totalCost / targetPrice * 100, 목표 원가율(targetCostRatio) 초과 시 빨간색 경고
+- standalone 열과 merged(부모-자식) 열 양쪽 모두 동일 패턴 적용
+- 변경 파일: components/MealPlanHistory.tsx
+- 학습: discountSummary useMemo가 이미 totalCost와 targetCostRatio를 계산하고 있어 렌더링만 추가하면 됨
+---
+
+## 2026-03-03 - US-013: P12 식단 구성 원가 필터 추가
+- 구현: MealPlanner.tsx에 원가 검토 블록 추가 (가격 검토 블록 바로 아래)
+- 목표 원가(budgetCap) vs 실제 원가(totalCost) 비교 표시
+- 원가율(costRatio%) vs 목표 원가율(targetCostRatio%) 비교, 초과 시 빨간색
+- 원가 충족/초과 시각적 구분 (초록/빨강 배경)
+- 변경 파일: components/MealPlanner.tsx
+---
+
+## 2026-03-03 - US-016: P15 태그 관리 확장 (양방향 연동)
+- 구현: MenuDatabase 태그 드롭다운에 '+ 신규 추가' 버튼 추가
+- 신규 태그 생성 시 prompt()로 이름 입력 → 아이템에 태그 추가 + zsub_target_tags에 동기화
+- tagVersion 상태로 useMemo 강제 재실행 → 드롭다운 목록 즉시 갱신
+- 양방향: 설정(SystemSettings)→리스트(기존 로드), 리스트→설정(신규 추가 시 localStorage 동기화)
+- 변경 파일: components/MenuDatabase.tsx
+---
+
+## 2026-03-03 - US-020: P19 태그 초기화 시 중복 데이터 태그 잔존 버그
+- 원인: P4 dedup 적용 전에 v2 reset이 실행되어, 이후 dedup 후 재초기화 안 됨
+- 수정: RESET_KEY를 zsub_tags_reset_v2 → v3으로 변경, 재초기화 실행
+- 초기화 건수 console.log 추가
+- 변경 파일: components/MenuDatabase.tsx
+---
+
+## 2026-03-03 - US-019: P18 반찬 리스트 테이블 헤더 고정
+- 확인: thead에 이미 sticky top-0 z-10 bg-stone-50 적용됨
+- 추가: 스크롤 시 시각적 구분을 위한 shadow 효과 추가
+- 부모 컨테이너: flex-1 overflow-auto (스크롤 컨텍스트) + 외부 overflow-hidden (경계)
+- 변경 파일: components/MenuDatabase.tsx
+---
+
+## 2026-03-03 - US-018: P17 검색 기능 강화 (속성 기반 검색)
+- 구현: filteredItems 검색에 tags, mainIngredient(key+MAJOR_INGREDIENTS label), season, category 매칭 추가
+- MAJOR_INGREDIENTS import from constants.ts
+- '된장' → 태그 매칭, '여름' → 시즌 매칭, '감자' → 주재료 라벨 매칭
+- 기존 name/code 검색 유지
+- 변경 파일: components/MenuDatabase.tsx
+---
+
+## 2026-03-03 - US-017: P16 알림 및 마이페이지
+- 구현: MyPage.tsx 신규 컴포넌트 생성 (프로필 표시 + 알림 목록 + 프로필 설정)
+- Layout.tsx: 사이드바에 마이페이지 탭 추가, 헤더에 알림 벨 아이콘 추가
+- App.tsx: 'mypage' 라우트 추가 (lazy import)
+- 알림 목록: getAllReviews + getReviewComments에서 pending/issue 수집
+- Google 로그인: AuthContext.loginWithGoogle() 연동 (오프라인 모드 시 버튼 표시)
+- 변경 파일: components/MyPage.tsx(신규), components/Layout.tsx, App.tsx
+---
+
+## 2026-03-03 - US-014: P13 제품 컬러링 통일 (글씨 색만 사용)
+- 구현: PLANNER_INGREDIENT_COLORS에서 bg/borderL/dot 필드 제거, text+label만 유지
+- INGREDIENT_COLORS에서 borderL/dot을 빈 문자열로, text에 실제 주재료별 컬러 적용
+- 범례/필터/SwapModal에서 점(dot) 제거, 텍스트 컬러로 대체
+- 메뉴 아이템 카드: border-l-2/bg 제거, 글씨 색만 유지
+- 변경 파일: components/MealPlanner.tsx, components/MealPlanHistory.tsx
+---
+
+## 2026-03-03 - US-015: P14 주차별 날짜 정보 표시
+- 구현: 주차 헤더에 날짜 범위(월요일~금요일) 표시 추가
+- 형식: '1주차 (4/7 월~4/11 금)' - getDeliveryDate 기반 계산
+- 월이 바뀌는 주(4/28 월~5/2 금)도 자동 처리
+- 변경 파일: components/MealPlanner.tsx
+---
+
+## 2026-03-03 - US-021: P20 신제품 출시일 연/월/일 입력 + 출시 전 자동 배제
+- 구현: types.ts launchDate 코멘트 YYYY-MM→YYYY-MM-DD 변경
+- MenuDatabase.tsx: input type="month"→"date" 변경 (연/월/일 입력)
+- engine.ts: getWeekDeliveryDate(monthLabel, weekIndex) 헬퍼 추가
+- baseFilter/availableMenu30/3차 fallback/boostWeekPrice에 launchDate > deliveryDate 배제 추가
+- getSwapCandidates에도 deliveryDate 파라미터 + 배제 로직 추가
+- MealPlanner.tsx: getSwapCandidates 3개 호출부에 deliveryDate 전달
+- 변경 파일: types.ts, services/engine.ts, components/MenuDatabase.tsx, components/MealPlanner.tsx
+- 학습: engine.ts의 필터 로직이 baseFilter, availableMenu30, 3차 fallback, boostWeekPrice, getSwapCandidates 5곳에 분산. 모든 필터 경로에 동일 조건 추가 필요
+---
+
+## 2026-03-03 - US-022: P21 대시보드 중복 위험 분석 기간 설정 + 확대
+- 구현: dupDays/dupStartDate/dupEndDate 상태 + applyDupPreset 함수 추가
+- 프리셋 버튼 (2주/30일/60일) + 시작일~종료일 date input UI 추가
+- duplicationData에 dates 필드 추가 (메뉴별 사용 날짜 수집)
+- 바 클릭 시 expandedDupMenu 사이드패널에 사용 날짜 목록 표시
+- 차트 높이 620→700으로 확대
+- 변경 파일: components/Dashboard.tsx
+- 학습: 기존 cutoff 고정 방식에서 dupStartDate/dupEndDate 범위 필터로 변경. 프리셋은 dupDays 상태로 active 표시
+---
+
+## 2026-03-03 - US-023: P22 상단 고정 바 UI 정리
+- 확인: US-017에서 날짜/배송일/정상운영 표시 이미 제거 완료 (Bell 아이콘만 유지)
+- 추가: 미사용 Badge import 제거 (Layout.tsx)
+- 변경 파일: components/Layout.tsx
+---
